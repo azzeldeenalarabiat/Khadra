@@ -68,7 +68,7 @@
         </div>
         <div class="state-actions">
           @if (tab() === 'all') {
-            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet">{{ t('dealerBookings.viewFleet') }}</a>
+            <a class="btn btn-primary btn-sm" [routerLink]="[root(), 'fleet']">{{ t('dealerBookings.viewFleet') }}</a>
           } @else {
             <button type="button" class="btn btn-secondary btn-sm" (click)="select('all')">
               {{ t('common.showAll') }}
@@ -96,7 +96,7 @@
                 <td class="td">
                   <a
                     class="row-link mono"
-                    [routerLink]="['/dealer/bookings', b.bookingId]"
+                    [routerLink]="[root(), 'bookings', b.bookingId]"
                     (click)="$event.stopPropagation()"
                     >{{ b.reference }}</a
                   >
@@ -156,7 +156,7 @@
                     } @else {
                       <a
                         class="btn btn-secondary btn-xs"
-                        [routerLink]="['/dealer/bookings', b.bookingId]"
+                        [routerLink]="[root(), 'bookings', b.bookingId]"
                         (click)="$event.stopPropagation()"
                         >{{ t('dealerBookings.view') }}</a
                       >

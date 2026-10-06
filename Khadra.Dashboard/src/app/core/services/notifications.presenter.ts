@@ -172,12 +172,15 @@ export function toAdminNotifications(
  * Built from the dashboard payload the console already holds, so the bell costs no extra request.
  * Ordered by urgency rather than by time — what is already late first, because that is the order the
  * reader has to work in. A count of zero produces no row at all: "0 requests waiting" is not news.
+ * Each row opens inside `root`, the console the reader works in: an owner's `/dealer`, an employee's
+ * `/employee` (E2E F79: the owner's console sends an employee back to their own dashboard).
  */
 export function toDealerNotifications(
   dashboard: DealerDashboard | null,
   now: number,
   t: Translate,
   localeTag: string,
+  root: '/dealer' | '/employee',
 ): readonly NotificationRow[] {
   if (!dashboard) return [];
   const rows: NotificationRow[] = [];
@@ -193,7 +196,7 @@ export function toDealerNotifications(
       when: t('notifications.overdue'),
       tone: 'bad',
       icon: 'warning-circle',
-      route: '/dealer/bookings',
+      route: `${root}/bookings`,
     });
   }
 
@@ -217,7 +220,7 @@ export function toDealerNotifications(
       when: t('notifications.toAnswer'),
       tone: 'warn',
       icon: 'calendar-check',
-      route: '/dealer/bookings',
+      route: `${root}/bookings`,
     });
   }
 
@@ -236,7 +239,7 @@ export function toDealerNotifications(
       when: relativeTime(pickup.when, now, localeTag),
       tone: pickup.isOverdue ? 'bad' : 'accent',
       icon: pickup.pickupMethod === 'Delivery' ? 'moped' : 'map-pin',
-      route: `/dealer/bookings/${pickup.bookingId}`,
+      route: `${root}/bookings/${pickup.bookingId}`,
     });
   }
 
@@ -248,7 +251,7 @@ export function toDealerNotifications(
       when: relativeTime(back.when, now, localeTag),
       tone: back.isOverdue ? 'bad' : 'ok',
       icon: 'arrow-u-down-left',
-      route: `/dealer/bookings/${back.bookingId}`,
+      route: `${root}/bookings/${back.bookingId}`,
     });
   }
 

@@ -16,6 +16,8 @@ import { DealerBookingsService } from '../../core/services/dealer-bookings.servi
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { DealerDisputesService } from '../../core/services/dealer-disputes.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
+import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
@@ -77,6 +79,9 @@ export class DealerBookingDetailComponent {
     party: (name) => this.enumLabel('party', name),
   };
   private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F79). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
 
   private readonly bookingId = toSignal(
     this.route.paramMap.pipe(map((params) => params.get('bookingId'))),
@@ -686,7 +691,7 @@ export class DealerBookingDetailComponent {
           count: this.slaHours(ticket.openedAt, ticket.slaDeadline),
         }),
       );
-      await this.router.navigate(['/dealer/disputes', ticket.ticketId]);
+      await this.router.navigate([this.root(), 'disputes', ticket.ticketId]);
     } catch (error) {
       this.problem.set(snapshotProblem(error));
     } finally {

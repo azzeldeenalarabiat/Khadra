@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
+import { SessionService } from '../../core/services/session.service';
 import { Tone } from '../../core/models/console.models';
 import { BookingListItem, PagedResult } from '../../core/models/bookings.api';
 import { Vehicle, VehicleStatusAction } from '../../core/models/fleet.api';
@@ -75,6 +77,9 @@ export class FleetListComponent {
   private readonly service = inject(FleetService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F79). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
   private readonly consoleData = inject(DealerConsoleService);
 
   protected readonly resource = this.service.vehicles;

@@ -131,7 +131,7 @@
             <li class="car-card" [class.is-busy]="busy() === car.vehicleId">
               <a
                 class="car-card-photo"
-                [routerLink]="['/dealer/fleet', car.vehicleId]"
+                [routerLink]="[root(), 'fleet', car.vehicleId]"
                 [attr.aria-label]="car.make + ' ' + car.model + ' ' + car.year"
               >
                 @if (cover(car); as url) {
@@ -154,7 +154,7 @@
 
               <div class="car-card-body">
                 <div class="car-card-head">
-                  <a class="car-card-name" [routerLink]="['/dealer/fleet', car.vehicleId]">
+                  <a class="car-card-name" [routerLink]="[root(), 'fleet', car.vehicleId]">
                     {{ car.make }} {{ car.model }} {{ car.year }}
                   </a>
                   <span class="car-card-plate mono">{{ car.plateNumber }}</span>

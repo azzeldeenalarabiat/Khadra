@@ -9,7 +9,7 @@
           <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
             {{ t('common.retry') }}
           </button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/fleet">{{
+          <a class="btn btn-secondary btn-sm" [routerLink]="[root(), 'fleet']">{{
             t('common.backToFleet')
           }}</a>
         </div>
@@ -152,7 +152,7 @@
                 </div>
                 <a
                   class="btn btn-secondary btn-sm self-start"
-                  [routerLink]="['/dealer/bookings', b.bookingId]"
+                  [routerLink]="[root(), 'bookings', b.bookingId]"
                   >{{ t('common.openBooking') }}</a
                 >
               } @else if (next(); as b) {
@@ -163,7 +163,7 @@
                 </div>
                 <a
                   class="btn btn-secondary btn-sm self-start"
-                  [routerLink]="['/dealer/bookings', b.bookingId]"
+                  [routerLink]="[root(), 'bookings', b.bookingId]"
                   >{{ t('common.openBooking') }}</a
                 >
               } @else {

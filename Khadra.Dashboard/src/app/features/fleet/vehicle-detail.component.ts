@@ -17,6 +17,8 @@ import { DealerActivityEntry } from '../../core/models/dealer-console.api';
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
+import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
@@ -100,6 +102,9 @@ export class VehicleDetailComponent {
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F79). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
 
   private readonly vehicleId = toSignal(
     this.route.paramMap.pipe(map((params) => params.get('vehicleId'))),
@@ -469,7 +474,7 @@ export class VehicleDetailComponent {
   }
 
   protected openBooking(id: string | null): void {
-    if (id) void this.router.navigate(['/dealer/bookings', id]);
+    if (id) void this.router.navigate([this.root(), 'bookings', id]);
   }
 
   protected primaryAction(): {

@@ -6,6 +6,8 @@ import { Tone } from '../../core/models/console.models';
 import { BookingListItem } from '../../core/models/bookings.api';
 import { BookingTab, DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
+import { SessionService } from '../../core/services/session.service';
 import { LiveRefreshService } from '../../core/services/live-refresh.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { BookingDecisions } from './booking-decisions';
@@ -63,6 +65,9 @@ export class DealerBookingsComponent {
   private readonly service = inject(DealerBookingsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F79). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
   private readonly route = inject(ActivatedRoute);
   private readonly decisions = inject(BookingDecisions);
   private readonly live = inject(LiveRefreshService);
@@ -161,7 +166,7 @@ export class DealerBookingsComponent {
   }
 
   protected open(booking: BookingListItem): void {
-    void this.router.navigate(['/dealer/bookings', booking.bookingId]);
+    void this.router.navigate([this.root(), 'bookings', booking.bookingId]);
   }
 
   protected approve(event: Event, booking: BookingListItem): void {

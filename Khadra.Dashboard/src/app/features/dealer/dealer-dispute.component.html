@@ -7,7 +7,7 @@
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
           <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">{{ t('common.backToBookings') }}</a>
+          <a class="btn btn-secondary btn-sm" [routerLink]="[root(), 'bookings']">{{ t('common.backToBookings') }}</a>
         </div>
       </div>
     </section>
@@ -43,7 +43,7 @@
         </div>
       </div>
       <div class="dc-head-actions">
-        <a class="btn btn-secondary btn-md" [routerLink]="['/dealer/bookings', d.bookingId]"
+        <a class="btn btn-secondary btn-md" [routerLink]="[root(), 'bookings', d.bookingId]"
           >{{ t('common.openBooking') }}</a
         >
         @if (d.isLive && openedByMe()) {
@@ -120,7 +120,7 @@
               <div class="field-hint">{{ note }}</div>
             }
             <div>
-              <a class="btn btn-secondary btn-sm" routerLink="/dealer/payouts">{{ t('officeOutcome.openPayouts') }}</a>
+              <a class="btn btn-secondary btn-sm" [routerLink]="[root(), 'payouts']">{{ t('officeOutcome.openPayouts') }}</a>
             </div>
           </div>
         </section>

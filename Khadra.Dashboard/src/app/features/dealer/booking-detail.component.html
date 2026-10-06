@@ -9,7 +9,7 @@
           <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
             {{ t('common.retry') }}
           </button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">{{
+          <a class="btn btn-secondary btn-sm" [routerLink]="[root(), 'bookings']">{{
             t('common.backToBookings')
           }}</a>
         </div>
@@ -84,7 +84,7 @@
           }
         }
         @if (b.liveDisputeId; as ticketId) {
-          <a class="btn btn-secondary btn-md s-bad" [routerLink]="['/dealer/disputes', ticketId]">
+          <a class="btn btn-secondary btn-md s-bad" [routerLink]="[root(), 'disputes', ticketId]">
             <kh-icon name="scales" />
             {{ t('common.openDispute') }}
           </a>
@@ -385,7 +385,7 @@
             @if (b.vehicle) {
               <a
                 class="sect-hint auth-link"
-                [routerLink]="['/dealer/fleet', b.vehicle.vehicleId]"
+                [routerLink]="[root(), 'fleet', b.vehicle.vehicleId]"
                 >{{ t('dealerBooking.openVehicle') }}</a
               >
             }

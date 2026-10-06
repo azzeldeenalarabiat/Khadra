@@ -13,6 +13,7 @@ import { filter, map, startWith } from 'rxjs';
 import { AdminDashboardService } from '../core/services/admin-dashboard.service';
 import { DealerConsoleService } from '../core/services/dealer-console.service';
 import { SessionService } from '../core/services/session.service';
+import { dealerConsoleRoot } from '../core/guards/role.guards';
 import { loaded } from '../core/services/loaded';
 import {
   NotificationRow,
@@ -59,6 +60,8 @@ export class NotificationsMenuComponent {
   protected readonly open = signal(false);
 
   private readonly isAdmin = computed(() => this.session.user()?.role === 'Admin');
+  /** The dealer console this reader works in, so a row opens inside it (E2E F79). */
+  private readonly root = computed(() => dealerConsoleRoot(this.session.user()));
   private readonly isDealer = computed(() => {
     const role = this.session.user()?.role;
     return role === 'DealerOwner' || role === 'DealerEmployee';
@@ -95,7 +98,13 @@ export class NotificationsMenuComponent {
     const now = Date.now();
     if (this.isAdmin()) return toAdminNotifications(this.queue() ?? null, now, this.t);
     if (this.isDealer())
-      return toDealerNotifications(this.dashboard() ?? null, now, this.t, this.i18n.localeTag());
+      return toDealerNotifications(
+        this.dashboard() ?? null,
+        now,
+        this.t,
+        this.i18n.localeTag(),
+        this.root(),
+      );
     return [];
   });
 
@@ -115,7 +124,7 @@ export class NotificationsMenuComponent {
 
   /** Where "See everything" goes: the screen that owns this work. */
   protected readonly allRoute = computed(() =>
-    this.isAdmin() ? '/dashboard' : '/dealer/dashboard',
+    this.isAdmin() ? '/dashboard' : `${this.root()}/dashboard`,
   );
 
   protected toggle(event: Event): void {

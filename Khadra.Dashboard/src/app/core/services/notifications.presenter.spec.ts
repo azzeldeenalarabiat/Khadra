@@ -155,12 +155,12 @@ describe('toDealerNotifications', () => {
     }) as DealerDashboard;
 
   it('shows nothing at all before the dashboard has answered', () => {
-    expect(toDealerNotifications(null, NOW, t, 'en-GB')).toEqual([]);
+    expect(toDealerNotifications(null, NOW, t, 'en-GB', '/dealer')).toEqual([]);
   });
 
   /** "0 requests waiting" is not news, and a badge of 0 is worse than no badge. */
   it('says nothing when there is nothing waiting', () => {
-    expect(toDealerNotifications(dashboard(), NOW, t, 'en-GB')).toEqual([]);
+    expect(toDealerNotifications(dashboard(), NOW, t, 'en-GB', '/dealer')).toEqual([]);
   });
 
   it('puts what is already late above what is merely due', () => {
@@ -180,6 +180,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(rows[0].id).toBe('overdue-returns');
@@ -203,6 +204,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(one[0].title).toBe('1 car is overdue back');
@@ -229,6 +231,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(row.detail).toBe('Oldest 4 days ago. The next one expires in 5 hr unless it is answered.');
@@ -250,6 +253,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(row.detail).toBe('An unanswered request expires at its answer deadline.');
@@ -261,6 +265,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(rows[0].route).toBe('/dealer/bookings/b9');
@@ -274,6 +279,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(row.when).toBe('in 3 hr');
@@ -286,6 +292,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(row.title).toBe('Return — Vehicle no longer listed');
@@ -299,12 +306,14 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
     const [collect] = toDealerNotifications(
       dashboard({ upcomingPickups: [handover({ pickupMethod: 'SelfPickup' })] }),
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(delivery.icon).toBe('moped');
@@ -317,6 +326,7 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     expect(row.tone).toBe('bad');
@@ -341,11 +351,48 @@ describe('toDealerNotifications', () => {
       NOW,
       t,
       'en-GB',
+      '/dealer',
     );
 
     // Two counts collapse to one row each; the five handovers-in-window are listed individually.
     expect(rows).toHaveLength(5);
     expect(new Set(rows.map((row) => row.id)).size).toBe(5);
+  });
+
+  /**
+   * E2E F79: the bell sits in every dealer console's header, and the owner's console sends an employee back to their
+   * own dashboard. Each row opens inside the console of whoever reads it.
+   */
+  it.each([
+    { root: '/dealer', who: 'the owner' },
+    { root: '/employee', who: 'an employee' },
+  ] as const)('opens every row inside $root, the console of $who', ({ root }) => {
+    const rows = toDealerNotifications(
+      dashboard({
+        bookings: {
+          requested: 1,
+          oldestRequestedAt: null,
+          earliestDecisionDeadline: null,
+          awaitingDeposit: 0,
+          confirmed: 0,
+          pickedUp: 0,
+          overdueReturns: 1,
+        },
+        upcomingPickups: [handover({ bookingId: 'p1' })],
+        upcomingReturns: [handover({ bookingId: 'r1' })],
+      }),
+      NOW,
+      t,
+      'en-GB',
+      root,
+    );
+
+    expect(rows.map((row) => row.route)).toEqual([
+      `${root}/bookings`,
+      `${root}/bookings`,
+      `${root}/bookings/p1`,
+      `${root}/bookings/r1`,
+    ]);
   });
 });
 

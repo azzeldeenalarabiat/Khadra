@@ -13,6 +13,7 @@ import { Tone } from '../../core/models/console.models';
 import { DealerDisputesService } from '../../core/services/dealer-disputes.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { SessionService } from '../../core/services/session.service';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -53,6 +54,8 @@ export class DealerDisputeComponent {
   private readonly service = inject(DealerDisputesService);
   private readonly ui = inject(ConsoleUiService);
   private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F79). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
   private readonly route = inject(ActivatedRoute);
 
   private readonly ticketId = toSignal(
