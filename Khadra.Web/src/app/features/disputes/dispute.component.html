@@ -4,7 +4,7 @@
   } @else if (problem(); as failure) {
     <kh-state-panel kind="error" [problem]="failure" (action)="dispute.reload()" />
   } @else if (dispute.value(); as d) {
-    @if (justOpened()) {
+    @if (justOpened() && d.isLive) {
       <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('dispute.opened') }}</p></div>
     }
     <a class="crumbs small" [routerLink]="i18n.link('bookings', d.bookingId)">

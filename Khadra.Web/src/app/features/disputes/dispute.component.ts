@@ -74,8 +74,12 @@ export class DisputeComponent {
   private readonly api = inject(DisputeApi);
   private readonly appConfig = inject(AppConfigService);
 
-  /** Arrived here straight from opening it: say so once (Wave 3 C4). */
-  protected readonly justOpened = signal(inject(DOCUMENT).defaultView?.history.state?.opened === true);
+  /**
+   * Arrived here straight from opening it: say so once (Wave 3 C4). The flag rides in the history entry, which a
+   * browser keeps across a reload, so it is taken out as it is read (the router's own keys stay); and the page shows
+   * it only while the dispute is live, so a withdrawal does not leave "your dispute was opened" above it (E2E F78).
+   */
+  protected readonly justOpened = signal(takeOpenedFlag(inject(DOCUMENT).defaultView));
 
   readonly ticketId = input<string>('');
   protected readonly dispute = httpData<Dispute>(() => {
@@ -221,4 +225,14 @@ export class DisputeComponent {
   protected tone(status: string): string {
     return status === 'Resolved' ? 'badge--ok' : status === 'Withdrawn' ? '' : 'badge--warn';
   }
+}
+
+/** Reads the "just opened" flag the opening page left in this history entry, and removes it so it is read once. */
+function takeOpenedFlag(view: (Window & typeof globalThis) | null): boolean {
+  const state = view?.history?.state as Record<string, unknown> | null | undefined;
+  if (state?.['opened'] !== true) return false;
+  const rest = { ...state };
+  delete rest['opened'];
+  view!.history.replaceState(rest, '');
+  return true;
 }

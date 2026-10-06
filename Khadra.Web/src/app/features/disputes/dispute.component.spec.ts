@@ -115,6 +115,30 @@ describe('DisputeComponent, answering a live dispute (Wave 3 C4)', () => {
     expect(button('Withdraw the dispute')).toBeUndefined();
   });
 
+  it('says once that the dispute is open, and never above one that was withdrawn (E2E F78)', async () => {
+    const opened = 'Your dispute is open. Khadra and the rental office can read it.';
+    // What the opening page leaves in the history entry, beside the router's own key.
+    window.history.replaceState({ opened: true, navigationId: 7 }, '');
+    const first = await render(live);
+    expect(first.text()).toContain(opened);
+    expect(window.history.state).toEqual({ navigationId: 7 });
+
+    first.button('Withdraw the dispute')!.click();
+    await first.settle();
+    first.button('Withdraw it')!.click();
+    await first.settle();
+    first.http.expectOne(`${URL}/withdraw`).flush({});
+    await first.settle();
+    first.http.expectOne(URL).flush({ ...live, status: 'Withdrawn', isLive: false, closedAt: '2026-10-05T18:30:00+00:00' });
+    await first.settle();
+    expect(first.text()).not.toContain(opened);
+    TestBed.resetTestingModule();
+
+    // The same entry reloaded: the browser keeps its state, but the flag was taken out when it was read.
+    const reloaded = await render(live);
+    expect(reloaded.text()).not.toContain(opened);
+  });
+
   it('offers no withdrawal on a dispute the office opened, and nothing at all once it is closed', async () => {
     const office = await render({ ...live, openedByParty: 'Dealer' });
     expect(office.button('Withdraw the dispute')).toBeUndefined();
