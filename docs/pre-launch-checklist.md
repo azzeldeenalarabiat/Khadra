@@ -4887,6 +4887,12 @@ re-send a message that may already have been accepted — no retry once the SMTP
 message id or idempotency key across attempts for the HTTP providers — with the total wait still bounded by
 `Email:TimeoutSeconds`.
 
+**Wider since Wave 3 (2026-10-06).** Eight office notification kinds are emailed now (C5), so a duplicate can reach an
+office too. And the local Wave 3 run showed the other face of the same fault: the bootstrap administrator's
+invitation was counted as failed (`TaskCanceledException` on attempt 1, during a cold start) while mailpit had
+received it, so the platform retired the link that had just been delivered and sent a second one on the next start.
+An "accepted is not delivered" log line already says this; the retry and the retirement do not yet act on it.
+
 ### 188. The customer website never shows why the platform cancelled a booking
 
 **Status:** open · **Raised:** 2026-09-28 · **Owner decision**
@@ -4911,8 +4917,10 @@ so notify the office's team as the customer's own actions already do.
 
 **Decided and built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The owner chose to tell
 the office, in the console and by email (decision D4, 5 Oct; C5). An administrator's cancellation raises
-`BookingCancelledByAdmin` for the whole team, as Khadra's, in the same save; so do an administrator's no-show and
-expiry of an approval nobody paid for, the settlement sweep's, and a dispute decision.
+`BookingCancelledByAdmin` for the whole team, as Khadra's, in the same save; so do an administrator's no-show, the
+settlement sweep's expiry of an approval nobody paid for, no-show and completion, the expiry inside another
+customer's request, and a dispute decision. An administrator's own "Expire" would raise it too, but that command
+cannot succeed today (item 232), so the sweep is what tells the office of an unpaid approval.
 
 ## Issued financial documents — after Phase 5b (2026-09-29)
 
@@ -5599,3 +5607,53 @@ Activity screen's page. Since Wave 3 (F27) the trail lists every change on the o
 requests, payments and cancellations, the platform's expiries, Khadra's decisions — so those 25 entries cover a shorter
 stretch, and a car's older changes drop off sooner. **To close:** a per-vehicle read of the trail
 (`GET /dealers/me/activity?vehicleId=…`), paged on its own.
+
+### 232. An administrator's "Expire" cannot succeed
+
+**Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Pre-existing**
+
+Every handler loads a booking through `SettlingBookingRepository` (`DependencyInjection.cs`), which settles a lapse
+in memory before the handler sees it (`BookingLapse.Settle`). So by the time `ExpireBookingAsAdminCommand` runs, a
+lapsed approval or request already reads `Expired`: the handler's choice between `ExpireUnpaid` and
+`ExpireUnanswered` picks the second, which refuses a booking that is not `Requested`, and nothing is saved. Before
+the deadline the aggregate refuses as it should. The command therefore refuses every time, in production and on
+Staging; `AdminBookingActionTests` pass only because they substitute the raw repository. Nothing is lost — the
+settlement sweep expires the booking and tells both parties — but an administrator's button that always fails is a
+defect. **To close:** delete the command (the sweep and the expiry inside a new request are the live paths, and both
+tell the office) or make it treat a lapse already settled on load as its own success, attributed to the
+administrator and announced as the sweep would.
+
+### 233. A conflict in the settlement sweep stalls the rest of its pass
+
+**Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Pre-existing**
+
+`SettleDueBookingsHandler.CommitAsync` catches a `ConcurrencyConflictException` and moves on without detaching
+anything. The conflicted booking stays `Modified` in the shared context, so every later save in that pass meets the
+same stale `xmin` and fails: one office acting at the wrong instant defers the whole pass to the next tick, the
+opposite of what the handler's remarks promise. And the notifications staged for the conflicted booking — since
+Wave 3 the office's as well as the customer's — stay `Added` in the tracker; they are never committed today only
+because every later save fails. **To close:** on a conflict, detach the booking and every row staged for it before
+the next booking, with a test on a real context (the current one substitutes the unit of work).
+
+### 234. A lapse settled on load and saved by another command tells nobody
+
+**Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Pre-existing**
+
+A command that loads a lapsed booking and saves for its own reason commits the settled `Expired` with no
+notification: the clearest case is a capture arriving just after the payment deadline
+(`ReceiveProviderEventCommand`), where the booking settles on load, the confirmation is refused, the capture is
+orphaned and saved — and the expiry with it. The sweep never sees that booking again, so neither the customer
+(`YourBookingExpired`) nor, since Wave 3, the office (`BookingExpiredUnpaid`) is told. Rare: a capture seconds
+after the deadline. **To close:** raise the expiry's notifications wherever a settled lapse is committed, or have
+`BookingLapse.Settle` report the transition so the saving handler can.
+
+### 235. The office is not told when a dispute is withdrawn
+
+**Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Owner decision**
+
+Since Wave 3 the office is told, in the console and by email, that a dispute was opened on one of its bookings, and
+invited to add its statement (C5). When the opener withdraws it — from the app, the console, or since Wave 3 the
+website — nobody else is told, and an office that then answers meets `dispute.not_open`. **To close:** decide
+whether a withdrawal is news for the other party; if so, a `DisputeWithdrawn` kind for the office (and the
+customer's existing `YourDisputeUpdated` when the office withdraws), beside C7's choice not to tell an office of a
+request it let lapse.

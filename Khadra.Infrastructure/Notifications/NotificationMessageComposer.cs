@@ -121,7 +121,7 @@ internal sealed class NotificationMessageComposer(
             "حُسم النزاع على الحجز {ref}", "حسمت خضرا النزاع على الحجز {ref}. افتحه لمعرفة القرار وما يسجّله لمكتبك."),
         ["BookingCompleted"] = new(
             "Booking {ref} completed", "Booking {ref} is complete: the car is back, and nothing on it is in dispute.",
-            "اكتمل الحجز {ref}", "اكتمل الحجز {ref}: عادت السيارة، ولا نزاع قائماً عليه."),
+            "اكتمل الحجز {ref}", "اكتمل الحجز {ref}: عادت السيارة، وليس عليه نزاع قائم."),
         ["BookingMarkedNoShow"] = new(
             "Booking {ref} marked a no-show", "Booking {ref} was marked a no-show: the customer did not collect the car in time.",
             "سُجّل عدم حضور على الحجز {ref}", "سُجّل عدم حضور على الحجز {ref}: لم يستلم العميل السيارة في الوقت المحدد."),
