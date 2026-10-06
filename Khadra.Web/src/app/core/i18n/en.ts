@@ -492,6 +492,9 @@ export const EN = {
   'booking.expiredTitle': 'This booking ran out of time',
   'booking.expiredText': 'Nothing is owed. The car went back on the market.',
   'booking.rejectedTitle': 'The office declined this request',
+  // Wave 3 E1: the words the office or Khadra wrote, shown beside the label (E2E F21, pre-launch item 188).
+  'booking.officeWrote': 'The office wrote:',
+  'booking.khadraWrote': 'Khadra wrote:',
   'booking.cancelledTitle': 'This booking was cancelled',
   'booking.cancelledByYou': 'Cancelled by you',
   // E2E F67: a cancellation that came from the customer's report that the office never handed the car over.

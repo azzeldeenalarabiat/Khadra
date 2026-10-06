@@ -594,6 +594,8 @@ export const AR: Record<TranslationKey, Message> = {
   'booking.expiredTitle': 'انتهى وقت هذا الحجز',
   'booking.expiredText': 'لا شيء مستحق. عادت السيارة إلى السوق.',
   'booking.rejectedTitle': 'رفض المكتب هذا الطلب',
+  'booking.officeWrote': 'كتب المكتب:',
+  'booking.khadraWrote': 'كتبت خضرا:',
   'booking.cancelledTitle': 'أُلغي هذا الحجز',
   'booking.cancelledByYou': 'أُلغي من قِبلك',
   'booking.cancelledAfterNonDelivery': 'أُلغي الحجز بعد أن أبلغت أن المكتب لم يسلّمك السيارة.',

@@ -168,8 +168,39 @@ export class BookingDetailComponent {
     const booking = this.view();
     if (!booking) return '';
     const change = [...booking.history].reverse().find((entry) => entry.toStatus === booking.status);
-    return this.reasonLabel(change?.reasonCode ?? booking.cancellationReasonCode);
+    return this.reasonLabel(change?.reasonCode ?? booking.cancellationReasonCode, booking.status);
   });
+
+  /**
+   * The office's own words on refusing the request (E2E F21, Wave 3 E1): sent to the customer with the code, and
+   * shown, as the app shows them, beside the label rather than instead of it.
+   */
+  protected readonly rejectionDetails = computed(() => {
+    const booking = this.view();
+    if (booking?.status !== 'Rejected') return null;
+    return [...booking.history].reverse().find((entry) => entry.toStatus === 'Rejected')?.reason ?? null;
+  });
+
+  /**
+   * Khadra's reason for cancelling (pre-launch item 188, Wave 3 E1): the administrator must give one, and the server
+   * promises it to both parties. Read from the booking's own cancellation reason — never from an administrator's history
+   * entry, which for an expiry or a no-show holds the platform's English, not a reason anybody wrote.
+   */
+  protected readonly khadraReason = computed(() => {
+    const booking = this.view();
+    return booking?.status === 'Cancelled' && booking.cancelledBy === 'Admin' ? booking.cancellationReason : null;
+  });
+
+  /**
+   * The words someone wrote beside a change in the history, where there are any to show: the office's (an approval
+   * note, a refusal's details), the customer's own, and Khadra's on a cancellation. An administrator's or the system's
+   * expiry or no-show carries platform English, never shown (Wave 3 E1, as the app does).
+   */
+  protected typedReason(change: { readonly actorParty: string; readonly toStatus: string; readonly reason: string | null }): string | null {
+    if (!change.reason) return null;
+    if (change.actorParty === 'Dealer' || change.actorParty === 'Customer') return change.reason;
+    return change.actorParty === 'Admin' && change.toStatus === 'Cancelled' ? change.reason : null;
+  }
 
   /**
    * What the Payments section re-reads on: the booking's money-relevant facts as last read — its status,
@@ -403,11 +434,18 @@ export class BookingDetailComponent {
     return `${this.format.number(value)}%`;
   }
 
-  protected reasonLabel(code: string | null): string {
+  /**
+   * A reason code in the reader's language, looked up in the list it belongs to. Both lists have an `Other`, so a
+   * refusal searched in the cancellation list first read as a cancellation's "Another reason" (F69).
+   */
+  protected reasonLabel(code: string | null, toStatus?: string): string {
     if (!code) return '';
     const vocabularies = this.appConfig.config()?.vocabularies;
-    const all = [...(vocabularies?.cancellationReasons ?? []), ...(vocabularies?.rejectionReasons ?? [])];
-    return vocabularyLabel(all, code, this.i18n.isArabic());
+    const cancellations = vocabularies?.cancellationReasons ?? [];
+    const rejections = vocabularies?.rejectionReasons ?? [];
+    const lists =
+      toStatus === 'Rejected' ? rejections : toStatus === 'Cancelled' ? cancellations : [...cancellations, ...rejections];
+    return vocabularyLabel(lists, code, this.i18n.isArabic());
   }
 
   // ── Payment ──────────────────────────────────────────────────────────────

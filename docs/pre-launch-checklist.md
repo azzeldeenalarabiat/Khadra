@@ -4865,6 +4865,11 @@ shown to both parties". The API sends it to the customer (`cancellationReason`),
 a coded reason, so the page says "Cancelled by Khadra" and nothing more. **To close:** decide whether the
 customer sees the administrator's reason; then show it (and check the app), or correct the server's message.
 
+**Decided and built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The owner chose to show it (C2): the
+app already did, and the server's message promises it. The website now shows "Khadra wrote:" and the reason beside
+"Cancelled by Khadra", read from `cancellationReason`, never from an administrator's history entry, which for an expiry
+or a no-show holds platform English. The office's refusal details (E2E F21) are shown the same way.
+
 ### 189. The office is not told when the platform cancels one of its bookings
 
 **Status:** open · **Raised:** 2026-09-28 · **Owner decision**

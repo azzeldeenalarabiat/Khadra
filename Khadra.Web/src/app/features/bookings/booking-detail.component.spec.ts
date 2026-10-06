@@ -868,3 +868,102 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(arabic.paid('قيد الاسترداد')).toMatch(amount('102.75'));
   });
 });
+
+describe('BookingDetailComponent, the words behind an ending (Wave 3 E1)', () => {
+  const change = (toStatus: string, actorParty: string, reasonCode: string | null, reason: string | null) => ({
+    fromStatus: null, toStatus, actorParty, reasonCode, reason, occurredAt: '2026-10-06T08:00:00+00:00',
+  });
+
+  async function render(booking: object, language: 'ar' | 'en') {
+    TestBed.configureTestingModule({
+      imports: [BookingDetailComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    TestBed.inject(I18nService).use(language);
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BookingDetailComponent);
+    fixture.componentRef.setInput('bookingId', ID);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(booking));
+    // Both reason lists carry an `Other`: the label must come from the list the change belongs to (F69).
+    void TestBed.inject(AppConfigService).load();
+    http.expectOne('/api/v1/app-config').flush({
+      currency: { code: 'JOD', minorUnits: 3 },
+      vocabularies: {
+        cancellationReasons: [{ name: 'Other', labelEn: 'Another reason', labelAr: 'سبب آخر' }],
+        rejectionReasons: [
+          { name: 'VehicleUnavailable', labelEn: 'The vehicle is no longer available', labelAr: 'لم تعد السيارة متاحة' },
+          { name: 'Other', labelEn: 'Declined by the rental office', labelAr: 'رفضه مكتب التأجير' },
+        ],
+      },
+    });
+    await settle();
+    // What the customer reads about the ending: the notices and the history, not the closed cancel sheet, whose list of
+    // cancellation reasons sits in the page unseen.
+    const page = fixture.nativeElement as HTMLElement;
+    return [...page.querySelectorAll('.notice, ul.history')]
+      .filter((element) => !element.closest('dialog'))
+      .map((element) => element.textContent ?? '')
+      .join(' ');
+  }
+
+  const rejected = (reasonCode: string, reason: string) => ({
+    ...CONFIRMED,
+    status: 'Rejected',
+    isTerminal: true,
+    history: [change('Requested', 'Customer', null, null), change('Rejected', 'Dealer', reasonCode, reason)],
+  });
+
+  it("shows the office's own words on a refusal, beside the label, in both languages (E2E F21)", async () => {
+    const english = await render(rejected('VehicleUnavailable', 'The car is in for service that week.'), 'en');
+    expect(english).toContain('The vehicle is no longer available');
+    expect(english).toContain('The office wrote:');
+    expect(english).toContain('The car is in for service that week.');
+    TestBed.resetTestingModule();
+
+    const arabic = await render(rejected('VehicleUnavailable', 'السيارة في الصيانة ذلك الأسبوع.'), 'ar');
+    expect(arabic).toContain('كتب المكتب:');
+    expect(arabic).toContain('السيارة في الصيانة ذلك الأسبوع.');
+  });
+
+  it('reads a refusal coded Other from the refusal list, never as a cancellation (F69)', async () => {
+    const text = await render(rejected('Other', 'We do not rent to new drivers.'), 'en');
+    expect(text).toContain('Declined by the rental office');
+    expect(text).not.toContain('Another reason');
+  });
+
+  it("shows Khadra's reason for cancelling, which the server promises to both parties (item 188)", async () => {
+    const cancelled = {
+      ...CONFIRMED,
+      status: 'Cancelled',
+      isTerminal: true,
+      cancelledBy: 'Admin',
+      cancellationReasonCode: null,
+      cancellationReason: 'The office has closed for the holiday.',
+      history: [change('Confirmed', 'Customer', null, null), change('Cancelled', 'Admin', null, 'The office has closed for the holiday.')],
+    };
+    const english = await render(cancelled, 'en');
+    expect(english).toContain('Khadra wrote:');
+    expect(english).toContain('The office has closed for the holiday.');
+    TestBed.resetTestingModule();
+
+    const arabic = await render(cancelled, 'ar');
+    expect(arabic).toContain('كتبت خضرا:');
+  });
+
+  it("never shows the platform's own English behind an expiry", async () => {
+    const expired = {
+      ...CONFIRMED,
+      status: 'Expired',
+      isTerminal: true,
+      history: [change('Approved', 'Dealer', null, 'See you at the counter.'), change('Expired', 'Admin', null, 'Payment window elapsed.')],
+    };
+    const text = await render(expired, 'en');
+    expect(text).toContain('See you at the counter.');
+    expect(text).not.toContain('Payment window elapsed.');
+  });
+});

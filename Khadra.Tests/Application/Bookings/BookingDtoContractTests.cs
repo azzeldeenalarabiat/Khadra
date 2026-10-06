@@ -62,6 +62,24 @@ public sealed class BookingDtoContractTests
         Assert.Equal(CityId, dto.DealerCityId);
     }
 
+    /// <summary>
+    /// When the booking's dispute window closes (Wave 3 C4): a screen offering "Open a dispute" names the booking's own
+    /// moment. Null while there is no window: a request, a booking not yet ended.
+    /// </summary>
+    [Fact]
+    public void A_booking_says_when_its_dispute_window_closes_and_nothing_before_it_has_one()
+    {
+        Assert.Null(BookingDto.From(Build.Booking(), Context(false, false), Build.Now).DisputeWindowEndsAt);
+
+        var booking = Build.ConfirmedBooking();
+        var cancelledAt = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, "Changed plans.", cancelledAt).IsSuccess);
+        var cancelled = BookingDto.From(booking, Context(false, false), cancelledAt);
+
+        Assert.NotNull(cancelled.DisputeWindowEndsAt);
+        Assert.Equal(booking.DisputeWindowEndsAt, cancelled.DisputeWindowEndsAt);
+    }
+
     [Fact]
     public void The_dealer_city_is_on_the_wire_as_an_id_under_its_own_name()
     {
