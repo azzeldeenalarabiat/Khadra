@@ -4,3 +4,7 @@
   <router-outlet />
 </main>
 <kh-site-footer />
+@if (shortlistRefusal(); as text) {
+  <div class="site-toast notice notice--warn" role="status"><kh-icon name="heart" /><p>{{ text }}</p>
+    <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="shortlist.dismissRefusal()"><kh-icon name="x" /></button></div>
+}

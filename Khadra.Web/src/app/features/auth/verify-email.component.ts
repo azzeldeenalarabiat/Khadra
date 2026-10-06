@@ -1,4 +1,5 @@
 import { HttpClient } from '@angular/common/http';
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -8,6 +9,7 @@ import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
 import { problemText } from '../../core/http/problem-text';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { SeoService } from '../../core/seo/seo.service';
+import { recallReturnAddress } from '../../core/session/return-address';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -28,6 +30,11 @@ export class VerifyEmailComponent {
   private readonly appConfig = inject(AppConfigService);
 
   protected readonly state = signal<'idle' | 'working' | 'verified' | 'failed'>('idle');
+  /**
+   * Where the visitor was going before registering, remembered by the registration page (Wave 3 E5; E2E F12): this page
+   * opens from an email, in a new tab with nothing of the first one. Null when nothing fresh was remembered.
+   */
+  protected readonly returnUrl = signal(recallReturnAddress(inject(DOCUMENT).defaultView?.localStorage, this.i18n.language()));
   protected readonly problem = signal<ProblemSnapshot | null>(null);
   protected readonly email = signal('');
   protected readonly resendBusy = signal(false);

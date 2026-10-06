@@ -13,7 +13,7 @@
           <h1 class="state__title">{{ i18n.t('verify.doneTitle') }}</h1>
           <p class="state__text">{{ i18n.t('verify.doneText') }}</p>
           <div class="row-actions">
-            <a class="btn btn--primary" [routerLink]="i18n.link('login')">{{ i18n.t('signIn.submit') }}</a>
+            <a class="btn btn--primary" [routerLink]="i18n.link('login')" [queryParams]="returnUrl() ? { returnUrl: returnUrl() } : {}">{{ i18n.t('signIn.submit') }}</a>
             <a class="btn btn--secondary" [routerLink]="i18n.link('cars')">{{ i18n.t('notFound.cars') }}</a>
           </div>
         </div>

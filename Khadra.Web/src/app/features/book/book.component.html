@@ -108,6 +108,7 @@
       }
       <button type="button" class="btn btn--primary" [disabled]="!canSubmit()" (click)="submit()">
         {{ busy() ? i18n.t('book.sending') : i18n.t('book.submit') }}</button>
+      @if (waitsOnSteps()) { <p class="muted small">{{ i18n.t('book.finishSteps') }}</p> }
     </div>
   } @else {
     <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>

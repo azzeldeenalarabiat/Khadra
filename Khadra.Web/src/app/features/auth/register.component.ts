@@ -1,4 +1,5 @@
 import { HttpClient } from '@angular/common/http';
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -11,6 +12,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { instantToWallClock } from '../../core/i18n/zoned-time';
 import { SeoService } from '../../core/seo/seo.service';
 import { safeReturnUrl } from '../../core/session/auth.guards';
+import { rememberReturnAddress } from '../../core/session/return-address';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 interface Registered {
@@ -32,6 +34,7 @@ interface Registered {
 })
 export class RegisterComponent {
   protected readonly i18n = inject(I18nService);
+  private readonly document = inject(DOCUMENT);
   private readonly appConfig = inject(AppConfigService);
   private readonly http = inject(HttpClient);
 
@@ -108,6 +111,8 @@ export class RegisterComponent {
         }),
       );
       this.done.set(registered);
+      // The verification email opens in a new tab with nothing of this one: remember where the visitor was going.
+      if (this.returnUrl() !== `/${this.i18n.language()}`) rememberReturnAddress(this.document.defaultView?.localStorage, this.returnUrl());
     } catch (error) {
       this.problem.set(snapshotProblem(error));
     } finally {

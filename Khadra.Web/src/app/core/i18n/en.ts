@@ -722,6 +722,8 @@ export const EN = {
   'book.termsPenalty': 'Cancelling after that assesses {percent} of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.',
   'book.submit': 'Send the request',
   'book.sending': 'Sending your request…',
+  // E2E F18: the request waits on a step the page already names above (the email, the documents).
+  'book.finishSteps': 'Complete the steps above to send your request.',
   'book.documentsTitle': 'Upload your documents first',
   'book.documentsText': 'Jordanian law requires the rental office to check your driving licence and ID before handing over a car.',
   'book.documentsAction': 'Upload them now',
@@ -744,6 +746,7 @@ export const EN = {
   'saved.unavailable': 'Currently unavailable',
   'saved.remove': 'Remove',
   'saved.full': 'Your saved list is full. Remove a car to save another.',
+  'saved.couldNotSave': 'That car could not be saved just now. Try again.',
   'saved.savedOn': 'Saved {date}',
 
   'notifications.title': 'Notifications',

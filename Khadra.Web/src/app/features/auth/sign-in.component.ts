@@ -1,4 +1,5 @@
 import { HttpClient } from '@angular/common/http';
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { SeoService } from '../../core/seo/seo.service';
 import { safeReturnUrl } from '../../core/session/auth.guards';
+import { forgetReturnAddress } from '../../core/session/return-address';
 import { SessionService, SignInFailure } from '../../core/session/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 
@@ -23,6 +25,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 })
 export class SignInComponent {
   protected readonly i18n = inject(I18nService);
+  private readonly document = inject(DOCUMENT);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
@@ -76,6 +79,7 @@ export class SignInComponent {
     // The language the customer is reading in becomes the one their emails and pushes use, as the
     // app does when a language is chosen. Best effort: a failure here must not undo the sign-in.
     void firstValueFrom(this.http.put('/api/v1/auth/me/language', { language: this.i18n.language() })).catch(() => undefined);
+    forgetReturnAddress(this.document.defaultView?.localStorage);
     void this.router.navigateByUrl(this.returnUrl());
   }
 }

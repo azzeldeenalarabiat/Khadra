@@ -10,6 +10,7 @@ import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
 import { problemText } from '../../core/http/problem-text';
 import { quoteRefusalText } from './quote-refusal';
+import { RequestState, canSendRequest, waitsOnTheCustomer } from './request-gate';
 import { TranslationKey } from '../../core/i18n/en';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -140,12 +141,18 @@ export class BookComponent {
     return problemText(problem, this.i18n.t.bind(this.i18n), this.i18n.language(), this.appConfig.config());
   }
 
-  protected readonly canSubmit = computed(
-    () =>
-      !this.busy() &&
-      this.quote.value()?.isAvailable === true &&
-      !(this.method() === 'Delivery' && !this.point()),
-  );
+  /** What the page knows about this request, for the gate below (E2E F18). */
+  private readonly requestState = computed<RequestState>(() => ({
+    busy: this.busy(),
+    available: this.quote.value()?.isAvailable ?? null,
+    delivery: this.method() === 'Delivery',
+    deliveryPointChosen: !!this.point(),
+    emailUnverified: this.emailUnverified(),
+    documentsIncomplete: this.documentsIncomplete(),
+  }));
+  protected readonly canSubmit = computed(() => canSendRequest(this.requestState()));
+  /** The request waits on a step above (the email, the documents): the button says so rather than failing later. */
+  protected readonly waitsOnSteps = computed(() => waitsOnTheCustomer(this.requestState()));
 
   protected readonly formValue = computed<SearchFormValue>(() => ({
     city: null,

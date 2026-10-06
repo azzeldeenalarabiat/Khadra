@@ -611,3 +611,14 @@
     box-shadow: var(--focus);
   }
 }
+
+// A refusal said wherever the visitor had scrolled to (Wave 3, E2E F70): a heart that did not hold.
+.site-toast {
+  position: fixed;
+  inset-inline: var(--space-4, 16px);
+  inset-block-end: var(--space-4, 16px);
+  z-index: 50;
+  max-inline-size: 36rem;
+  margin-inline: auto;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}

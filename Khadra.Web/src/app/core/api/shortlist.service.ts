@@ -1,8 +1,12 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, computed, effect, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { firstValueFrom } from 'rxjs';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter, firstValueFrom } from 'rxjs';
 import { SessionService } from '../session/session.service';
+import { SAVE_INTENT_PARAM } from '../session/return-address';
+
+const VEHICLE_ID = /^[0-9a-f-]{36}$/i;
 
 /**
  * Saved cars — the SAME account list the app reads (`/customers/me/shortlist`), never a list kept in
@@ -22,6 +26,9 @@ export class ShortlistService {
   private readonly asked = new Set<string>();
   private readonly pending = signal<ReadonlySet<string>>(new Set());
   readonly lastRefusal = signal<{ vehicleId: string; code: string | null } | null>(null);
+  private readonly router = inject(Router);
+  /** A heart pressed while signed out, back in the address after sign-in (Wave 3 E5; E2E F12). */
+  private readonly intent = signal<string | null>(null);
 
   readonly savedIds = this.saved.asReadonly();
   readonly busyIds = this.pending.asReadonly();
@@ -34,6 +41,51 @@ export class ShortlistService {
       this.saved.set(new Set());
       this.asked.clear();
     });
+
+    if (this.isBrowser) {
+      this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
+        const id = this.router.parseUrl(this.router.url).queryParams[SAVE_INTENT_PARAM];
+        this.intent.set(typeof id === 'string' && VEHICLE_ID.test(id) ? id.toLowerCase() : null);
+      });
+      // Once somebody is signed in, the car they chose before signing in is saved, once, and the address forgets it.
+      effect(() => {
+        const vehicleId = this.intent();
+        if (!vehicleId || !this.session.isSignedIn()) return;
+        this.intent.set(null);
+        void this.saveIntended(vehicleId);
+      });
+    }
+  }
+
+  /** Saves a car, whatever it was before: a PUT, so sending it twice saves it once. Never the toggle. */
+  async save(vehicleId: string): Promise<void> {
+    if (this.pending().has(vehicleId)) return;
+    this.setSaved(vehicleId, true);
+    this.pending.update((current) => new Set([...current, vehicleId]));
+    this.lastRefusal.set(null);
+    try {
+      await firstValueFrom(this.http.put(`/api/v1/customers/me/shortlist/${vehicleId}`, {}));
+    } catch (error) {
+      this.setSaved(vehicleId, false);
+      const code = error instanceof HttpErrorResponse ? ((error.error?.code as string | undefined) ?? null) : null;
+      this.lastRefusal.set({ vehicleId, code });
+    } finally {
+      this.pending.update((current) => {
+        const next = new Set(current);
+        next.delete(vehicleId);
+        return next;
+      });
+    }
+  }
+
+  /** The visitor has read why a heart did not hold. */
+  dismissRefusal(): void {
+    this.lastRefusal.set(null);
+  }
+
+  private async saveIntended(vehicleId: string): Promise<void> {
+    void this.router.navigate([], { queryParams: { [SAVE_INTENT_PARAM]: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    await this.save(vehicleId);
   }
 
   isSaved(vehicleId: string): boolean {

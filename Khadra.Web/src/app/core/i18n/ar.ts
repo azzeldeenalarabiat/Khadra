@@ -838,6 +838,7 @@ export const AR: Record<TranslationKey, Message> = {
   'book.termsPenalty': 'الإلغاء بعد ذلك يُقدَّر بـ {percent} من العربون، ويُحتفظ به من عربونك عند انتهاء مهلة النزاع ما لم يقضِ نزاع بغير ذلك.',
   'book.submit': 'أرسل الطلب',
   'book.sending': 'جارٍ إرسال طلبك…',
+  'book.finishSteps': 'أكمل الخطوات أعلاه لإرسال طلبك.',
   'book.documentsTitle': 'ارفع مستنداتك أولًا',
   'book.documentsText': 'يوجب القانون الأردني على مكتب التأجير التحقق من رخصة القيادة والهوية قبل تسليم السيارة.',
   'book.documentsAction': 'ارفعها الآن',
@@ -860,6 +861,7 @@ export const AR: Record<TranslationKey, Message> = {
   'saved.unavailable': 'غير متاحة حاليًا',
   'saved.remove': 'إزالة',
   'saved.full': 'قائمتك المحفوظة ممتلئة. أزل سيارة لتحفظ أخرى.',
+  'saved.couldNotSave': 'تعذّر حفظ هذه السيارة الآن. أعد المحاولة.',
   'saved.savedOn': 'حُفظت {date}',
 
   'notifications.title': 'التنبيهات',
