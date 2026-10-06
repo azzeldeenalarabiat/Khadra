@@ -3742,6 +3742,8 @@ export const EN = {
   'disputePreview.title': 'What this decision does to the money',
   'disputePreview.working': 'Working out what this decision does…',
   'disputePreview.waiting': 'Shown once the three amounts add up to the deposit held.',
+  // F66: the amounts balance, and a figure beside them (the office charge, a leg's decimals) is refused.
+  'disputePreview.waitingForValid': 'Shown once every amount is valid.',
   'disputePreview.statusAfter': 'The booking becomes {status}.',
   'disputePreview.statusStays': 'The booking stays {status}.',
   'disputePreview.refundRequested': 'Refund requested to the customer',

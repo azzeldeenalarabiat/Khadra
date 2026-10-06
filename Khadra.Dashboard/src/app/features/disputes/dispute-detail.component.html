@@ -400,7 +400,7 @@
               } @else if (previewPending()) {
                 <div class="field-hint">{{ t('disputePreview.working') }}</div>
               } @else {
-                <div class="field-hint">{{ t('disputePreview.waiting') }}</div>
+                <div class="field-hint">{{ previewWaiting() }}</div>
               }
             </div>
 

@@ -3820,6 +3820,7 @@ export const AR = {
   'disputePreview.title': 'ما يفعله هذا القرار بالأموال',
   'disputePreview.working': 'جارٍ حساب أثر هذا القرار…',
   'disputePreview.waiting': 'يظهر حين تساوي المبالغ الثلاثة العربون المحتجَز.',
+  'disputePreview.waitingForValid': 'يظهر حين تصبح المبالغ كلها صحيحة.',
   'disputePreview.statusAfter': 'تصبح حالة الحجز {status}.',
   'disputePreview.statusStays': 'تبقى حالة الحجز {status}.',
   'disputePreview.refundRequested': 'استرداد مطلوب للعميل',

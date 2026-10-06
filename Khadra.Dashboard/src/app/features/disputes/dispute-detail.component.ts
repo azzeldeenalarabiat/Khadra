@@ -39,7 +39,7 @@ import {
   stepFor,
 } from './dispute-form.presenter';
 import { PayoutFormat } from '../payouts/payouts.presenter';
-import { PreviewWords, previewConfirmSentence, previewView } from './resolution-preview.presenter';
+import { PreviewWords, previewConfirmSentence, previewView, previewWaitingKey } from './resolution-preview.presenter';
 
 /** How long the split must rest before its preview is asked for: a pause in typing, not a business figure. */
 const PREVIEW_PAUSE_MS = 400;
@@ -316,6 +316,11 @@ export class DisputeDetailComponent {
       status: (name: string) => this.statusLabel(name, 'booking'),
     };
   });
+
+  /** What the preview box says while no preview is shown: which of the two waits it is (F66). */
+  protected readonly previewWaiting = computed(() =>
+    this.t(previewWaitingKey(this.balanced(), this.placesHint() !== null || this.chargeIssue() !== null)),
+  );
 
   /** The split a preview would be taken of, or null while it cannot be: unbalanced, refused here, or not live. */
   private readonly previewSplit = computed(() => {

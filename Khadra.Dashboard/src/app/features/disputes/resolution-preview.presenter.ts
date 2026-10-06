@@ -1,3 +1,4 @@
+import { TranslationKey } from '../../core/i18n/en';
 import { KeyValue, Tone } from '../../core/models/console.models';
 import { OfficeExpectedOutcome, ResolutionPreview } from '../../core/models/disputes.api';
 import { PayableLineRow, PayoutFormat, PayoutWords, lineRow, netText } from '../payouts/payouts.presenter';
@@ -128,4 +129,13 @@ function timing(preview: ResolutionPreview, words: PreviewWords, format: PayoutF
     lines.push(t('disputePreview.untilWindow', { when: format.dateTime(preview.furtherDecisionsPossibleUntil) }));
   }
   return lines;
+}
+
+/**
+ * Why the preview is not shown yet (Wave 3, F66): the three amounts do not add up to the deposit held, or they do and
+ * a figure beside them is refused (the office charge out of range, a leg with too many decimals). It used to say the
+ * amounts must add up in both cases, though in the second they already did.
+ */
+export function previewWaitingKey(balanced: boolean, figureRefused: boolean): TranslationKey {
+  return balanced && figureRefused ? 'disputePreview.waitingForValid' : 'disputePreview.waiting';
 }

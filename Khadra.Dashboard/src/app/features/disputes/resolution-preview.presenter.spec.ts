@@ -11,6 +11,7 @@ import {
   officeOutcomeView,
   previewConfirmSentence,
   previewView,
+  previewWaitingKey,
 } from './resolution-preview.presenter';
 
 /**
@@ -218,5 +219,18 @@ describe("the office's reading of a decided dispute", () => {
     expect(officeOutcomeView({ ...outcome, anotherDisputeOpen: true }, words(ar), format).notes).toContain(
       'ما زال نزاع آخر على هذا الحجز مفتوحًا، وقد يغيّر قراره هذه الأرقام.',
     );
+  });
+});
+
+describe('previewWaitingKey (Wave 3, F66)', () => {
+  it('asks for the three amounts to add up only while they do not', () => {
+    expect(previewWaitingKey(false, false)).toBe('disputePreview.waiting');
+    expect(previewWaitingKey(false, true)).toBe('disputePreview.waiting');
+  });
+
+  it('names a refused figure once the amounts balance, in both languages', () => {
+    expect(previewWaitingKey(true, true)).toBe('disputePreview.waitingForValid');
+    expect(en('disputePreview.waitingForValid')).toBe('Shown once every amount is valid.');
+    expect(ar('disputePreview.waitingForValid')).toBe('يظهر حين تصبح المبالغ كلها صحيحة.');
   });
 });
