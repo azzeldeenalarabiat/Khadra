@@ -157,7 +157,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                 ticket.BookingId == booking.Id &&
                 (ticket.Status == open || ticket.Status == underReview)),
             booking.DealerId.Value,
-            booking.CustomerId.Value);
+            booking.CustomerId.Value,
+            booking.ApprovedAt);
     }
 
     /// <summary>A list row as it leaves the database: each party's name is null when it did not resolve.</summary>
@@ -177,7 +178,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         string? CustomerName,
         bool HasLiveDispute,
         Guid DealerId,
-        Guid CustomerId)
+        Guid CustomerId,
+        DateTimeOffset? ApprovedAt)
     {
         public BookingListItem ToItem() => new(
             BookingId,
@@ -197,7 +199,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             CustomerAccountClosed: CustomerName is null,
             HasLiveDispute,
             DealerId,
-            CustomerId);
+            CustomerId,
+            ApprovedAt);
     }
 
     /// <summary>The bookings this caller may see at all: their own, and nothing else filtered out.</summary>

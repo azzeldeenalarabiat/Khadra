@@ -57,7 +57,11 @@ public sealed class ListMyBookingsHandler(IBookingReader reader, DealerMembershi
             return scope.Error;
 
         var filter = scope.Value with { Status = request.Status, Tab = request.Tab, VehicleId = request.VehicleId };
-        return await reader.ListAsync(filter, request.Page, cancellationToken);
+        var page = await reader.ListAsync(filter, request.Page, cancellationToken);
+        // A customer's rows carry no plate before the office approves (Wave 3, F65); the office's list keeps it.
+        return request.Role == UserRole.Customer
+            ? page with { Items = page.Items.Select(item => item.ForCustomer()).ToList() }
+            : page;
     }
 
     public async Task<Result<IReadOnlyDictionary<string, int>, Error>> Handle(
@@ -127,8 +131,9 @@ public sealed class GetMyNextBookingHandler(IBookingReader reader, IClock clock)
         if (request.Role != UserRole.Customer)
             return BookingErrors.NotAParty;
 
-        return Result.Success<NextBooking?, Error>(
-            await reader.NextForCustomerAsync(request.UserId, clock.UtcNow, cancellationToken));
+        var next = await reader.NextForCustomerAsync(request.UserId, clock.UtcNow, cancellationToken);
+        // The customer's surface: no plate on a request the office has not approved (Wave 3, F65).
+        return Result.Success<NextBooking?, Error>(next is null ? null : next with { Booking = next.Booking.ForCustomer() });
     }
 }
 

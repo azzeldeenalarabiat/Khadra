@@ -36,7 +36,21 @@ public sealed record BookingListItem(
     // Both parties by id, so a platform-wide row can open the dealership or the customer behind it.
     // A dealer or customer reading their own list already knows one of them; the Admin knows neither.
     Guid DealerId,
-    Guid CustomerId);
+    Guid CustomerId,
+    // When the office approved the booking, or null while it has not (Fix & Polish Wave 3, F65). Added last.
+    DateTimeOffset? ApprovedAt = null)
+{
+    /// <summary>
+    /// The customer's copy of the row: no plate until the office has approved the booking (owner, 2026-10-05; E2E F65).
+    /// </summary>
+    /// <remarks>
+    /// The office's add-vehicle form promises the plate is shown to the customer only after it approves, and a
+    /// request the office never answered must not hand the car's registration to whoever asked. Once approved, the
+    /// plate stays, whatever happens to the booking next. The office's own list is never passed through this.
+    /// </remarks>
+    public BookingListItem ForCustomer() =>
+        ApprovedAt is null && Vehicle is not null ? this with { Vehicle = Vehicle.WithoutPlate() } : this;
+}
 
 /// <summary>What a booking needs from the other contexts to be readable as a whole.</summary>
 /// <remarks>
@@ -192,9 +206,14 @@ public sealed record VehicleLabel(
     string Model,
     int Year,
     string? Color,
-    string PlateNumber,
+    // Null on a customer's copy until the office approves the booking (Wave 3, F65); always present for the office.
+    string? PlateNumber,
     // The cover photo's public path, or null: not every seeded car has bytes behind its key.
-    string? CoverImageUrl);
+    string? CoverImageUrl)
+{
+    /// <summary>The same car without its plate: the customer's view of a booking the office has not approved.</summary>
+    public VehicleLabel WithoutPlate() => this with { PlateNumber = null };
+}
 
 /// <summary>
 /// Which bookings. Either a raw domain status or a TAB, the console's vocabulary, resolved here so

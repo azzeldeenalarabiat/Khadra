@@ -169,11 +169,23 @@ public sealed record BookingDto(
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
+    /// <para>
     /// The commission is between the platform and the office. The PERCENT stays on the terms, because
     /// installed customer apps parse it; the amount, which no customer client has ever read, does not
     /// travel to a customer at all.
+    /// </para>
+    /// <para>
+    /// No plate either until the office approves (owner, 2026-10-05; E2E F65): the office is told the plate is shown
+    /// to the customer only after it approves, so a request still waiting, refused, expired unanswered or cancelled
+    /// before an answer carries <c>plateNumber: null</c>. Once approved it stays. Installed apps read the null as an
+    /// empty string and print an empty "Plate:" until 1.4.0 hides the row (owner, 2026-10-06, decision A3).
+    /// </para>
     /// </remarks>
-    public BookingDto ForCustomer() => this with { CommissionAmount = null };
+    public BookingDto ForCustomer() => this with
+    {
+        CommissionAmount = null,
+        Vehicle = ApprovedAt is null ? Vehicle?.WithoutPlate() : Vehicle,
+    };
 
     /// <summary>
     /// The rental office's copy: the same booking without the money the office is not shown (owner

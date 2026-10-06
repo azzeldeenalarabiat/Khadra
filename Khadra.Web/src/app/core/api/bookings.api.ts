@@ -31,7 +31,8 @@ export interface VehicleLabel {
   readonly model: string;
   readonly year: number;
   readonly color: string | null;
-  readonly plateNumber: string;
+  /** Null until the office approves the booking (Wave 3, F65): the plate is not the customer's before then. */
+  readonly plateNumber: string | null;
   readonly coverImageUrl: string | null;
 }
 

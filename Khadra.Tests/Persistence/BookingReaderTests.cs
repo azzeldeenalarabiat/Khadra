@@ -143,6 +143,29 @@ public sealed class BookingReaderTests : IDisposable
         Assert.Equal(onA.Id.Value, only.BookingId);
     }
 
+    /// <summary>
+    /// A row says when the office approved it (Wave 3, F65), so the customer's copy can keep the plate back until then
+    /// and the office's copy, which never passes through that rule, keeps it whatever.
+    /// </summary>
+    [Fact]
+    public async Task A_row_says_when_the_office_approved_it()
+    {
+        var waiting = Mine();
+        var approved = Mine(booking => booking.Approve(Id.New(), Build.Now));
+
+        await using (var context = NewContext())
+        {
+            context.Bookings.AddRange(waiting, approved);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var page = await new BookingReader(reader).ListAsync(new BookingListFilter(null, _dealerId, null), PageRequest.From(1, 20));
+
+        Assert.Null(page.Items.Single(row => row.BookingId == waiting.Id.Value).ApprovedAt);
+        Assert.Equal(Build.Now, page.Items.Single(row => row.BookingId == approved.Id.Value).ApprovedAt);
+    }
+
     private KhadraDbContext NewContext() => new(_options);
 
     // ── The landing surface's one booking ────────────────────────────────────
