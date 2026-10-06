@@ -2398,9 +2398,9 @@ export const EN = {
   'disputeDetail.quoted': '“{text}”',
   'disputeDetail.dueAt': 'Due {when}',
   'disputeDetail.resolveConfirmBody':
-    '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}. Both parties see the decision, your note and your name, and it is written to the audit log.',
+    "{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}. The customer sees the decision as Khadra's, with your note but never your name; the office sees only its own share, with your note and your name. All of it is written to the audit log.",
   'disputeDetail.resolveConfirmBodyWithCharge':
-    '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}, and {charge} charged to the dealer. Both parties see the decision, your note and your name, and it is written to the audit log.',
+    "{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}, and {charge} charged to the dealer. The customer sees the decision as Khadra's, with your note but never your name; the office sees only its own share and the charge, with your note and your name. All of it is written to the audit log.",
   'dealerDispute.openedByYourSide': 'Opened {when} by {name} (your side)',
   'dealerDispute.openedByCustomer': 'Opened {when} by {name} (the customer)',
   'dealerDispute.handledByName': 'Handled by {name}',

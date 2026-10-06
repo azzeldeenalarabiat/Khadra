@@ -2189,9 +2189,9 @@ export const AR = {
   'disputeDetail.quoted': '«{text}»',
   'disputeDetail.dueAt': 'موعد البتّ {when}',
   'disputeDetail.resolveConfirmBody':
-    'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}. يرى الطرفان القرار وملاحظتك واسمك، ويُسجَّل في سجل التدقيق.',
+    'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}. يرى العميل القرار على أنه قرار خضرا، مع ملاحظتك دون اسمك؛ ولا يرى المكتب إلا حصته، مع ملاحظتك واسمك. ويُكتب ذلك كله في سجل التدقيق.',
   'disputeDetail.resolveConfirmBodyWithCharge':
-    'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}، ويُحصَّل {charge} من المكتب. يرى الطرفان القرار وملاحظتك واسمك، ويُسجَّل في سجل التدقيق.',
+    'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}، ويُحصَّل {charge} من المكتب. يرى العميل القرار على أنه قرار خضرا، مع ملاحظتك دون اسمك؛ ولا يرى المكتب إلا حصته والمبلغ المحصَّل منه، مع ملاحظتك واسمك. ويُكتب ذلك كله في سجل التدقيق.',
   'dealerDispute.openedByYourSide': 'فُتح في {when} من قِبل {name} (من جانبكم)',
   'dealerDispute.openedByCustomer': 'فُتح في {when} من قِبل {name} (العميل)',
   'dealerDispute.handledByName': 'يتولّاه {name}',

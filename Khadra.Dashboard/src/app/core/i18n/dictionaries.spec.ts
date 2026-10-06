@@ -161,3 +161,30 @@ describe('office copy that states a rule', () => {
     }
   });
 });
+
+/**
+ * Who sees a dispute decision (owner decisions D5 and Q4, 2026-10-06): the customer sees it as Khadra's, with the
+ * note but never the administrator's name; the office sees only its own share, with the note and the name. The form
+ * and the confirmation dialog both state it, and the dialog once kept the older "both parties see your name" after
+ * the form had changed (E2E F75).
+ */
+describe("the administrator's promise about who sees a dispute decision", () => {
+  const PROMISES: TranslationKey[] = [
+    'disputeDetail.theDecisionYourNote',
+    'disputeDetail.resolveConfirmBody',
+    'disputeDetail.resolveConfirmBodyWithCharge',
+  ];
+
+  it("names the decision Khadra's and keeps the administrator's name from the customer", () => {
+    for (const key of PROMISES) {
+      const en = EN[key] as string;
+      const ar = AR[key] as string;
+      expect(en, key).toContain("as Khadra's");
+      expect(en, key).toContain('never your name');
+      expect(en, key).not.toMatch(/both parties/i);
+      expect(ar, key).toContain('قرار خضرا');
+      expect(ar, key).toContain('دون اسمك');
+      expect(ar, key).not.toContain('الطرفان');
+    }
+  });
+});
