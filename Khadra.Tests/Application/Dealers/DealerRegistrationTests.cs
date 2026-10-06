@@ -106,6 +106,20 @@ public sealed class DealerRegistrationTests
     }
 
     [Fact]
+    public async Task An_office_named_after_the_platform_is_refused_before_anything_is_stored()
+    {
+        // Pre-launch item 230 (owner, 2026-10-05 and 2026-10-06): no office may be announced as the platform.
+        var context = new Context();
+        var named = CompleteCommand() with { BusinessName = "خضراء" };
+
+        var result = await context.Submit().Handle(named, CancellationToken.None);
+
+        Assert.Equal("dealer.business_name_reserved", result.Error.Code);
+        Assert.Empty(context.Added);
+        Assert.Empty(context.Storage.Saved);
+    }
+
+    [Fact]
     public async Task An_owner_cannot_register_a_second_business()
     {
         var context = new Context();

@@ -41,7 +41,7 @@ public sealed class DealerAdminReaderTests : IDisposable
             Build.Amman,
             Build.NineToFive,
             submittedAt,
-            Build.ReviewSla);
+            Build.ReviewSla).Value;
         Build.AttachAllDocuments(dealer, submittedAt);
         return dealer;
     }

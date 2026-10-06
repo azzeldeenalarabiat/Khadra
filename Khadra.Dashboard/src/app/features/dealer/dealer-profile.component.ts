@@ -298,7 +298,11 @@ export class DealerProfileComponent {
   }
 
   protected fieldError(name: string): string | null {
-    return fieldMessage(this.fieldProblem(), name, this.i18n.lang(), this.t);
+    const problem = this.fieldProblem();
+    // The platform's own name (pre-launch item 230), worded in either language beneath the name it refused.
+    if (name === 'businessName' && problem?.code === 'dealer.business_name_reserved')
+      return this.t('dealerApply.nameReserved');
+    return fieldMessage(problem, name, this.i18n.lang(), this.t);
   }
 }
 
@@ -316,9 +320,9 @@ function describe(failure: Failure, t: I18nService['t'], language: Language): st
       ? t('vehicleWizard.useAJpegPng')
       : (serverSentence(p, language, t) ?? t('dealerProfile.theUploadDidNot'));
   }
-  return p.code === 'dealer.business_name_locked'
-    ? t('dealerProfile.theBusinessNameIs')
-    : (serverSentence(p, language, t) ?? t('dealerDelivery.serviceDidNotRespond'));
+  if (p.code === 'dealer.business_name_locked') return t('dealerProfile.theBusinessNameIs');
+  if (p.code === 'dealer.business_name_reserved') return t('dealerApply.nameReserved');
+  return serverSentence(p, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
 }
 
 function fromProfile(d: DealerProfile): readonly DayScheduleInput[] {

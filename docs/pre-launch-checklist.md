@@ -5528,3 +5528,13 @@ exact name "Khadra" would have every refund and booking push and email worded as
 approves and locks every business name, which is why C6 shipped name-based as scoped. **To close:** refuse the
 platform's name ("Khadra", and "خضرا" for good measure, compared case-insensitively after trimming) in
 `BusinessName.Create` only, leaving `FromPersisted` as it is; or, later, give notifications an actor-kind column.
+
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The owner decided to block it (2026-10-05) and to
+reserve «خضراء», with hamza, as well (2026-10-06). `Platform.ReservedNames` in the shared kernel holds "Khadra", «خضرا» and
+«خضراء», beside the platform's name that `Notification.PlatformActorName` now reads. They are compared as a reader would
+see them: ignoring case, Unicode compatibility forms, invisible format characters, Arabic diacritics and tatweel, and
+repeated spaces. "Khadra Rentals" stays free. **Not in `BusinessName.Create`, as written above:** the dealer page sends the
+current name with every save, and `Create` runs before the approval lock, so a rule there would stop an office already
+carrying such a name from saving its hours. The rule is where a name is SET instead: `Dealer.Register`, which now returns
+a `Result`, and `Dealer.UpdateProfile` when the name changes. It refuses with `dealer.business_name_reserved`, on the
+`businessName` field, before any document is stored. Existing names are never checked again.

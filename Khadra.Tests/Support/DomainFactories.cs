@@ -78,7 +78,7 @@ internal static class Build
             Amman,
             NineToFive,
             moment,
-            ReviewSla);
+            ReviewSla).Value;
     }
 
     // A dealer that has cleared the licence check and can trade.

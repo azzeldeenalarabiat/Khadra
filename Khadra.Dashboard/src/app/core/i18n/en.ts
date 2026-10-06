@@ -2093,6 +2093,9 @@ export const EN = {
     'A gallery is already registered with that commercial registration number.',
   'dealerApply.allThreeDocumentsAre':
     'All three documents are required. Attach the missing one and submit again.',
+  // Pre-launch item 230: the platform's own name, in either script.
+  'dealerApply.nameReserved':
+    'That name is the platform’s own, so an office cannot use it. Use your office’s own business name.',
   'dealerApply.oneOfTheFiles':
     'One of the files is larger than the upload limit. Attach a smaller copy.',
   'dealerApply.uploadEachDocumentAs': 'Upload each document as a JPEG, PNG or PDF.',

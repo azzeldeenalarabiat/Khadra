@@ -72,6 +72,7 @@ this batch (decision D6).
 | 3 | `pickupAvailableFrom` and `returnAvailableFrom` on every booking: the earliest moment the office may record the pickup (the rental start less the frozen turnaround, `Booking.HoldStart`) and the return (the rental start) | additive | none: ignored by named-key parsing |
 | 3 | `POST /bookings/{id}/pickup` before `pickupAvailableFrom` and `/return` before the rental start are refused: 409 `booking.pickup_too_early` / `booking.return_too_early`, with `availableFrom`. Checked before the handover code, so an early attempt costs the customer no try | new refusals | none: office-only endpoints. **Code issuance is unchanged** (owner, 2026-10-06, decision A2): `POST /bookings/{id}/handover-code` is still answered on any confirmed booking, because refusing a request installed apps make would be breaking |
 | 3 | A customer's copy of a booking (detail, list, `/bookings/next`, create/cancel/non-delivery answers) carries `vehicle.plateNumber: null` until the office approves; list rows gain `approvedAt` | value (same field, null before approval) + additive | installed builds print an empty "Plate:" on a booking awaiting the office until 1.4.0 (owner, decision A3); nothing throws |
+| 3 | `POST /dealers` (the office application) and `PUT /dealers/me/profile` refuse a business name that is one of the platform's own: 400 `dealer.business_name_reserved`, on the `businessName` field | new refusal | none: office endpoints only |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 

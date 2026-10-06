@@ -79,7 +79,15 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     {
     }
 
-    public static Dealer Register(
+    /// <summary>A new office's application, pending the platform's review.</summary>
+    /// <remarks>
+    /// Refused with <c>dealer.business_name_reserved</c> when the name is one of the platform's own
+    /// (<see cref="Platform.ReservedNames"/>; pre-launch item 230). The rule lives here and in
+    /// <see cref="UpdateProfile"/>, where a name is SET, never in <c>BusinessName.Create</c>: the
+    /// dealer page sends the name again with every save, so a rule in the factory would stop an office already
+    /// carrying such a name from saving its hours.
+    /// </remarks>
+    public static Result<Dealer, Error> Register(
         Id ownerUserId,
         BusinessName businessName,
         CommercialRegistrationNumber commercialRegistration,
@@ -97,6 +105,8 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         ArgumentNullException.ThrowIfNull(operatingHours);
         if (ownerUserId.IsEmpty)
             throw new DomainException("A dealer requires an owner.");
+        if (Platform.IsReservedName(businessName.Value))
+            return DealerErrors.BusinessNameReserved;
 
         var dealer = new Dealer(Id.New())
         {
@@ -294,6 +304,9 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         // whether an approved dealer may rename with an admin record; the default here is no.)
         if (VerificationStatus == DealerVerificationStatus.Approved && businessName != BusinessName)
             return UnitResult.Failure(DealerErrors.BusinessNameLocked);
+        // Only a name being CHANGED is checked: the page resends the current one with every save.
+        if (businessName != BusinessName && Platform.IsReservedName(businessName.Value))
+            return UnitResult.Failure(DealerErrors.BusinessNameReserved);
 
         BusinessName = businessName;
         Location = location;

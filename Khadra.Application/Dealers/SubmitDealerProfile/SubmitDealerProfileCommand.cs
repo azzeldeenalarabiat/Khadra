@@ -153,7 +153,8 @@ public sealed class SubmitDealerProfileHandler(
         var rules = await businessRules.GetAsync(cancellationToken);
         var now = clock.UtcNow;
 
-        var dealer = Dealer.Register(
+        // Refused here, before any document is stored, when the name is one of the platform's own (item 230).
+        var registered = Dealer.Register(
             request.OwnerUserId,
             businessName.Value,
             registration.Value,
@@ -164,6 +165,9 @@ public sealed class SubmitDealerProfileHandler(
             about,
             request.CityId,
             address.Value);
+        if (registered.IsFailure)
+            return registered.Error;
+        var dealer = registered.Value;
 
         foreach (var (type, upload) in uploads.Value)
         {

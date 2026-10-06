@@ -14,9 +14,9 @@ import {
   ProblemSnapshot,
   fieldMessage,
   fieldMessageFor,
-  serverSentence,
   snapshotProblem,
 } from '../../core/i18n/problem';
+import { describeApplicationRefusal } from './dealer-apply.presenter';
 
 /** The three papers spec 3.1 requires. The keys are the form field names the API binds. */
 const REQUIRED_DOCUMENTS = [
@@ -109,7 +109,7 @@ export class DealerApplyComponent {
   protected readonly problem = signal<ProblemSnapshot | null>(null);
   protected readonly problemText = computed(() => {
     const problem = this.problem();
-    return problem ? describe(problem, this.t, this.i18n.lang()) : null;
+    return problem ? describeApplicationRefusal(problem, this.t, this.i18n.lang()) : null;
   });
 
   /**
@@ -117,7 +117,11 @@ export class DealerApplyComponent {
    * console is English, "Check this field." beneath the field while it is Arabic.
    */
   protected fieldProblem(field: string): string | null {
-    return fieldMessage(this.problem(), field, this.i18n.lang(), this.t);
+    const problem = this.problem();
+    // The platform's own name (item 230) is a refusal this console words itself, in either language.
+    if (field === 'businessName' && problem?.code === 'dealer.business_name_reserved')
+      return this.t('dealerApply.nameReserved');
+    return fieldMessage(problem, field, this.i18n.lang(), this.t);
   }
 
   /**
@@ -407,49 +411,4 @@ export class DealerApplyComponent {
       this.busy.set(false);
     }
   }
-}
-
-/**
- * Why a submission was refused, in the reader's own language, worded when it is shown.
- *
- * The codes this screen knows by their own sentences; anything else by the server's English title
- * while the console is English, and the console's own lines while it is not.
- */
-function describe(
-  problem: ProblemSnapshot,
-  t: (key: TranslationKey) => string,
-  language: Language,
-): string {
-  // No answer at all — the request never reached the platform, or something failed before it could.
-  if (problem.status === 0) {
-    return t('dealerApply.theServiceDidNot');
-  }
-
-  switch (problem.code) {
-    case 'dealer.already_registered':
-    // The database's own answer to the same question, from the unique index on the owner. The
-    // handler's check and the index can only disagree in a race — two tabs, or a double click on a
-    // slow multipart — and the person on the other end needs the same sentence either way.
-    case 'data.conflict':
-      return t('dealerApply.thisAccountHasAlready');
-    case 'dealer.commercial_registration_taken':
-      return t('dealerApply.aGalleryIsAlready');
-    case 'dealer.missing_required_documents':
-      return t('dealerApply.allThreeDocumentsAre');
-    case 'dealer.document_too_large':
-    case 'documents.too_large':
-      return t('dealerApply.oneOfTheFiles');
-    case 'dealer.invalid_document_content':
-    case 'documents.invalid_content':
-      return t('dealerApply.uploadEachDocumentAs');
-    case 'dealer.invalid_operating_hours':
-      return t('dealerApply.closingTimeMustBe');
-    default:
-      break;
-  }
-
-  if (problem.status === 413) {
-    return t('dealerApply.theDocumentsTogetherAre');
-  }
-  return serverSentence(problem, language, t) ?? t('dealerApply.theApplicationWasRejected');
 }

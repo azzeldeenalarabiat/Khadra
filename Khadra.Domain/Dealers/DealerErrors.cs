@@ -37,6 +37,19 @@ public static class DealerErrors
     public static readonly Error InvalidBusinessName =
         Error.Validation("dealer.invalid_business_name", "The business name must be between 2 and 150 characters.");
 
+    private const string ReservedNameMessage =
+        "That name is the platform's own. Register under your office's own business name.";
+
+    /// <summary>
+    /// A new office, or an office still fixing its application, chose one of the platform's own names (owner,
+    /// 2026-10-05 and 2026-10-06; pre-launch item 230). Named on the field, so the form puts it under the box.
+    /// </summary>
+    public static readonly Error BusinessNameReserved = new(
+        "dealer.business_name_reserved",
+        ReservedNameMessage,
+        ErrorKind.Validation,
+        new Dictionary<string, string[]> { ["businessName"] = [ReservedNameMessage] });
+
     public static readonly Error InvalidCommercialRegistration =
         Error.Validation(
             "dealer.invalid_commercial_registration",

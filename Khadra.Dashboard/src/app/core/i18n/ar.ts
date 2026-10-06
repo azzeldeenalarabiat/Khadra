@@ -1910,6 +1910,7 @@ export const AR = {
     'سبق أن قدّم هذا الحساب طلب مكتب. أعد تحميل لوحة التحكم لترى وضعه.',
   'dealerApply.aGalleryIsAlready': 'يوجد مكتب مسجّل بالفعل بهذا الرقم التجاري.',
   'dealerApply.allThreeDocumentsAre': 'الوثائق الثلاث كلها مطلوبة. أرفق الناقصة وأعد الإرسال.',
+  'dealerApply.nameReserved': 'هذا الاسم هو اسم المنصة نفسها، ولا يمكن لمكتب استخدامه. استخدم الاسم التجاري لمكتبك.',
   'dealerApply.oneOfTheFiles': 'أحد الملفات أكبر من الحد المسموح للرفع. أرفق نسخة أصغر.',
   'dealerApply.uploadEachDocumentAs': 'ارفع كل وثيقة بصيغة JPEG أو PNG أو PDF.',
   'dealerApply.closingTimeMustBe': 'يجب أن يكون وقت الإغلاق بعد وقت الفتح في اليوم نفسه.',

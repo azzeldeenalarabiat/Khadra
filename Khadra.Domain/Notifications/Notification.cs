@@ -60,7 +60,7 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
     /// administrator's cancellation and the refunds they order, an expiry (Wave 2 C6; E2E F48). One definition, so
     /// every place that raises such a notification and every place that words one agree on it.
     /// </summary>
-    public const string PlatformActorName = "Khadra";
+    public const string PlatformActorName = Platform.Name;
 
     /// <summary>
     /// Whether the platform itself acted, rather than a person or a rental office: no person's id, and the platform's
