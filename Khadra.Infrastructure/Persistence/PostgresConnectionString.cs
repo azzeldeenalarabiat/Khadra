@@ -79,6 +79,37 @@ internal static class PostgresConnectionString
         return builder.ConnectionString;
     }
 
+    /// <summary>
+    /// Caps the size of the connection pool built from <paramref name="connectionString"/> at
+    /// <paramref name="maxPoolSize"/>, keeping a smaller cap the string already carries.
+    /// </summary>
+    /// <remarks>
+    /// Every open Npgsql connection is one client of the database's pooler, and Supabase's session
+    /// pooler admits a fixed number per database user (15 on Staging's plan). With no cap Npgsql's
+    /// default of 100 applied, and a busy minute answered 500 with <c>EMAXCONNSESSION</c>
+    /// (pre-launch item 237). The smaller of the two wins, so a deployment that already wrote
+    /// <c>Maximum Pool Size</c> into its secret is never widened by the tracked setting, and one that
+    /// did not is never left at 100. A minimum pool above the cap is lowered with it, because Npgsql
+    /// refuses a minimum larger than the maximum.
+    /// </remarks>
+    public static string ApplyPoolCap(string connectionString, int? maxPoolSize)
+    {
+        if (maxPoolSize is null) return connectionString;
+        if (maxPoolSize < 1)
+        {
+            throw new InvalidOperationException(
+                $"Database:MaxPoolSize must be at least 1; it is {maxPoolSize.Value.ToString(CultureInfo.InvariantCulture)}.");
+        }
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        var cap = Math.Min(builder.MaxPoolSize, maxPoolSize.Value);
+        if (builder.MaxPoolSize == cap && builder.MinPoolSize <= cap) return connectionString;
+
+        builder.MaxPoolSize = cap;
+        builder.MinPoolSize = Math.Min(builder.MinPoolSize, cap);
+        return builder.ConnectionString;
+    }
+
     private static bool LooksLikeUrl(string value) =>
         value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
         value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase);

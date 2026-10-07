@@ -166,6 +166,17 @@ ConnectionStrings__DefaultConnection=postgresql://postgres.<ref>:<password>@aws-
 URL form is fine — the application converts it, and adds `SSL Mode=Require`, which
 Supabase needs.
 
+**The session pooler has a client cap, and the API stays under it.** Supabase admits a fixed number of
+clients per database user on the session pooler — 15 on Staging's plan — and every open Npgsql
+connection is one of them. Above it, a request fails with `EMAXCONNSESSION … max clients are limited to
+pool_size` and answers 500 (Staging, 6 October 2026). The API caps its pools with the tracked
+`Database:MaxPoolSize`, **5**, which every pool built from the connection string obeys: the requests'
+pool, the readiness probe and the startup check. A deploy's overlap of two instances asks for at most
+2 × (5 + 1) + 1 = 13, which leaves room for a backup or a person's SQL session. A smaller
+`Maximum Pool Size` in the connection string still wins, so Staging's existing `Maximum Pool Size=5` is
+unchanged. Raise the cap (`Database__MaxPoolSize`) only together with the pooler's limit for the plan,
+keeping 2 × (cap + 1) + 1 below it; the startup line `Database reachable at …` states the cap in force.
+
 ## Who the client is
 
 `KnownProxies` is a **security input**, not a formality.

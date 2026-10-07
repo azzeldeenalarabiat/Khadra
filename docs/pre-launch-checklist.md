@@ -5776,6 +5776,15 @@ overlap, a backup and a person's SQL session. Do it either with `Maximum Pool Si
 Staging, or with a tracked `Database:MaxPoolSize` applied to the data source, so that nobody has to edit a secret.
 Otherwise size the pooler for the plan. Either way, write the cap into `docs/deployment.md` and `docs/production.md`.
 
+**Built, 2026-10-07 (`claude/wonderful-lovelace-ztynsz`, on `fix/polish-wave4` at `4e2c1f1`), awaiting Production's
+pooler limit.** The tracked route: `Database:MaxPoolSize` (5 in `appsettings.json`) is applied by
+`DependencyInjection.ResolveConnectionString`, so the DbContext, `/health/ready` and the startup check all build their
+pools capped; a smaller `Maximum Pool Size` already in the connection string wins, so Staging is unchanged; a cap
+below 1 refuses to start; the startup line `Database reachable at …` names the cap. Written into both deployment
+documents. Pinned by `PostgresConnectionStringTests`, including that the tracked figure keeps a deploy's overlap
+within Staging's 15. **To close:** confirm Production's session-pooler limit for its plan and keep
+2 × (cap + 1) + 1 below it, raising `Database__MaxPoolSize` only with it.
+
 ### 238. The customer app is not asked for consent, and anything that declares an app version is not judged
 
 **Status:** open, launch blocker with item 224 · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's

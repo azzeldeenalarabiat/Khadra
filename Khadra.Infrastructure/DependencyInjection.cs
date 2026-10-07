@@ -357,7 +357,12 @@ public static class DependencyInjection
         var configured = configuration.GetConnectionString(ConnectionStringName)
             ?? throw new InvalidOperationException($"ConnectionStrings:{ConnectionStringName} is required.");
 
-        return PostgresConnectionString.Normalise(configured);
+        // The pool cap is part of the value for the same reason: the DbContext, the readiness probe and
+        // the startup check each build a pool from it, and all of them count against the pooler's limit.
+        var maxPoolSize = configuration.GetSection(DatabaseOptions.SectionName)
+            .GetValue<int?>(nameof(DatabaseOptions.MaxPoolSize));
+
+        return PostgresConnectionString.ApplyPoolCap(PostgresConnectionString.Normalise(configured), maxPoolSize);
     }
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)

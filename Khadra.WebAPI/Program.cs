@@ -812,7 +812,8 @@ public partial class Program
             var builder = new Npgsql.NpgsqlConnectionStringBuilder(resolved);
             identity =
                 $"{builder.Host}:{builder.Port.ToString(CultureInfo.InvariantCulture)}, " +
-                $"database {builder.Database ?? "(none)"}, as {builder.Username ?? "(none)"}";
+                $"database {builder.Database ?? "(none)"}, as {builder.Username ?? "(none)"}, " +
+                $"at most {builder.MaxPoolSize.ToString(CultureInfo.InvariantCulture)} connections per pool";
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {

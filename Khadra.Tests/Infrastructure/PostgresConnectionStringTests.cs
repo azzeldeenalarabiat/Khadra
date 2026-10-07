@@ -1,4 +1,6 @@
 using Khadra.Infrastructure.Persistence;
+using Microsoft.Extensions.Configuration;
+using Khadra.Tests.Support;
 using Npgsql;
 
 namespace Khadra.Tests.Infrastructure;
@@ -116,4 +118,91 @@ public class PostgresConnectionStringTests
     [InlineData("   ")]
     public void An_empty_connection_string_is_refused(string value) =>
         Assert.Throws<ArgumentException>(() => PostgresConnectionString.Normalise(value));
+
+    // Pre-launch item 237: the pool may not ask the database's pooler for more clients than it admits.
+
+    [Fact]
+    public void A_pool_cap_is_applied_to_a_string_that_names_none()
+    {
+        var result = PostgresConnectionString.ApplyPoolCap("Host=db.example.com;Database=khadra;Username=u;Password=p", 5);
+
+        Assert.Equal(5, new NpgsqlConnectionStringBuilder(result).MaxPoolSize);
+    }
+
+    [Fact]
+    public void A_smaller_cap_already_in_the_connection_string_wins()
+    {
+        const string staging = "Host=db.example.com;Database=khadra;Username=u;Password=p;Maximum Pool Size=3";
+
+        Assert.Equal(3, new NpgsqlConnectionStringBuilder(PostgresConnectionString.ApplyPoolCap(staging, 5)).MaxPoolSize);
+    }
+
+    [Fact]
+    public void A_larger_cap_in_the_connection_string_is_lowered_to_the_setting()
+    {
+        const string wide = "Host=db.example.com;Database=khadra;Username=u;Password=p;Maximum Pool Size=100";
+
+        Assert.Equal(5, new NpgsqlConnectionStringBuilder(PostgresConnectionString.ApplyPoolCap(wide, 5)).MaxPoolSize);
+    }
+
+    [Fact]
+    public void A_minimum_pool_above_the_cap_is_lowered_with_it()
+    {
+        const string warm = "Host=db.example.com;Database=khadra;Username=u;Password=p;Minimum Pool Size=10";
+
+        var parsed = new NpgsqlConnectionStringBuilder(PostgresConnectionString.ApplyPoolCap(warm, 5));
+
+        Assert.Equal(5, parsed.MaxPoolSize);
+        Assert.Equal(5, parsed.MinPoolSize);
+    }
+
+    [Fact]
+    public void No_setting_leaves_the_string_exactly_as_it_was()
+    {
+        const string keyword = "Host=db.example.com;Database=khadra;Username=u;Password=p";
+
+        Assert.Equal(keyword, PostgresConnectionString.ApplyPoolCap(keyword, null));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void A_cap_below_one_is_refused_naming_the_setting(int cap)
+    {
+        var error = Assert.Throws<InvalidOperationException>(
+            () => PostgresConnectionString.ApplyPoolCap("Host=db.example.com;Database=khadra", cap));
+
+        Assert.Contains("Database:MaxPoolSize", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_resolved_connection_string_carries_the_tracked_cap()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:DefaultConnection"] = "postgresql://u:p@db.example.com:5432/khadra",
+                ["Database:MaxPoolSize"] = "5",
+            })
+            .Build();
+
+        var resolved = Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(configuration);
+
+        Assert.Equal(5, new NpgsqlConnectionStringBuilder(resolved).MaxPoolSize);
+    }
+
+    [Fact]
+    public void The_tracked_settings_cap_the_pool_below_the_staging_pooler()
+    {
+        // Two instances overlap during a deploy, each with its request pool, one readiness connection
+        // and (on the new one) one startup check, and Staging's session pooler admits 15.
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(RepositoryRoot.File("Khadra.WebAPI", "appsettings.json"))
+            .Build();
+
+        var cap = configuration.GetSection("Database").GetValue<int?>("MaxPoolSize");
+
+        Assert.NotNull(cap);
+        Assert.True(2 * (cap.Value + 1) + 1 <= 15, $"Database:MaxPoolSize {cap} would let a deploy's overlap exceed 15 clients.");
+    }
 }
