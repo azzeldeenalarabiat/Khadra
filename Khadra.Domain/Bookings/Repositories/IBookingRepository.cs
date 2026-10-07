@@ -6,6 +6,14 @@ public interface IBookingRepository
 {
     Task<Booking?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The booking as stored, NOT settled against the clock on load. Only for the one command whose act IS the
+    /// settlement: an administrator's expiry (pre-launch item 232). Loaded settled, a lapsed booking already reads
+    /// Expired by the system, and the administrator's own expiry can only be refused. Every other caller uses
+    /// <see cref="GetByIdAsync"/>.
+    /// </summary>
+    Task<Booking?> GetByIdAsStoredAsync(Id id, CancellationToken cancellationToken = default);
+
     Task<Booking?> GetByReferenceAsync(BookingReference reference, CancellationToken cancellationToken = default);
 
     /// <summary>

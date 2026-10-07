@@ -42,9 +42,17 @@ public sealed record CancelBookingAsAdminCommand(Id BookingId, string Reason) : 
 /// unanswered past the dealer's.
 /// </summary>
 /// <remarks>
-/// The stand-in for a background job that does not exist yet (pre-launch item 4). Which of the two
-/// expiries applies is the booking's status, not the caller's choice, and the aggregate refuses both
+/// <para>
+/// Which of the two expiries applies is the booking's status, not the caller's choice, and the aggregate refuses both
 /// while the FROZEN window still has time in it — so an admin cannot expire anything early by asking.
+/// </para>
+/// <para>
+/// <b>Loaded as stored</b> (pre-launch item 232). Every other handler loads a booking settled against the clock, and a
+/// lapsed one then already reads Expired by the system, so this command used to refuse every time. Here the
+/// administrator's act IS the settlement: the transition is theirs, and it is announced through the one
+/// <see cref="BookingExpiryAnnouncer"/> the sweep uses, so the customer and the office are told exactly as they would
+/// have been. A booking the sweep already expired and saved is refused as before; it has been announced.
+/// </para>
 /// </remarks>
 public sealed record ExpireBookingAsAdminCommand(Id BookingId) : ICommand<Result<BookingDto, Error>>;
 
@@ -73,6 +81,7 @@ public sealed class AdminBookingCommandHandlers(
     AdminActionRecorder audit,
     DealerTeamNotifier team,
     IDealerRepository dealers,
+    BookingExpiryAnnouncer announcer,
     ICurrentActor actor,
     IUnitOfWork unitOfWork,
     IClock clock) :
@@ -93,23 +102,45 @@ public sealed class AdminBookingCommandHandlers(
             cancellationToken);
     }
 
-    public Task<Result<BookingDto, Error>> Handle(ExpireBookingAsAdminCommand request, CancellationToken cancellationToken)
+    public async Task<Result<BookingDto, Error>> Handle(ExpireBookingAsAdminCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ActAsync(
-            request.BookingId,
-            // Which expiry applies is the booking's own state, not something the caller chooses:
-            // approved but unpaid past its payment window, or unanswered past the dealer's own. Any other
-            // status falls through to the aggregate, which answers with the right refusal.
-            (booking, now) => booking.Status == BookingStatus.Approved
-                ? booking.ExpireUnpaid(now, actor.UserId)
-                : booking.ExpireUnanswered(now, actor.UserId),
+        var booking = await bookings.GetByIdAsStoredAsync(request.BookingId, cancellationToken);
+        if (booking is null)
+            return BookingErrors.NotFound;
+
+        var previousStatus = booking.Status.Name;
+        var now = clock.UtcNow;
+        // Which expiry applies is the booking's own state, not something the caller chooses: approved but unpaid past
+        // its payment window, or unanswered past the dealer's own. Any other status falls through to the aggregate,
+        // which answers with the right refusal.
+        var lapse = booking.Status == BookingStatus.Approved ? BookingLapseKind.Unpaid : BookingLapseKind.Unanswered;
+        var outcome = lapse == BookingLapseKind.Unpaid
+            ? booking.ExpireUnpaid(now, actor.UserId)
+            : booking.ExpireUnanswered(now, actor.UserId);
+        if (outcome.IsFailure)
+            return outcome.Error;
+
+        // As every admin action records its ending's refund in the same save. An expiry ends a booking nobody has paid
+        // for, so there is none, and nothing about money changes here.
+        await BookingEndingRefunds.RecordAsync(booking, payments, now, cancellationToken);
+
+        audit.Record(
             AuditAction.BookingExpired,
-            reason: null,
-            NotificationKind.YourBookingExpired,
-            // The office hears of an approval nobody paid for, never of a request it let lapse (C7).
-            previousStatus => previousStatus == BookingStatus.Approved.Name ? NotificationKind.BookingExpiredUnpaid : null,
-            cancellationToken);
+            AuditEntityType.Booking,
+            booking.Id,
+            booking.Reference.Value,
+            previousStatus,
+            booking.Status.Name,
+            reason: null);
+
+        // Announced as the sweep announces an expiry, in the same save: the customer always, and the office only of an
+        // approval nobody paid for, never of a request it let lapse (C7).
+        await announcer.AnnounceAsync(booking, lapse, now, cancellationToken);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return BookingDto.From(booking, await reader.ContextAsync(booking.Id, cancellationToken), clock.UtcNow);
     }
 
     public Task<Result<BookingDto, Error>> Handle(MarkBookingNoShowAsAdminCommand request, CancellationToken cancellationToken)

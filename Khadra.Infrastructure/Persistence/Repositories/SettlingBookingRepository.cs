@@ -65,6 +65,11 @@ internal sealed class SettlingBookingRepository(BookingRepository inner, IClock 
 
     // ---------------------------------------------------------------- straight through
 
+    // The administrator's expiry, whose act is the settlement itself (pre-launch item 232). It expires the booking
+    // in the administrator's name and announces it through the same BookingExpiryAnnouncer, so nothing is skipped.
+    public Task<Booking?> GetByIdAsStoredAsync(Id id, CancellationToken cancellationToken = default) =>
+        inner.GetByIdAsync(id, cancellationToken);
+
     public Task AddAsync(Booking booking, CancellationToken cancellationToken = default) =>
         inner.AddAsync(booking, cancellationToken);
 

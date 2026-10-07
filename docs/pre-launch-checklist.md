@@ -5701,6 +5701,16 @@ defect. **To close:** delete the command (the sweep and the expiry inside a new 
 tell the office) or make it treat a lapse already settled on load as its own success, attributed to the
 administrator and announced as the sweep would.
 
+**Built, 2026-10-07 (`claude/wonderful-lovelace-ztynsz`; owner: make it succeed), awaiting the Staging check.** The
+command loads the booking as stored, through `IBookingRepository.GetByIdAsStoredAsync`, the one load that does not
+settle, because here the administrator's act IS the settlement. It expires the booking in the administrator's name
+(`BookingParty.Admin` in the status history), audits `BookingExpired` and announces through the one
+`BookingExpiryAnnouncer` the sweep uses, in the same save: the customer always, and the office only of an approval
+nobody paid for. A booking still inside its window is refused by the aggregate as before, and one the sweep already
+expired and saved is refused because it has already been announced. Proved through the real seam on SQLite
+(`SettlingBookingRepositoryTests`: succeeds, names the admin, one notification, one audit entry; the same test fails
+on the old load) and at the handler (`AdminBookingActionTests`). No API shape changes.
+
 ### 233. A conflict in the settlement sweep stalls the rest of its pass
 
 **Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Pre-existing**

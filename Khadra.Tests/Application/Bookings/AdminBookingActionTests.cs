@@ -1,4 +1,5 @@
 using Khadra.Application.Auditing;
+using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.AdminBookings;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
@@ -59,6 +60,7 @@ public sealed class AdminBookingActionTests
         public Booking Given(Booking booking)
         {
             Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
+            Bookings.GetByIdAsStoredAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
             return booking;
         }
 
@@ -108,6 +110,7 @@ public sealed class AdminBookingActionTests
             new AdminActionRecorder(AuditTrail, Actor, Clock),
             new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()),
             Dealers,
+            new BookingExpiryAnnouncer(new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()), Dealers),
             Actor,
             UnitOfWork,
             Clock);
@@ -324,6 +327,37 @@ public sealed class AdminBookingActionTests
         Assert.Same(BookingStatus.Expired, last.To);
         Assert.Same(BookingParty.Admin, last.ActorParty);
         Assert.Equal(AdminId, last.ActorUserId);
+    }
+
+    /// <summary>
+    /// Pre-launch item 232: the expiry is the administrator's act, so it never goes through the load that settles a
+    /// lapse in the system's name first. That load is what made the command refuse every time.
+    /// </summary>
+    [Fact]
+    public async Task An_admin_expiry_loads_the_booking_as_stored_and_never_settled()
+    {
+        var context = new Context();
+        var booking = context.Given(Build.ApprovedBooking());
+        context.At(booking.PaymentDeadline!.Value.AddMinutes(1));
+
+        await context.Handlers().Handle(new ExpireBookingAsAdminCommand(booking.Id), CancellationToken.None);
+
+        await context.Bookings.Received(1).GetByIdAsStoredAsync(booking.Id, Arg.Any<CancellationToken>());
+        await context.Bookings.DidNotReceive().GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_admin_expiry_is_audited_with_the_status_it_ended()
+    {
+        var context = new Context();
+        var booking = context.Given(Build.ApprovedBooking());
+        context.At(booking.PaymentDeadline!.Value.AddMinutes(1));
+
+        await context.Handlers().Handle(new ExpireBookingAsAdminCommand(booking.Id), CancellationToken.None);
+
+        var entry = Assert.Single(context.Recorded);
+        Assert.Same(AuditAction.BookingExpired, entry.Action);
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

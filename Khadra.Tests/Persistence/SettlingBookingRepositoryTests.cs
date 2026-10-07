@@ -1,15 +1,20 @@
+using Khadra.Application.Auditing;
 using Khadra.Application.Bookings;
+using Khadra.Application.Bookings.AdminBookings;
+using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Notifications;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Notifications;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using NSubstitute;
 
 namespace Khadra.Tests.Persistence;
 
@@ -237,5 +242,61 @@ public sealed class SettlingBookingRepositoryTests : IDisposable
 
         await using var verify = NewContext();
         Assert.Single(await verify.Notifications.AsNoTracking().ToListAsync());
+    }
+
+    /// <summary>
+    /// Pre-launch item 232, on a real context and through the real seam: an administrator's Expire on a booking whose
+    /// window has closed succeeds, in the administrator's name, and the customer is told once. It used to be refused
+    /// every time, because the seam had already settled the booking by the time the handler saw it; the handler tests
+    /// passed only because they substitute the repository.
+    /// </summary>
+    [Fact]
+    public async Task An_administrators_expiry_through_the_seam_succeeds_in_their_name_and_is_announced_once()
+    {
+        var stored = await GivenAnUnansweredRequestAsync();
+        var afterTheWindow = stored.DecisionDeadline.AddMinutes(1);
+        var adminId = Id.New();
+
+        await using (var context = NewContext())
+        {
+            var clock = new TestClock(afterTheWindow);
+            var actor = Substitute.For<ICurrentActor>();
+            actor.UserId.Returns(adminId);
+            actor.Role.Returns(UserRole.Admin);
+            actor.Name.Returns("Rania Haddad");
+            var reader = Substitute.For<IBookingReader>();
+            reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
+                .Returns(new BookingContext(null, "Petra Rentals", false, null, "Sami Khoury", false, null, null));
+            var unitOfWork = Substitute.For<IUnitOfWork>();
+            unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(call => context.SaveChangesAsync(call.Arg<CancellationToken>()));
+
+            var handlers = new AdminBookingCommandHandlers(
+                RepositoryOn(context, afterTheWindow),
+                new PaymentRepository(context),
+                reader,
+                new AdminActionRecorder(new AuditTrail(context), actor, clock),
+                new DealerTeamNotifier(new Notifier(context), new UserRepository(context)),
+                new DealerRepository(context),
+                AnnouncerOn(context),
+                actor,
+                unitOfWork,
+                clock);
+
+            var result = await handlers.Handle(
+                new ExpireBookingAsAdminCommand(stored.Id), CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+        }
+
+        await using var verify = NewContext();
+        var row = await new BookingRepository(verify).GetByIdAsync(stored.Id);
+        Assert.Same(BookingStatus.Expired, row!.Status);
+        var last = row.StatusHistory.Last();
+        Assert.Same(BookingParty.Admin, last.ActorParty);
+        Assert.Equal(adminId, last.ActorUserId);
+        var told = Assert.Single(await verify.Notifications.AsNoTracking().ToListAsync());
+        Assert.Same(NotificationKind.YourBookingExpired, told.Kind);
+        Assert.Equal(stored.CustomerId, told.RecipientUserId);
+        Assert.Single(await verify.AuditEntries.AsNoTracking().ToListAsync());
     }
 }

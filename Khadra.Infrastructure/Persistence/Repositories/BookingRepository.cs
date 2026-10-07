@@ -20,6 +20,10 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
     public Task<Booking?> GetByIdAsync(Id id, CancellationToken cancellationToken = default) =>
         WithChildren().SingleOrDefaultAsync(booking => booking.Id == id, cancellationToken);
 
+    // This repository never settles; SettlingBookingRepository is the one that does.
+    public Task<Booking?> GetByIdAsStoredAsync(Id id, CancellationToken cancellationToken = default) =>
+        GetByIdAsync(id, cancellationToken);
+
     public Task<Booking?> GetByReferenceAsync(BookingReference reference, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reference);
