@@ -4007,4 +4007,7 @@ export const AR = {
   'auditLog.actionLegalDocumentPublished': 'نُشر مستند قانوني',
   'auditLog.entityLegalDocument': 'مستند قانوني',
   'activity.legalDocumentPublished': 'نُشر إصدار جديد من {subject} من قِبل {actor}',
+  'auditLog.actionPaymentIncidentHandled': 'عولجت حالة خصم للمراجعة',
+  'auditLog.entityPaymentIncident': 'حالة خصم للمراجعة',
+  'activity.paymentIncidentHandled': 'عولجت حالة الخصم على {subject} من قِبل {actor}',
 } as const satisfies Record<TranslationKey, Message>;

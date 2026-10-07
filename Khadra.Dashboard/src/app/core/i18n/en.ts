@@ -3929,6 +3929,10 @@ export const EN = {
   'auditLog.actionLegalDocumentPublished': 'Legal document published',
   'auditLog.entityLegalDocument': 'Legal document',
   'activity.legalDocumentPublished': '{actor} published a new version of the {subject}',
+  // Capture incidents (Wave 4, B1), labelled by the booking's reference, or by the payment when it has none.
+  'auditLog.actionPaymentIncidentHandled': 'Capture incident marked as handled',
+  'auditLog.entityPaymentIncident': 'Capture incident',
+  'activity.paymentIncidentHandled': '{actor} marked the capture incident on {subject} as handled',
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

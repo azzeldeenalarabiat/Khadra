@@ -549,4 +549,19 @@ describe('toActivityRows', () => {
     expect(toActivityRows([entry(recorded)], now, t, 'en-GB')[0].icon).toBe('receipt');
     expect(toActivityRows([entry(held)], now, t, 'en-GB')[0].icon).toBe('pause-circle');
   });
+
+  // Wave 4 (B1) recorded it and left the console spelling the action's name out: a handled capture incident is worded
+  // by the booking's reference, or by the payment when it has none.
+  it('words a capture incident marked as handled, by its booking', () => {
+    const handled: Partial<ActivityEntry> = {
+      action: 'PaymentIncidentHandled',
+      entityType: 'PaymentIncident',
+      subjectLabel: 'KH-ABCD1234',
+      bookingReference: null,
+    };
+
+    expect(english(handled)).toBe('Azzeldeen Al-Arabiat marked the capture incident on KH-ABCD1234 as handled');
+    expect(arabic(handled)).toBe('عولجت حالة الخصم على KH-ABCD1234 من قِبل Azzeldeen Al-Arabiat');
+    expect(toActivityRows([entry(handled)], now, t, 'en-GB')[0].icon).toBe('check-circle');
+  });
 });

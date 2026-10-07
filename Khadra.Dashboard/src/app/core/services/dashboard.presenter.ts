@@ -401,6 +401,7 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   OfficePayableHeld: 'pause-circle',
   OfficePayableReleased: 'check-circle',
   LegalDocumentPublished: 'gavel',
+  PaymentIncidentHandled: 'check-circle',
 };
 
 /**
@@ -446,6 +447,8 @@ const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   OfficePayableReleased: 'activity.officePayableReleased',
   // Labelled by the document's KIND NAME, worded here: never an English phrase in a table that cannot be rewritten.
   LegalDocumentPublished: 'activity.legalDocumentPublished',
+  // Labelled by the booking's reference, or the payment when it has none (Wave 4, B1).
+  PaymentIncidentHandled: 'activity.paymentIncidentHandled',
 };
 
 /** The lookup actions are shared by both lists; the entry's type says which one changed. */

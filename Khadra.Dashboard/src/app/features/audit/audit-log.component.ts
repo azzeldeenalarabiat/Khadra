@@ -56,6 +56,7 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   OfficePayableHeld: 'auditLog.actionOfficePayableHeld',
   OfficePayableReleased: 'auditLog.actionOfficePayableReleased',
   LegalDocumentPublished: 'auditLog.actionLegalDocumentPublished',
+  PaymentIncidentHandled: 'auditLog.actionPaymentIncidentHandled',
 };
 
 /** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */
@@ -73,6 +74,7 @@ const ENTITY_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
   OfficeSettlement: 'auditLog.entityOfficeSettlement',
   OfficePayable: 'auditLog.entityOfficePayable',
   LegalDocument: 'auditLog.entityLegalDocument',
+  PaymentIncident: 'auditLog.entityPaymentIncident',
 };
 
 /**
@@ -310,7 +312,7 @@ export class AuditLogComponent {
    */
   protected tone(action: string): Tone {
     if (/Rejected|Suspended|Deactivated|Hidden|Cancelled|NoShow|Expired|Voided/.test(action)) return 'bad';
-    if (/Approved|Reactivated|Restored|Resolved/.test(action)) return 'ok';
+    if (/Approved|Reactivated|Restored|Resolved|Handled/.test(action)) return 'ok';
     if (/Clarification|Opened|Assigned/.test(action)) return 'warn';
     return 'dim';
   }
