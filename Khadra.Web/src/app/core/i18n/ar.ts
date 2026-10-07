@@ -630,7 +630,7 @@ export const AR: Record<TranslationKey, Message> = {
   'booking.remainingBalance': 'المبلغ المتبقي',
   'booking.termsFrozen': 'هذه هي الشروط التي أُبرم الحجز بموجبها. تغيير أي إعداد اليوم لا يُعيد تسعير حجز سابق.',
   'booking.odometer': 'العدّاد {km} كم',
-  'booking.fuelLevel': 'الوقود {percent}%',
+  'booking.fuelLevel': 'الوقود {percent}',
   'booking.cash': 'المبلغ النقدي المستلم: {amount}',
   'booking.recordedAt': 'سُجّل {date}',
   'booking.disputeOpen': 'يوجد نزاع مفتوح على هذا الحجز، وخضرا تتولّاه.',

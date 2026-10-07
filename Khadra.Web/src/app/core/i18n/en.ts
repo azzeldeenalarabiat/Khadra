@@ -535,7 +535,7 @@ export const EN = {
   'booking.remainingBalance': 'Remaining balance',
   'booking.termsFrozen': 'These are the terms this booking was made under. Changing a setting today never re-prices a booking already made.',
   'booking.odometer': 'Odometer {km} km',
-  'booking.fuelLevel': 'Fuel {percent}%',
+  'booking.fuelLevel': 'Fuel {percent}',
   'booking.cash': 'Cash taken: {amount}',
   'booking.recordedAt': 'Recorded {date}',
   'booking.disputeOpen': 'A dispute is open on this booking. Khadra is handling it.',

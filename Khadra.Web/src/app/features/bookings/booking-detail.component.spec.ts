@@ -989,7 +989,7 @@ describe('BookingDetailComponent, the fuel level of a handover (Wave 4, F84)', (
     ],
   });
 
-  async function render(booking: object, language: 'ar' | 'en') {
+  async function render(booking: object, language: 'ar' | 'en', keepIsolates = false) {
     TestBed.configureTestingModule({
       imports: [BookingDetailComponent],
       providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -1006,9 +1006,11 @@ describe('BookingDetailComponent, the fuel level of a handover (Wave 4, F84)', (
     http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(booking));
     await settle();
     const page = fixture.nativeElement as HTMLElement;
-    // What a reader sees: the isolates the Arabic page puts around each figure carry no glyph.
+    // What a reader sees: the isolates the Arabic page puts around each figure carry no glyph. Kept on request, because
+    // where a sign falls relative to them decides which side of the figure it is drawn on.
     return [...page.querySelectorAll('.handover-record')]
-      .map((record) => (record.textContent ?? '').replace(/[⁨⁩]/g, '').replace(/\s+/g, ' '));
+      .map((record) => record.textContent ?? '')
+      .map((text) => (keepIsolates ? text : text.replace(/[⁨⁩]/g, '')).replace(/\s+/g, ' '));
   }
 
   it('reads a full tank and a half one as whole percentages, in English', async () => {
@@ -1023,5 +1025,14 @@ describe('BookingDetailComponent, the fuel level of a handover (Wave 4, F84)', (
     expect(pickup).toContain('الوقود 100%');
     expect(back).toContain('الوقود 0%');
     expect(pickup).not.toContain('الوقود 1%');
+  });
+
+  // Found in the local run (E2E F91): with the sign typed into the Arabic sentence after the isolated figure, the page
+  // drew «%100». The sign must travel inside the isolate with its figure, as the deposit's percentage does.
+  it('keeps the percent sign inside the isolate with its figure, so Arabic draws it after the number', async () => {
+    const [pickup, back] = await render(completed(0.75, 1), 'ar', true);
+    expect(pickup).toContain('الوقود ⁨75%⁩');
+    expect(back).toContain('الوقود ⁨100%⁩');
+    expect(back).not.toContain('⁩%');
   });
 });

@@ -3,7 +3,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { Money } from '../api/common.api';
 import { I18nService } from './i18n.service';
 import { formatCalendarDate, formatFrozenLocal } from './date-format';
-import { formatAmount, formatNumber, formatStoredAmount, fuelPercent } from './number-format';
+import { formatAmount, formatNumber, formatPercent, formatStoredAmount, fuelPercent } from './number-format';
 
 const FSI = '⁨';
 const PDI = '⁩';
@@ -66,9 +66,13 @@ export class FormatService {
     return formatNumber(value, this.locale(), fractionDigits);
   }
 
-  /** A handover's fuel level, recorded as a fraction of a full tank, as a whole percentage: 1 → "100". */
+  /**
+   * A handover's fuel level, recorded as a fraction of a full tank, as a whole percentage: 1 → "100%". The sign is
+   * part of the value, as the deposit's is, so an Arabic sentence isolates "100%" whole; a sign typed into the
+   * sentence after the figure landed on its left, «%100» (E2E F91).
+   */
   fuelLevel(level: number): string {
-    return this.number(fuelPercent(level));
+    return formatPercent(fuelPercent(level), this.locale());
   }
 
   /** 23 Sept 2026 */
