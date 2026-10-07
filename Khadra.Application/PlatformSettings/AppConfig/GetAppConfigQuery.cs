@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Legal;
 using Khadra.Application.Legal.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -260,22 +261,12 @@ public sealed class GetAppConfigHandler(
                 mobileApp.UpdateUrl?.AbsoluteUri),
             legalInForce is null
                 ? null
-                : new LegalConfigDto([.. legalInForce.Select(version => new LegalConfigDocumentDto(
-                    version.Kind.Name,
-                    version.Kind.Slug,
+                : new LegalConfigDto([.. legalInForce.Select(version => LegalPageLinks.Describe(
+                    site,
+                    version.Kind,
                     version.VersionId.Value,
                     version.VersionLabel,
-                    version.EffectiveFrom,
-                    PageUrls(version.Kind.Slug)))]));
-    }
-
-    /// <summary>The website's page for a document, in each language: the same paths the website serves.</summary>
-    private LegalPageUrlsDto? PageUrls(string slug)
-    {
-        if (site.BaseUrl is not { } baseUrl)
-            return null;
-        var root = baseUrl.AbsoluteUri.TrimEnd('/');
-        return new LegalPageUrlsDto($"{root}/en/{slug}", $"{root}/ar/{slug}");
+                    version.EffectiveFrom))]));
     }
 }
 

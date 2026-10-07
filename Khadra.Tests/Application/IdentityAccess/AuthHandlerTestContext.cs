@@ -61,10 +61,13 @@ internal sealed class AuthHandlerTestContext
             .Returns(call => Message(call.Arg<User>(), "admin", call.ArgAt<string>(1)));
     }
 
+    /// <summary>The legal texts in force and the consents staged (Wave 4, W4-8): nothing in force unless a test publishes.</summary>
+    public TestLegal Legal { get; } = new();
+
     // Registration is shared by the customer and dealer-owner flows; both handlers delegate here.
     public AccountRegistrar Registrar => new(
         UserRepository, VerificationTokens, Hasher, OpaqueTokens, Policy,
-        BusinessRules, Calendar, Clock, UnitOfWork, Emails);
+        BusinessRules, Calendar, Clock, UnitOfWork, Emails, Legal.Recorder);
 
     /// <summary>What the access tokens were minted for, so a test can read the session claim back.</summary>
     public StubAccessTokenIssuer AccessTokens { get; } = new();

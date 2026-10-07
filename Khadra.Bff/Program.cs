@@ -196,10 +196,10 @@ builder.Services.AddReverseProxy()
 
         transformBuilder.AddRequestTransform(async transform =>
         {
-            // The browser never chooses the API identity: strip its credentials, attach the server-held one.
-            transform.ProxyRequest.Headers.Remove("Cookie");
-            transform.ProxyRequest.Headers.Remove("Authorization");
-            transform.ProxyRequest.Headers.Remove(BffConstants.XsrfHeaderName);
+            // The browser never chooses the API identity, and is never the customer app: its credentials and the app's
+            // version header go (Wave 4, W4-8), on every route, anonymous ones included, before the early return below.
+            // The server-held token is attached afterwards.
+            ProxyRequestHeaders.RemoveBrowserSupplied(transform.ProxyRequest.Headers);
 
             var clientAddress = transform.HttpContext.Connection.RemoteIpAddress?.ToString();
             if (clientAddress is not null)

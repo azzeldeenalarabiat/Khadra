@@ -2,8 +2,10 @@ using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
 using Khadra.Application.IdentityAccess.Dtos;
+using Khadra.Application.Legal;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.Legal;
 using MediatR;
 
 namespace Khadra.Application.IdentityAccess.RegisterDealerOwner;
@@ -24,7 +26,9 @@ public sealed record RegisterDealerOwnerCommand(
     string Email,
     string Password,
     string FullName,
-    string Phone) : ICommand<Result<RegisteredUserDto, Error>>;
+    string Phone,
+    // The legal texts the console showed and the owner accepted (Wave 4, W4-8): required while a text is in force.
+    ConsentInput? Consent = null) : ICommand<Result<RegisteredUserDto, Error>>;
 
 public sealed class RegisterDealerOwnerCommandValidator : AbstractValidator<RegisterDealerOwnerCommand>
 {
@@ -34,6 +38,7 @@ public sealed class RegisterDealerOwnerCommandValidator : AbstractValidator<Regi
         RuleFor(command => command.Password).NotEmpty().MaximumLength(PasswordPolicy.MaximumLength);
         RuleFor(command => command.FullName).NotEmpty().MaximumLength(PersonName.MaxLength);
         RuleFor(command => command.Phone).NotEmpty().MaximumLength(32);
+        RuleFor(command => command.Consent!).SetValidator(new ConsentInputValidator()).When(command => command.Consent is not null);
     }
 }
 
@@ -55,6 +60,8 @@ public sealed class RegisterDealerOwnerHandler(AccountRegistrar registrar)
             enforceMinimumAge: false,
             (email, phone, name, hash, now, _) =>
                 User.RegisterDealerOwner(email, phone, name, hash, now),
+            // Only the console registers an office's owner, and the console must ask (W4-D7).
+            new ConsentRequest(request.Consent ?? ConsentInput.None, ConsentChannel.Console, Required: true),
             cancellationToken);
     }
 }

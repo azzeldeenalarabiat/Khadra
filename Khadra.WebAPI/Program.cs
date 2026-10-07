@@ -714,6 +714,9 @@ app.UseRateLimiter();
 app.UseMiddleware<MobileAppVersionGate>();
 app.UseAuthentication();
 app.UseAuthorization();
+// After authorization: a website or console request from a person who has not accepted a legal text in force is
+// refused (Wave 4, W4-8) — see LegalConsentGate for whom it never judges.
+app.UseMiddleware<LegalConsentGate>();
 
 app.MapControllers();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();

@@ -12,6 +12,12 @@ internal static class BffConstants
     /// <summary>Carries BffSecurity:FrontendSharedSecret to the renderer.</summary>
     public const string EdgeSecretHeaderName = "X-Khadra-Edge";
 
+    /// <summary>
+    /// The header a customer app build declares its version in (the API's <c>MobileAppContract.VersionHeader</c>; a test
+    /// pins the two equal). Never forwarded: nothing behind this BFF is the customer app (Wave 4, W4-8).
+    /// </summary>
+    public const string CustomerAppVersionHeaderName = "X-Khadra-App-Version";
+
     public const string AccessTokenName = "access_token";
     public const string RefreshTokenName = "refresh_token";
     public const string AccessExpiresAtName = "expires_at";

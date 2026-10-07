@@ -54,6 +54,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<OfficeSettlementVoid> OfficeSettlementVoids => Set<OfficeSettlementVoid>();
     public DbSet<OfficePayableHold> OfficePayableHolds => Set<OfficePayableHold>();
     public DbSet<LegalDocumentVersion> LegalDocumentVersions => Set<LegalDocumentVersion>();
+    public DbSet<LegalConsent> LegalConsents => Set<LegalConsent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -23,6 +23,8 @@ public static class DependencyInjection
 
         services.AddScoped<AuthTokenFactory>();
         services.AddScoped<AccountRegistrar>();
+        // Consent to the legal texts (Wave 4, W4-8): staged for the caller's own save, never saved here.
+        services.AddScoped<Legal.LegalConsentRecorder>();
         services.AddScoped<IdentityAccess.AdminUsers.AdminBootstrapper>();
         services.AddScoped<Auditing.AdminActionRecorder>();
         services.AddScoped<Auditing.DocumentAccessRecorder>();

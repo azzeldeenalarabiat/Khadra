@@ -39,4 +39,7 @@ public sealed record AuthTokensDto(
 /// failed — the account and its token are saved either way — it means nothing is on its way to that
 /// inbox and the person should be told to ask for another link rather than sent off to wait.
 /// </param>
-public sealed record RegisteredUserDto(Guid UserId, string Email, bool VerificationEmailSent);
+/// <param name="ConsentsRecorded">
+/// How many of the legal texts in force this registration recorded as accepted (Wave 4, W4-8); 0 when none was asked.
+/// </param>
+public sealed record RegisteredUserDto(Guid UserId, string Email, bool VerificationEmailSent, int ConsentsRecorded = 0);

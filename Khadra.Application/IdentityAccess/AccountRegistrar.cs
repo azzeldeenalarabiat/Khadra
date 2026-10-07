@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess.Dtos;
+using Khadra.Application.Legal;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
@@ -33,7 +34,8 @@ public sealed class AccountRegistrar(
     IReportingCalendar calendar,
     IClock clock,
     IUnitOfWork unitOfWork,
-    AuthEmailDispatcher emails)
+    AuthEmailDispatcher emails,
+    LegalConsentRecorder consents)
 {
     public delegate User CreateUser(
         EmailAddress email,
@@ -47,6 +49,7 @@ public sealed class AccountRegistrar(
     /// Whether the configured renter minimum age applies to this registration. True for a customer,
     /// false for a gallery owner: see the class remarks.
     /// </param>
+    /// <param name="consent">What this registration must record of the legal texts in force (Wave 4, W4-8).</param>
     public async Task<Result<RegisteredUserDto, Error>> RegisterAsync(
         string rawEmail,
         string rawPhone,
@@ -55,9 +58,11 @@ public sealed class AccountRegistrar(
         DateOnly? dateOfBirth,
         bool enforceMinimumAge,
         CreateUser create,
+        ConsentRequest consent,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(create);
+        ArgumentNullException.ThrowIfNull(consent);
 
         var email = EmailAddress.Create(rawEmail);
         if (email.IsFailure)
@@ -100,6 +105,13 @@ public sealed class AccountRegistrar(
             dateOfBirth);
         await users.AddAsync(user, cancellationToken);
 
+        // The texts in force, accepted in the same save as the account (Wave 4, W4-8): a refused registration leaves
+        // no consent behind, and an account never exists without the consent it was asked for.
+        var consented = await consents.StageAsync(
+            user.Id, consent.Input, consent.Channel, consent.Required, now, cancellationToken);
+        if (consented.IsFailure)
+            return consented.Error;
+
         var rawToken = opaqueTokens.Generate();
         var verification = VerificationToken.Issue(
             user.Id,
@@ -122,6 +134,6 @@ public sealed class AccountRegistrar(
         // verification email that was never sent. The same reasoning as BookingEmailDispatcher.
         var delivered = await emails.SendEmailVerificationAsync(user, rawToken.Value, CancellationToken.None);
 
-        return new RegisteredUserDto(user.Id, user.Email.Value, delivered);
+        return new RegisteredUserDto(user.Id, user.Email.Value, delivered, consented.Value);
     }
 }

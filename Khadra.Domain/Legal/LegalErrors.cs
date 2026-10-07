@@ -42,6 +42,38 @@ public static class LegalErrors
             "Another version of this document was published at the same moment. Reload the list and try again.");
 
     /// <summary>
+    /// A registration or an invitation that must accept the texts in force did not (Wave 4, W4-8). Only a caller that is
+    /// not the customer app is asked, and only while a text is in force.
+    /// </summary>
+    public static readonly Error ConsentRequired =
+        Error.Validation(
+            "legal.consent_required",
+            "Read and accept the Terms of Service and the Privacy notice to continue.");
+
+    /// <summary>
+    /// A consent named a version that is not the one in force — superseded since the screen read it, or never published.
+    /// The screen reloads the texts and asks again.
+    /// </summary>
+    public static readonly Error VersionNotCurrent =
+        Error.Conflict(
+            "legal.version_not_current",
+            "The Terms of Service or the Privacy notice have just been updated. Read the current version and accept it again.");
+
+    /// <summary>An acceptance must say which language the texts were read in: the version holds both.</summary>
+    public static readonly Error ConsentLanguageRequired =
+        Error.Validation("legal.consent_language_required", "Say which language the texts were read in: ar or en.");
+
+    /// <summary>
+    /// The answer of the consent gate (Wave 4, W4-8): this account has not accepted a text in force, and the website or
+    /// the console asked for something other than what resolves that. Never sent to the customer app or to an
+    /// administrator.
+    /// </summary>
+    public static readonly Error ConsentPending =
+        Error.Forbidden(
+            "legal.consent_pending",
+            "Accept the current Terms of Service and Privacy notice to continue.");
+
+    /// <summary>
     /// The text uses Markdown this platform does not publish. Its extensions say which language, which line and why:
     /// <c>language</c> (<c>en</c> or <c>ar</c>), <c>line</c> (from 1) and <c>reason</c>.
     /// </summary>

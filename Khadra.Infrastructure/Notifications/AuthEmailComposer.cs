@@ -123,7 +123,9 @@ internal sealed class AuthEmailComposer(IOptions<AppOptions> options) : IAuthEma
 
         return Compose(
             user,
-            Link("accept-invitation", rawToken),
+            // `for=staff` tells the screen to ask for the legal texts in force before it is answered (Wave 4, W4-8). A
+            // display hint only: the server decides by the token, and a link without it falls back to the refusal.
+            $"{Link("accept-invitation", rawToken)}&for=staff",
             subject: $"{dealerName} دعاك إلى خضرا · {dealerName} has invited you to Khadra",
             arabicBody:
                 $"أضافك {business} موظفاً على خضرا. ستتمكن من الاطّلاع على طلبات حجز المكتب والرد عليها.",

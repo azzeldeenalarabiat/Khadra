@@ -210,5 +210,12 @@ internal readonly record struct ClientBuild(bool IsTheApp, AppVersion? Version, 
     public bool IsSupportedAt(AppVersion minimum) =>
         !IsTheApp || (Version is { } version && version >= minimum);
 
+    /// <summary>
+    /// A customer app build that declared a version that parses: the one caller the legal-consent rules spare until a
+    /// build asks for consent itself (Wave 4, W4-8; the advisor's review). Not a legacy User-Agent and not an
+    /// unreadable version — either can be typed by anyone, and with no minimum configured neither would be refused.
+    /// </summary>
+    public bool DeclaresAVersion => IsTheApp && Version is not null;
+
     public string Describe() => IsTheApp ? Evidence : "not the customer app";
 }

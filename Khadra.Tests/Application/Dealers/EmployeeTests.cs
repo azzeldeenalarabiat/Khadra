@@ -7,7 +7,9 @@ using Khadra.Application.Dealers.ManageEmployees;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.IdentityAccess;
 using Khadra.Application.IdentityAccess.AcceptInvitation;
+using Khadra.Application.Legal;
 using Khadra.Domain.Common;
+using Khadra.Domain.Legal;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.IdentityAccess;
@@ -81,8 +83,11 @@ public sealed class EmployeeTests
             Clock,
             UnitOfWork);
 
+        /// <summary>The legal texts in force (Wave 4, W4-8): nothing unless a test publishes.</summary>
+        public TestLegal Legal { get; } = new();
+
         public AcceptInvitationHandler Accept() =>
-            new(Tokens, Users, Hasher, Opaque, TestAuthPolicy.Default, Clock, UnitOfWork);
+            new(Tokens, Users, Hasher, Opaque, TestAuthPolicy.Default, Clock, UnitOfWork, Legal.Recorder);
     }
 
     private static InviteEmployeeCommand Invite(Id owner) =>
@@ -143,6 +148,84 @@ public sealed class EmployeeTests
         Assert.Equal("auth.email_taken", result.Error.Code);
         Assert.Empty(context.Dealer.Employees);
         await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>A staff invitation accepts the legal texts in force in its own save (Wave 4, W4-8), as the console's.</summary>
+    [Fact]
+    public async Task A_staff_invitation_accepts_the_texts_in_force_in_the_same_save()
+    {
+        var context = new Context();
+        var (terms, privacy) = context.Legal.PublishBoth();
+        var (user, raw) = await InvitedAsync(context);
+
+        var accepted = await context.Accept().Handle(
+            new AcceptInvitationCommand(raw, "Passw0rd1", new ConsentInput([terms.Value, privacy.Value], "ar")),
+            CancellationToken.None);
+
+        Assert.Equal(2, accepted.Value);
+        Assert.All(context.Legal.Staged, consent =>
+        {
+            Assert.Equal(user.Id, consent.UserId);
+            Assert.Same(ConsentChannel.Console, consent.Channel);
+        });
+        Assert.True(user.IsEmailVerified);
+    }
+
+    /// <summary>Refused before anything is saved, so the link is not spent: the person ticks the box and tries again.</summary>
+    [Fact]
+    public async Task A_staff_invitation_without_the_texts_in_force_is_refused_and_nothing_is_saved()
+    {
+        var context = new Context();
+        context.Legal.PublishBoth();
+        var (user, raw) = await InvitedAsync(context);
+        context.UnitOfWork.ClearReceivedCalls();
+
+        var refused = await context.Accept().Handle(new AcceptInvitationCommand(raw, "Passw0rd1"), CancellationToken.None);
+
+        Assert.Equal(LegalErrors.ConsentRequired.Code, refused.Error.Code);
+        Assert.Empty(context.Legal.Staged);
+        Assert.Null(user.PasswordChangedAt);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The texts address customers and rental offices, not Khadra's own staff (owner, 2026-10-07): an administrator's
+    /// invitation asks for nothing, and records nothing even when something is sent.
+    /// </summary>
+    [Fact]
+    public async Task An_administrators_invitation_asks_for_nothing_and_records_nothing()
+    {
+        var context = new Context();
+        var (terms, privacy) = context.Legal.PublishBoth();
+        var admin = User.CreateInvitedAdmin(
+            EmailAddress.Create("staff@khadra.jo").Value,
+            PhoneNumber.Create("0790000001").Value,
+            PersonName.Create("Dana Saleh").Value,
+            PasswordHash.FromHash("unusable"),
+            Build.Now);
+        var raw = context.Opaque.Generate();
+        var token = VerificationToken.Issue(admin.Id, VerificationPurpose.AdminInvitation, raw.Hash, Build.Now, TimeSpan.FromDays(7));
+        context.Tokens.GetByHashAsync(raw.Hash, VerificationPurpose.AdminInvitation, Arg.Any<CancellationToken>()).Returns(token);
+        context.Users.GetByIdAsync(admin.Id, Arg.Any<CancellationToken>()).Returns(admin);
+
+        var withNothing = await context.Accept().Handle(new AcceptInvitationCommand(raw.Value, "Passw0rd1"), CancellationToken.None);
+
+        Assert.Equal(0, withNothing.Value);
+        Assert.Empty(context.Legal.Staged);
+        Assert.True(admin.IsEmailVerified);
+    }
+
+    /// <summary>Invites one employee and makes their link redeemable: the account and the raw link.</summary>
+    private static async Task<(User User, string Raw)> InvitedAsync(Context context)
+    {
+        await context.Handlers().Handle(Invite(OwnerId), CancellationToken.None);
+        var user = context.AddedUsers.Single();
+        var token = context.IssuedTokens.Single();
+        var raw = context.Opaque.Issued.Single().Value;
+        context.Tokens.GetByHashAsync(context.Opaque.Hash(raw), VerificationPurpose.EmployeeInvitation, Arg.Any<CancellationToken>())
+            .Returns(token);
+        context.Users.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+        return (user, raw);
     }
 
     [Fact]

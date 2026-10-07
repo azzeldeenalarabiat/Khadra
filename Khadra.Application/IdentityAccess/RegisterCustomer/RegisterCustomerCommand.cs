@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
 using Khadra.Application.IdentityAccess.Dtos;
+using Khadra.Application.Legal;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 
@@ -16,7 +17,11 @@ public sealed record RegisterCustomerCommand(
     // because whether it is required depends on a configured business rule, and RenterAgePolicy is
     // the single place that decides.
     DateOnly? DateOfBirth,
-    bool IsForeignNational) : ICommand<Result<RegisteredUserDto, Error>>;
+    bool IsForeignNational,
+    // The legal texts the screen showed and the person accepted (Wave 4, W4-8). Required of every caller but the
+    // customer app while a text is in force: see the handler.
+    ConsentInput? Consent = null,
+    ClientInfo? Client = null) : ICommand<Result<RegisteredUserDto, Error>>;
 
 public sealed class RegisterCustomerCommandValidator : AbstractValidator<RegisterCustomerCommand>
 {
@@ -31,5 +36,6 @@ public sealed class RegisterCustomerCommandValidator : AbstractValidator<Registe
         RuleFor(command => command.DateOfBirth)
             .Must(date => date is null || date.Value.Year >= 1900)
             .WithMessage("The date of birth is not valid.");
+        RuleFor(command => command.Consent!).SetValidator(new ConsentInputValidator()).When(command => command.Consent is not null);
     }
 }

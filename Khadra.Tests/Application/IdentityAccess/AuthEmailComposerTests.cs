@@ -190,6 +190,24 @@ public sealed class AuthEmailLinkTargetTests
         Assert.DoesNotContain(Website, verify.HtmlBody + invitation.HtmlBody, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A staff invitation's link says so (Wave 4, W4-8), so the screen asks for the legal texts in force before it is
+    /// answered; an administrator's says nothing, because nothing is asked of them. A display hint only: the server
+    /// decides by the token.
+    /// </summary>
+    [Fact]
+    public void A_staff_invitation_link_says_it_is_for_staff_and_an_administrators_does_not()
+    {
+        var composer = Composer(Website);
+
+        var staff = composer.EmployeeInvitation(Build.Customer(), "Petra Rentals", "tok-3");
+        var admin = composer.AdminInvitation(Build.Customer(), "tok-4");
+
+        Assert.Contains($"{Console}/accept-invitation?token=tok-3&for=staff", staff.TextBody, StringComparison.Ordinal);
+        Assert.Contains($"{Console}/accept-invitation?token=tok-4", admin.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("for=staff", admin.TextBody + admin.HtmlBody, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Until_the_website_is_set_a_customer_is_sent_where_they_always_were()
     {

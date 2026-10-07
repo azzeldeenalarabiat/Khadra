@@ -1,5 +1,6 @@
 using Khadra.Application.Common;
 using Khadra.Application.IdentityAccess.ChangePassword;
+using Khadra.Application.IdentityAccess.Dtos;
 using Khadra.Application.IdentityAccess.GetCurrentUser;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess.Logout;
@@ -355,7 +356,7 @@ public sealed class GetCurrentUserHandlerTests
     {
         var context = new AuthHandlerTestContext();
         var user = context.KnownUser(Users.Customer());
-        var handler = new GetCurrentUserHandler(context.UserRepository);
+        var handler = new GetCurrentUserHandler(context.UserRepository, context.Legal.Consents, context.Legal.Site, context.Clock);
 
         var found = await handler.Handle(new GetCurrentUserQuery(user.Id), CancellationToken.None);
         var missing = await handler.Handle(new GetCurrentUserQuery(Id.New()), CancellationToken.None);
@@ -364,6 +365,57 @@ public sealed class GetCurrentUserHandlerTests
         Assert.Equal("Customer", found.Value.Role);
         Assert.True(found.Value.IsEmailVerified);
         Assert.Equal("auth.user_not_found", missing.Error.Code);
+    }
+
+    /// <summary>
+    /// Every installed customer app reads <c>/auth/me</c>'s fields at the top level (the advisor's review, blocking): the
+    /// consent list is added BESIDE them, and the answer stays a superset of <see cref="UserDto"/>, name for name.
+    /// </summary>
+    [Fact]
+    public async Task The_answer_stays_flat_and_carries_every_field_an_installed_app_reads()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        var handler = new GetCurrentUserHandler(context.UserRepository, context.Legal.Consents, context.Legal.Site, context.Clock);
+
+        var current = (await handler.Handle(new GetCurrentUserQuery(user.Id), CancellationToken.None)).Value;
+
+        var web = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+        var before = System.Text.Json.JsonSerializer.SerializeToElement(UserDto.From(user), web)
+            .EnumerateObject().Select(property => property.Name).ToList();
+        var now = System.Text.Json.JsonSerializer.SerializeToElement(current, web);
+        var names = now.EnumerateObject().Select(property => property.Name).ToList();
+
+        Assert.Subset(names.ToHashSet(), before.ToHashSet());
+        Assert.Contains("pendingConsents", names);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, now.GetProperty("pendingConsents").ValueKind);
+        // Flat: the user's own fields are values, never an object wrapped around them.
+        Assert.Equal(System.Text.Json.JsonValueKind.String, now.GetProperty("email").ValueKind);
+    }
+
+    [Fact]
+    public async Task It_names_the_texts_still_to_accept_and_never_asks_an_administrator()
+    {
+        var context = new AuthHandlerTestContext();
+        var customer = context.KnownUser(Users.Customer());
+        var admin = context.KnownUser(User.CreateInvitedAdmin(
+            EmailAddress.Create("staff@khadra.jo").Value,
+            PhoneNumber.Create("0790000001").Value,
+            PersonName.Create("Dana Saleh").Value,
+            PasswordHash.FromHash("unusable"),
+            Users.Now));
+        var terms = new Khadra.Application.Legal.ReadModels.PendingLegalVersion(
+            Khadra.Domain.Legal.LegalDocumentKind.Terms, Id.New(), "2026-10", TestLegal.Published);
+        context.Legal.Consents.PendingAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([terms]);
+        var handler = new GetCurrentUserHandler(context.UserRepository, context.Legal.Consents, context.Legal.Site, context.Clock);
+
+        var forCustomer = (await handler.Handle(new GetCurrentUserQuery(customer.Id), CancellationToken.None)).Value;
+        var forAdmin = (await handler.Handle(new GetCurrentUserQuery(admin.Id), CancellationToken.None)).Value;
+
+        var pending = Assert.Single(forCustomer.PendingConsents);
+        Assert.Equal(("Terms", terms.VersionId.Value), (pending.Kind, pending.VersionId));
+        Assert.Empty(forAdmin.PendingConsents);
     }
 }
 

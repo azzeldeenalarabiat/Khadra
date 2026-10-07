@@ -73,7 +73,19 @@ SELECT encode(sha256(convert_to(body_en, 'UTF8')), 'hex') = body_en_sha256::text
 
         await RefusedAsync(connection, "UPDATE legal_document_versions SET body_en = 'Rewritten.'", "is append-only");
         await RefusedAsync(connection, "DELETE FROM legal_document_versions", "is append-only");
-        await RefusedAsync(connection, "TRUNCATE legal_document_versions", "is append-only");
+        // Since Wave 4 (W4-8) the consents reference this table, and PostgreSQL refuses to truncate a referenced table
+        // before any trigger runs; either refusal keeps the record.
+        await using (var truncate = new NpgsqlCommand("TRUNCATE legal_document_versions", connection))
+        {
+            var refusal = await Assert.ThrowsAsync<PostgresException>(() => truncate.ExecuteNonQueryAsync());
+            Assert.True(
+                refusal.MessageText.Contains("is append-only", StringComparison.Ordinal)
+                || refusal.SqlState == PostgresErrorCodes.FeatureNotSupported,
+                refusal.MessageText);
+        }
+
+        await using (var count = new NpgsqlCommand("SELECT count(*) FROM legal_document_versions", connection))
+            Assert.Equal(1L, (long)(await count.ExecuteScalarAsync())!);
         await CheckRefusedAsync(connection, "ck_legal_document_versions_effective_from", @"
 INSERT INTO legal_document_versions (id, kind, version_label, effective_from, published_at, published_by_admin_id,
                                      body_en, body_ar, body_en_sha256, body_ar_sha256)

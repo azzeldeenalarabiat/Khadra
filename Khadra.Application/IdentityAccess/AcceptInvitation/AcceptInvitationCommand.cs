@@ -2,8 +2,10 @@ using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Legal;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.Legal;
 using Khadra.Domain.IdentityAccess.Repositories;
 using MediatR;
 
@@ -13,7 +15,13 @@ namespace Khadra.Application.IdentityAccess.AcceptInvitation;
 /// An invited employee takes up their account: proves they own the mailbox, sets their first
 /// password, and can sign in from then on (spec 4.2).
 /// </summary>
-public sealed record AcceptInvitationCommand(string Token, string Password) : ICommand<UnitResult<Error>>;
+/// <param name="Consent">
+/// The legal texts the console showed and the person accepted (Wave 4, W4-8): required of a staff invitation while a
+/// text is in force; ignored for an administrator's, whom the texts do not address (owner, 2026-10-07).
+/// </param>
+/// <returns>How many acceptances were recorded.</returns>
+public sealed record AcceptInvitationCommand(string Token, string Password, ConsentInput? Consent = null)
+    : ICommand<Result<int, Error>>;
 
 public sealed class AcceptInvitationCommandValidator : AbstractValidator<AcceptInvitationCommand>
 {
@@ -21,6 +29,7 @@ public sealed class AcceptInvitationCommandValidator : AbstractValidator<AcceptI
     {
         RuleFor(command => command.Token).NotEmpty().MaximumLength(512);
         RuleFor(command => command.Password).NotEmpty().MaximumLength(72);
+        RuleFor(command => command.Consent!).SetValidator(new ConsentInputValidator()).When(command => command.Consent is not null);
     }
 }
 
@@ -32,16 +41,17 @@ public sealed class AcceptInvitationHandler(
     IOpaqueTokenService opaqueTokens,
     IAuthPolicySettings policy,
     IClock clock,
-    IUnitOfWork unitOfWork)
-    : IRequestHandler<AcceptInvitationCommand, UnitResult<Error>>
+    IUnitOfWork unitOfWork,
+    LegalConsentRecorder consents)
+    : IRequestHandler<AcceptInvitationCommand, Result<int, Error>>
 {
-    public async Task<UnitResult<Error>> Handle(AcceptInvitationCommand request, CancellationToken cancellationToken)
+    public async Task<Result<int, Error>> Handle(AcceptInvitationCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         var password = PasswordPolicy.Validate(request.Password, policy.PasswordMinimumLength);
         if (password.IsFailure)
-            return password;
+            return password.Error;
 
         var now = clock.UtcNow;
 
@@ -53,15 +63,15 @@ public sealed class AcceptInvitationHandler(
             await verificationTokens.GetByHashAsync(hash, VerificationPurpose.EmployeeInvitation, cancellationToken)
             ?? await verificationTokens.GetByHashAsync(hash, VerificationPurpose.AdminInvitation, cancellationToken);
         if (token is null)
-            return UnitResult.Failure(IdentityErrors.InvalidToken);
+            return IdentityErrors.InvalidToken;
 
         var consumed = token.Consume(now);
         if (consumed.IsFailure)
-            return consumed;
+            return consumed.Error;
 
         var user = await users.GetByIdAsync(token.UserId, cancellationToken);
         if (user is null)
-            return UnitResult.Failure(IdentityErrors.InvalidToken);
+            return IdentityErrors.InvalidToken;
 
         // An invitation must not outlive the first real password.
         //
@@ -79,7 +89,20 @@ public sealed class AcceptInvitationHandler(
         // the address rather than the role, so an invited administrator can use it) still has none
         // until they choose one here.
         if (user.PasswordChangedAt is not null)
-            return UnitResult.Failure(IdentityErrors.InvalidToken);
+            return IdentityErrors.InvalidToken;
+
+        // A staff invitation accepts the texts in force in the same save (Wave 4, W4-8); a refusal here saves nothing,
+        // so it does not spend the invitation. An administrator's asks nothing: the texts address customers and rental
+        // offices, not Khadra's own staff (owner, 2026-10-07), and whatever was sent with it is not recorded.
+        var recorded = 0;
+        if (token.Purpose == VerificationPurpose.EmployeeInvitation)
+        {
+            var consented = await consents.StageAsync(
+                user.Id, request.Consent ?? ConsentInput.None, ConsentChannel.Console, required: true, now, cancellationToken);
+            if (consented.IsFailure)
+                return consented.Error;
+            recorded = consented.Value;
+        }
 
         // Accepting IS the proof of address: nobody else could have read the link. Then the first
         // real password replaces the unusable one; the stamp rotation and session revoke it raises
@@ -88,6 +111,6 @@ public sealed class AcceptInvitationHandler(
         user.ChangePassword(PasswordHash.FromHash(passwordHasher.Hash(request.Password)), now);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return UnitResult.Success<Error>();
+        return recorded;
     }
 }

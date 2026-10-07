@@ -415,6 +415,8 @@ public static class DependencyInjection
         // The published legal texts (Wave 2 G1), and the one renderer their preview and their public page share.
         services.AddScoped<ILegalDocumentVersionRepository, LegalDocumentVersionRepository>();
         services.AddSingleton<ILegalTextRenderer, MarkdigLegalTextRenderer>();
+        // Consents to those texts (Wave 4, W4-8): append-only, staged for the caller's own save.
+        services.AddScoped<ILegalConsentRepository, LegalConsentRepository>();
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
 
@@ -443,6 +445,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<ILegalDocumentReader, LegalDocumentReader>();
+        services.AddScoped<ILegalConsentReader, LegalConsentReader>();
         // The administrator's payments list, refunds queue and payment page, and the dashboard's money
         // panel and attention rows (payments Phase 4b).
         services.AddScoped<IPaymentAdminReader, PaymentAdminReader>();
