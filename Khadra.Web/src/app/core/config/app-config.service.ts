@@ -53,6 +53,20 @@ export class AppConfigService {
     return this.inFlight;
   }
 
+  /**
+   * Reads the platform's facts again, past the browser's cache (Wave 4, W4-8): a registration refused because a legal
+   * text it showed was replaced, or because a text is in force that the page never showed, re-presents what is
+   * current rather than failing. A failure keeps what is already known.
+   */
+  async reloadLegal(): Promise<void> {
+    try {
+      this.state.set(await firstValueFrom(this.http.get<AppConfig>('/api/v1/app-config', { cache: 'no-store' })));
+      this.failed.set(false);
+    } catch {
+      // The texts already shown stay; the server goes on refusing a version that is not in force.
+    }
+  }
+
   /** Ask now, instead of waiting for the next scheduled attempt. */
   retryNow(): Promise<AppConfig | null> {
     if (this.retryTimer) clearTimeout(this.retryTimer);

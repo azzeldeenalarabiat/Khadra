@@ -1,12 +1,15 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { CONSENT_REQUIRED, VERSION_NOT_CURRENT } from '../../core/services/consent-gate.service';
+import { PlatformConfigService } from '../../core/services/platform-config.service';
 import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { LegalConsentComponent } from '../../shared/legal-consent/legal-consent.component';
 import { LegalLinksComponent } from '../../shared/legal-links/legal-links.component';
 
 /**
@@ -20,21 +23,29 @@ import { LegalLinksComponent } from '../../shared/legal-links/legal-links.compon
  * No date of birth is asked for. Spec 5.1's minimum age governs who may RENT a car, and the person
  * who owns the rental office is not renting one; their identity is proved by the ID document an
  * administrator reads at licence review. The server no longer asks for it either.
+ *
+ * While a legal text is in force, the owner accepts it here, and the account and the acceptance are saved together
+ * (Wave 4, W4-8): the server refuses a registration without it.
  */
 @Component({
   selector: 'kh-register-dealer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './register-dealer.component.html',
-  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent, LegalLinksComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent, LegalConsentComponent, LegalLinksComponent],
 })
 export class RegisterDealerComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   private readonly http = inject(HttpClient);
+  private readonly config = inject(PlatformConfigService);
 
   protected readonly fullName = signal('');
   protected readonly email = signal('');
   protected readonly phone = signal('');
   protected readonly password = signal('');
+  /** The legal texts in force, accepted. Asked only while one is in force. */
+  protected readonly agreed = signal(false);
+  private readonly legalVersions = computed(() => this.config.legal().map((text) => text.versionId));
 
   protected readonly busy = signal(false);
   protected readonly problem = signal<string | null>(null);
@@ -56,15 +67,23 @@ export class RegisterDealerComponent {
   protected async submit(): Promise<void> {
     if (this.busy()) return;
 
+    const versions = this.legalVersions();
     const body = {
       fullName: this.fullName().trim(),
       email: this.email().trim(),
       phone: this.phone().trim(),
       password: this.password(),
+      // The texts the page showed, in the language it showed them in (Wave 4, W4-8).
+      ...(versions.length ? { acceptedLegalVersions: versions, legalLanguage: this.i18n.lang() } : {}),
     };
 
     if (!body.fullName || !body.email || !body.phone || !body.password) {
       this.problem.set(this.t('registerDealer.fillInEveryField'));
+      return;
+    }
+
+    if (versions.length && !this.agreed()) {
+      this.problem.set(this.t('consent.required'));
       return;
     }
 
@@ -84,7 +103,16 @@ export class RegisterDealerComponent {
       this.registered.set(created.email);
       this.emailSent.set(created.verificationEmailSent);
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      const code: string | undefined = error instanceof HttpErrorResponse ? error.error?.code : undefined;
+      if (code === VERSION_NOT_CURRENT || code === CONSENT_REQUIRED) {
+        // A text was replaced while this page was open, or one is in force that this page never showed: present the
+        // current texts, unticked, rather than failing.
+        await this.config.reloadLegal();
+        this.agreed.set(false);
+        this.problem.set(this.t(code === VERSION_NOT_CURRENT ? 'consent.versionChanged' : 'consent.required'));
+      } else {
+        this.problem.set(describe(error, this.t));
+      }
     } finally {
       this.busy.set(false);
     }

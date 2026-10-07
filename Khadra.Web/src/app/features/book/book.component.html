@@ -95,7 +95,7 @@
     }
     @if (documentsIncomplete()) {
       <div class="notice notice--warn"><kh-icon name="identification-card" />
-        <div><p class="notice__title">{{ i18n.t('book.documentsTitle') }}</p><p>{{ i18n.t('book.documentsText') }}</p>
+        <div><p class="notice__title">{{ i18n.t(documentsRejected() ? 'book.documentsRejectedTitle' : 'book.documentsTitle') }}</p><p>{{ i18n.t(documentsRejected() ? 'book.documentsRejectedText' : 'book.documentsText') }}</p>
           <a class="link" [routerLink]="i18n.link('profile', 'documents')">{{ i18n.t('book.documentsAction') }}</a></div></div>
     }
     @if (refusal(); as text) {

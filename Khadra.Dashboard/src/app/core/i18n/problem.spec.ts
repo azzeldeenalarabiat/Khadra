@@ -90,6 +90,17 @@ describe('problemMessage', () => {
     expect(problemMessage(phone, 'ar', t)).not.toBe(problemMessage(email, 'ar', t));
   });
 
+  it("says a renter's file was replaced after it was opened, rather than a generic conflict (Wave 4, W4-9)", () => {
+    const replaced = refusal(409, {
+      code: 'documents.changed_since_viewed',
+      title: 'The customer has uploaded a new file since you opened this one.',
+    });
+
+    expect(problemMessage(replaced, 'ar', t)).toBe('«problem.documentChangedSinceViewed»');
+    expect(problemMessage(replaced, 'en', t)).toBe('«problem.documentChangedSinceViewed»');
+    expect(problemMessage(refusal(404, { code: 'documents.not_found' }), 'ar', t)).toBe('«problem.documentNotFound»');
+  });
+
   it('words a malformed address from the code the API now sends', () => {
     // Before the controller stopped carrying [EmailAddress] this arrived as a bare model-validation
     // failure with no code at all — the second case below, which is why both are covered.

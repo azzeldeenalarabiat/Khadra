@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { ConsentGateService } from '../session/consent-gate.service';
 import { SessionService } from '../session/session.service';
 import { ShortlistService } from './shortlist.service';
 
@@ -16,6 +17,8 @@ class PageComponent {}
 
 describe('ShortlistService, a heart pressed before signing in (Wave 3 E5, E2E F12)', () => {
   const signedIn = signal(false);
+  /** Whether the customer is known to owe no legal consent (Wave 4, W4-8). */
+  const consentClear = signal(true);
 
   afterEach(() => TestBed.resetTestingModule());
 
@@ -27,6 +30,7 @@ describe('ShortlistService, a heart pressed before signing in (Wave 3 E5, E2E F1
         provideHttpClientTesting(),
         provideRouter([{ path: '**', component: PageComponent }]),
         { provide: SessionService, useValue: { isSignedIn: signedIn, user: signal(null) } },
+        { provide: ConsentGateService, useValue: { clear: consentClear } },
       ],
     });
     const service = TestBed.inject(ShortlistService);
@@ -62,6 +66,21 @@ describe('ShortlistService, a heart pressed before signing in (Wave 3 E5, E2E F1
     http.expectNone(SAVE_URL);
 
     signedIn.set(true);
+    await settle();
+    http.expectOne(SAVE_URL).flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  // Wave 4, W4-8: the save would only be refused while a legal text awaits the customer's consent.
+  it('waits until the customer owes no legal consent, then saves the car', async () => {
+    signedIn.set(true);
+    consentClear.set(false);
+    const { http, router } = setUp();
+
+    await router.navigateByUrl(`/en/cars?save=${CAR}`);
+    await settle();
+    http.expectNone(SAVE_URL);
+
+    consentClear.set(true);
     await settle();
     http.expectOne(SAVE_URL).flush(null, { status: 204, statusText: 'No Content' });
   });

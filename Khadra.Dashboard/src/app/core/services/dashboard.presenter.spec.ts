@@ -428,6 +428,21 @@ describe('toActivityRows', () => {
     expect(arabic(suspended)).toBe('أُوقف حساب العميل 0198abcd من قِبل Omar Haddad');
   });
 
+  it("words a rejected document by the customer's short reference, never a name (Wave 4, W4-9)", () => {
+    const rejected: Partial<ActivityEntry> = {
+      action: 'CustomerDocumentRejected',
+      entityType: 'Customer',
+      subjectLabel: 'Customer 0198abcd',
+      entityId: '0198abcd-1234-7def-8abc-0123456789ab',
+      bookingReference: null,
+      actorName: 'Omar Haddad',
+    };
+
+    expect(english(rejected)).toBe('Omar Haddad rejected a document of customer 0198abcd');
+    expect(arabic(rejected)).toBe('رُفضت وثيقة للعميل 0198abcd من قِبل Omar Haddad');
+    expect(toActivityRows([entry(rejected)], now, t, 'en-GB')[0].icon).toBe('file-x');
+  });
+
   it('leaves the English of every other line as it read before', () => {
     const approved: Partial<ActivityEntry> = {
       action: 'DealerApproved',

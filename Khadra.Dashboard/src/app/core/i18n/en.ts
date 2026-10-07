@@ -564,7 +564,7 @@ export const EN = {
     'Suspending ends every session at once. It does not cancel bookings already made, and it moves no money. The decision is attributed to you in the',
   'customerProfile.theirBookings': 'Their bookings',
   'customerProfile.thePlatformHoldsThese':
-    'The platform holds these but does not open them here. Identity papers are private (spec 7) and the domain lets only the customer and a dealer with an active request see one; whether an administrator may, and whether admin review is how a document becomes verified, is an owner decision that has not been made.',
+    'Khadra never marks a document as verified. Open one only on the way to deciding whether it must be replaced: every opening is recorded with your name and the time.',
   'customerProfile.thisCustomerCannotComplete':
     'This customer cannot complete a booking until their licence and identity are on file.',
   'customerProfile.whichRecordsTheAccount':
@@ -1282,6 +1282,7 @@ export const EN = {
   // Recording that the DEALERSHIP checked a document. Never "verified by Khadra": the platform
   // authenticates nothing, and the notice below says so in the same breath as the control.
   'renterDocs.reviewedByDealer': 'Reviewed by dealer',
+  'renterDocs.newUploadRequested': 'New upload requested by Khadra',
   'renterDocs.notReviewed': 'Not reviewed',
   'renterDocs.markAsReviewed': 'Mark as reviewed',
   'renterDocs.reviewedAt': 'Reviewed',
@@ -1409,6 +1410,7 @@ export const EN = {
   'activity.dealerReactivated': '{actor} reactivated dealer {subject}',
   'activity.customerSuspended': '{actor} suspended customer {subject}',
   'activity.customerReactivated': '{actor} reactivated customer {subject}',
+  'activity.customerDocumentRejected': '{actor} rejected a document of customer {subject}',
   'activity.disputeOpened': '{actor} opened a dispute on booking {subject}',
   'activity.disputeAssigned': '{actor} took the dispute on booking {subject}',
   'activity.disputeResolved': '{actor} resolved the dispute on booking {subject}',
@@ -1656,6 +1658,18 @@ export const EN = {
   'customerProfile.theyCanSignIn':
     'They can sign in and book again straight away. Their verification state is unchanged.',
   'customerProfile.accountReactivated': 'Account reactivated',
+  // Rejecting a renter's document (Wave 4, W4-9; owner D3): the file is opened from inside the decision about it.
+  'customerProfile.rejectDocumentButton': 'Reject…',
+  'customerProfile.rejectDocumentQuestion': 'Reject the {document}?',
+  'customerProfile.rejectDocumentBody':
+    'Open the file and read it before deciding. If you reject it, the customer is told by push and email, and must upload a new file before their next booking request. Bookings already made are not affected.',
+  'customerProfile.openTheFile': 'Open the file in a new tab',
+  'customerProfile.rejectDocumentNote':
+    'Opening the file is recorded with your name. The reason is shown to the customer exactly as you write it, and kept permanently in the audit log: do not include personal details.',
+  'customerProfile.rejectReasonPlaceholder': 'For example: the photo is too blurred to read the licence number.',
+  'customerProfile.rejectDocument': 'Reject the file',
+  'customerProfile.documentRejected': 'File rejected',
+  'customerProfile.documentRejectedBody': 'The customer has been told, and asked for a new upload.',
   'security.changeYourPassword': 'Change your password',
   'security.everyOtherSessionIs':
     'Every other session is signed out when the password changes. The one you are using now stays.',
@@ -2281,6 +2295,9 @@ export const EN = {
   'problem.signedOut': 'Your session has ended. Sign in again and retry.',
   'problem.notPermitted': 'Your account is not allowed to do that.',
   'problem.notFound': 'That record no longer exists. Reload the screen.',
+  'problem.documentChangedSinceViewed':
+    'The customer uploaded a new file after you opened this one. Close this, then open the file again before deciding.',
+  'problem.documentNotFound': "That file is no longer on the customer's record. Reload the page.",
   'problem.conflict': 'That conflicts with the record as it stands now. Reload and check it.',
   'problem.tooMany': 'Too many attempts. Wait a moment and try again.',
   'problem.unavailable': 'The service could not complete that. Nothing has been changed.',
@@ -2861,6 +2878,7 @@ export const EN = {
   'auditLog.actionDealerReactivated': 'Dealer reactivated',
   'auditLog.actionCustomerSuspended': 'Customer suspended',
   'auditLog.actionCustomerReactivated': 'Customer reactivated',
+  'auditLog.actionCustomerDocumentRejected': 'Customer document rejected',
   'auditLog.actionDisputeOpened': 'Dispute opened',
   'auditLog.actionDisputeAssigned': 'Dispute assigned',
   'auditLog.actionDisputeResolved': 'Dispute resolved',
@@ -3926,6 +3944,25 @@ export const EN = {
   'legal.reasonNesting': 'nests lists, quotes or emphasis deeper than a page can show',
   'legal.reasonUnsupported': 'uses Markdown that is not published',
   'legal.linksLabel': 'Legal',
+  // Consent to the texts in force (Wave 4, W4-8): the checkbox where somebody joins, and the prompt that takes the
+  // page while a text awaits a signed-in person's acceptance. The joining words carry their own spaces.
+  'consent.agreeLead': 'I have read and accept the ',
+  'consent.agreeAnd': ' and the ',
+  'consent.required': 'Tick the box to accept the texts in force.',
+  'consent.versionChanged':
+    'The texts were updated while this page was open. Read the current version and tick the box again.',
+  'consent.title': 'Before you continue',
+  'consent.badge': 'Your acceptance is needed',
+  'consent.body':
+    'Khadra has published the texts that govern your use of the platform. Read them, then accept them to continue: until you do, nothing else in the console is available.',
+  'consent.version': 'version',
+  'consent.agree': 'I have read these texts and accept them.',
+  'consent.accept': 'Accept and continue',
+  'consent.accepting': 'Recording your acceptance…',
+  'consent.signOut': 'Sign out',
+  'consent.changed':
+    'A newer version came into force while this page was open. Read the texts listed now, then accept again.',
+  'consent.failed': 'Your acceptance was not recorded. Try again.',
   'auditLog.actionLegalDocumentPublished': 'Legal document published',
   'auditLog.entityLegalDocument': 'Legal document',
   'activity.legalDocumentPublished': '{actor} published a new version of the {subject}',

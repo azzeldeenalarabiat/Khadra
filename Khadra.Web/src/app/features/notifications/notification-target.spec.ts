@@ -23,17 +23,25 @@ const CUSTOMER_KINDS = [
   'YourBookingReturned',
   'YourDepositRefunded',
   'YourPartialRefundSettled',
+  'YourDocumentRejected',
 ];
+
+/** The kinds about the account rather than a booking: they carry no subject. */
+const ACCOUNT_KINDS = new Set(['YourDisputeUpdated', 'YourDocumentRejected']);
 
 describe('notificationTarget', () => {
   it('opens the booking for every booking kind', () => {
-    for (const kind of CUSTOMER_KINDS.filter((k) => k !== 'YourDisputeUpdated')) {
+    for (const kind of CUSTOMER_KINDS.filter((k) => !ACCOUNT_KINDS.has(k))) {
       expect(notificationTarget(kind, ID), kind).toEqual(['bookings', ID]);
     }
   });
 
   it('opens the dispute for a dispute update, whose subject is the ticket', () => {
     expect(notificationTarget('YourDisputeUpdated', ID)).toEqual(['disputes', ID]);
+  });
+
+  it('opens the documents page for a rejected document, which has no subject (Wave 4, W4-9)', () => {
+    expect(notificationTarget('YourDocumentRejected', null)).toEqual(['profile', 'documents']);
   });
 
   it('opens nothing without a subject', () => {

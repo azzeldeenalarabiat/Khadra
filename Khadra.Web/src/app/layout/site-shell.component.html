@@ -1,7 +1,13 @@
 <a class="skip-link" href="#main">{{ i18n.t('nav.skipToContent') }}</a>
 <kh-site-header />
 <main id="main" class="site-main" tabindex="-1">
-  <router-outlet />
+  <!-- While a legal text in force waits for the signed-in customer's consent, the server answers nothing else, so the
+       page is the prompt (Wave 4, W4-8) — except the texts' own pages, which the prompt opens to be read. -->
+  @if (consentBlocked()) {
+    <kh-consent-prompt />
+  } @else {
+    <router-outlet />
+  }
 </main>
 <kh-site-footer />
 @if (shortlistRefusal(); as text) {

@@ -1,0 +1,7 @@
+@if (parts().length) {
+  <!-- One line on purpose: the words carry their own spaces, and Arabic joins "و" to the name that follows. -->
+  <label class="choice legal-consent">
+    <input type="checkbox" name="legalConsent" required [checked]="agreed()" [disabled]="disabled()" (change)="agreed.set(checked($event))" />
+    <span>@for (part of parts(); track $index) {@if (part.url) {<a class="auth-link" [href]="part.url" target="_blank" rel="noopener">{{ part.text }}</a>} @else {<span>{{ part.text }}</span>}}</span>
+  </label>
+}

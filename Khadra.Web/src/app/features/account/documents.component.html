@@ -21,7 +21,8 @@
               <p class="row"><span class="badge {{ statusTone(doc.status) }}">{{ statusLabel(doc.status) }}</span>
                 <span class="faint small">{{ i18n.t('documents.uploadedAt', { date: format.date(doc.uploadedAt) }) }}</span></p>
               @if (doc.status === 'Rejected' && doc.reviewNote) {
-                <p class="field__error">{{ i18n.t('documents.rejectedReason', { reason: doc.reviewNote }) }}</p>
+                <!-- The reason as Khadra wrote it, isolated: it may be in the other language from the page's (Wave 4, W4-9). -->
+                <p class="field__error">{{ i18n.t('documents.rejectedWhy') }} <span class="user-text" dir="auto">{{ doc.reviewNote }}</span></p>
               }
             } @else {
               <p class="faint small">{{ i18n.t('documents.notUploaded') }}</p>

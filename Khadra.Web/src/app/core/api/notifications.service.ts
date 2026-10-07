@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { DOCUMENT, Injectable, PLATFORM_ID, effect, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
+import { ConsentGateService } from '../session/consent-gate.service';
 import { SessionService } from '../session/session.service';
 
 /** How often the unread count is asked for while the page is visible (docs/refresh-policy.md: 60s). */
@@ -38,6 +39,7 @@ export interface NotificationFeed {
 export class NotificationsService {
   private readonly http = inject(HttpClient);
   private readonly session = inject(SessionService);
+  private readonly consent = inject(ConsentGateService);
   private readonly document = inject(DOCUMENT);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
@@ -53,6 +55,9 @@ export class NotificationsService {
   constructor() {
     effect(() => {
       const signedIn = this.session.isSignedIn();
+      // Silent behind the consent prompt (Wave 4, W4-8), where every answer would be a refusal; asked again, and
+      // polled again, the moment the texts are accepted.
+      const blocked = this.consent.blocked();
       if (!this.isBrowser) return;
       if (this.timer) clearInterval(this.timer);
       this.timer = null;
@@ -60,6 +65,7 @@ export class NotificationsService {
         this.unread.set(0);
         return;
       }
+      if (blocked) return;
       void this.refresh();
       this.timer = setInterval(() => {
         if (this.document.visibilityState === 'visible') void this.refresh();
@@ -94,7 +100,7 @@ export class NotificationsService {
   }
 
   async refresh(): Promise<void> {
-    if (!this.session.isSignedIn()) return;
+    if (!this.session.isSignedIn() || this.consent.blocked()) return;
     const asked = ++this.generation;
     try {
       const count = await firstValueFrom(this.http.get<number>('/api/v1/notifications/unread-count'));

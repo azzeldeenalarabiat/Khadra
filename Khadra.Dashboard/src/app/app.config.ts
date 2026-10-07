@@ -15,6 +15,7 @@ import { routes } from './app.routes';
 import { I18nService } from './core/i18n/i18n.service';
 import { TranslatedTitleStrategy } from './core/i18n/translated-title.strategy';
 import { PlatformConfigService } from './core/services/platform-config.service';
+import { consentGateInterceptor } from './core/services/consent-gate.interceptor';
 import { sessionExpiredInterceptor } from './core/services/session-expired.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -40,7 +41,8 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(
       withFetch(),
       withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }),
-      withInterceptors([sessionExpiredInterceptor]),
+      // A refusal for a pending consent raises the prompt (Wave 4, W4-8); see ConsentGateService.
+      withInterceptors([sessionExpiredInterceptor, consentGateInterceptor]),
     ),
   ],
 };

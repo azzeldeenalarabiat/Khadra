@@ -24,6 +24,8 @@ export const KNOWN_KINDS: ReadonlySet<string> = new Set([
   'YourDisputeOpened',
   'YourDepositRefunded',
   'YourPartialRefundSettled',
+  // About the account, not a booking (Wave 4, W4-9): no subject, and it opens the documents page.
+  'YourDocumentRejected',
 ]);
 
 /** One notification's sentence, the same on the full page and in the header's panel. */

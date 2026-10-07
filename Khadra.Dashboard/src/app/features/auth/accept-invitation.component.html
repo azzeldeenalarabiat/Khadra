@@ -46,6 +46,11 @@
         />
       </div>
 
+      <!-- A staff invitation accepts the legal texts in force with the password (Wave 4, W4-8). -->
+      @if (asksConsent()) {
+        <kh-legal-consent [(agreed)]="agreed" [disabled]="busy()" />
+      }
+
       <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="busy()">
         {{ busy() ? t('auth.invite.busy') : t('auth.invite.submit') }}
       </button>

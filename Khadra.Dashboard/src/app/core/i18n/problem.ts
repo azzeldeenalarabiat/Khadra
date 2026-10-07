@@ -196,6 +196,9 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'legal.text_unsupported': 'legal.textUnsupportedSomewhere',
   'legal.publish_conflict': 'legal.publishConflict',
   'legal.kind_unknown': 'legal.kindUnknown',
+  // A renter's document (Wave 4, W4-9): replaced after it was opened, or no longer on the record.
+  'documents.changed_since_viewed': 'problem.documentChangedSinceViewed',
+  'documents.not_found': 'problem.documentNotFound',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */

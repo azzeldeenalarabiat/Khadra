@@ -276,9 +276,10 @@
                     <div class="renter-doc">
                       <div class="renter-doc-head">
                         <span class="renter-doc-title">{{ doc.label }}</span>
-                        <!-- The ONLY status on this tile, and it is the dealership's own. There is
-                             no platform verdict beside it: Khadra verifies nothing, and a second
-                             badge would invite the reading that one of them is a guarantee. -->
+                        <!-- The ONLY status on this tile: the dealership's own review, or, once Khadra has
+                             asked the renter for a new file, that request in its place (Wave 4, W4-9).
+                             Khadra verifies nothing, and a second badge would invite the reading that one
+                             of them is a guarantee. -->
                         <span class="pill" [class]="toneClass(doc.tone)">{{ doc.status }}</span>
                         <div class="renter-doc-actions">
                           @if (doc.isImage) {
@@ -306,7 +307,7 @@
                           <!-- Once reviewed it stays reviewed: there is no un-review, and pressing
                                again would only return the record that is already there. The control
                                is replaced by what it recorded. -->
-                          @if (!doc.isReviewed) {
+                          @if (!doc.isReviewed && !doc.newUploadRequested) {
                             <button
                               type="button"
                               class="btn btn-primary btn-xs"

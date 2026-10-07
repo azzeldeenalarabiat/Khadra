@@ -374,6 +374,7 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   DealerReactivated: 'check-circle',
   CustomerSuspended: 'user-gear',
   CustomerReactivated: 'user-gear',
+  CustomerDocumentRejected: 'file-x',
   DisputeOpened: 'scales',
   DisputeAssigned: 'scales',
   DisputeResolved: 'gavel',
@@ -421,6 +422,8 @@ const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   DealerReactivated: 'activity.dealerReactivated',
   CustomerSuspended: 'activity.customerSuspended',
   CustomerReactivated: 'activity.customerReactivated',
+  // Labelled by the customer's short reference, never a name, like every customer entry (Wave 4, W4-9).
+  CustomerDocumentRejected: 'activity.customerDocumentRejected',
   DisputeOpened: 'activity.disputeOpened',
   DisputeAssigned: 'activity.disputeAssigned',
   DisputeResolved: 'activity.disputeResolved',

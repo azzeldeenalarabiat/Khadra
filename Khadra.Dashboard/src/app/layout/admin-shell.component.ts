@@ -4,7 +4,9 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AdminSidebarComponent } from './admin-sidebar.component';
 import { AdminTopbarComponent } from './admin-topbar.component';
+import { ConsentGateService } from '../core/services/consent-gate.service';
 import { ConfirmModalComponent } from '../shared/confirm-modal/confirm-modal.component';
+import { ConsentPromptComponent } from '../shared/consent-prompt/consent-prompt.component';
 import { SandboxBannerComponent } from '../shared/sandbox-banner/sandbox-banner.component';
 import { ToastComponent } from '../shared/toast/toast.component';
 
@@ -21,12 +23,14 @@ import { ToastComponent } from '../shared/toast/toast.component';
     AdminSidebarComponent,
     AdminTopbarComponent,
     ConfirmModalComponent,
+    ConsentPromptComponent,
     SandboxBannerComponent,
     ToastComponent,
   ],
 })
 export class AdminShellComponent {
   private readonly page = viewChild<ElementRef<HTMLElement>>('page');
+  protected readonly consent = inject(ConsentGateService);
 
   constructor() {
     // The page area scrolls, not the window, so Angular's own scroll

@@ -356,4 +356,42 @@ describe('the renter-documents panel', () => {
       expect(rendered).not.toMatch(/PendingReview|"Verified"|Rejected/);
     });
   });
+
+  // Wave 4, W4-9 (owner D3): Khadra may ask a renter for a new file, and never says one is genuine.
+  describe('a file Khadra asked the renter to replace', () => {
+    const replaced = answer({
+      documents: [document({ rejectedByPlatform: true, dealerReview: review() })],
+      missing: ['DrivingLicenceFront', 'NationalId'],
+    });
+
+    it("says so on its tile, in place of the dealership's own review, which is not offered on it", () => {
+      const result = panel('resolved', replaced);
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.newUploadRequested).toBe(true);
+      expect(tile.status).toBe('New upload requested by Khadra');
+      expect(tile.tone).toBe('bad');
+    });
+
+    it('is not named again in the missing line: only what has no tile at all is listed there', () => {
+      const result = panel('resolved', replaced);
+
+      expect(result.kind === 'ready' ? result.missing : null).toBe('Not on file: National ID');
+    });
+
+    it('reads in Arabic too', () => {
+      const result = panel('resolved', replaced, undefined, ar);
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.status).toBe('طلبت خضرا رفع نسخة جديدة');
+    });
+
+    it('leaves a file nobody rejected exactly as it was, and an older API that never says is read as no request', () => {
+      const result = panel('resolved', answer({ documents: [document({ dealerReview: review() })] }));
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.newUploadRequested).toBe(false);
+      expect(tile.status).toBe('Reviewed by dealer');
+    });
+  });
 });

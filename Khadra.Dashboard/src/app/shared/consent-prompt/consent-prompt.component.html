@@ -1,0 +1,52 @@
+<div class="locked-wrap">
+  <section class="sect locked-card" aria-labelledby="consent-title">
+    <div class="locked-head s-accent">
+      <div class="locked-icon"><kh-icon name="scales" /></div>
+      <div>
+        <h1 id="consent-title" class="locked-title consent-title">{{ t('consent.title') }}</h1>
+        <span class="pill s-accent">{{ t('consent.badge') }}</span>
+      </div>
+    </div>
+    <div class="locked-body">{{ t('consent.body') }}</div>
+
+    <div class="locked-points">
+      @for (text of texts(); track text.versionId) {
+        <div class="locked-point s-accent">
+          <kh-icon name="scales" />
+          <span>
+            @if (text.url) {
+              <a class="auth-link" [href]="text.url" target="_blank" rel="noopener">{{ text.label }}</a>
+            } @else {
+              {{ text.label }}
+            }
+            · {{ t('consent.version') }} <span class="user-text">{{ text.version }}</span>
+          </span>
+        </div>
+      }
+    </div>
+
+    @if (problem(); as key) {
+      <div class="banner s-warn" role="alert">
+        <kh-icon name="warning-circle" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">{{ t(key) }}</div>
+        </div>
+      </div>
+    }
+
+    <label class="choice">
+      <input type="checkbox" [checked]="agreed()" [disabled]="busy()" (change)="agreed.set(checked($event))" />
+      {{ t('consent.agree') }}
+    </label>
+
+    <div class="row row-gap-8">
+      <button type="button" class="btn btn-primary btn-md" [disabled]="!agreed() || busy()" (click)="accept()">
+        {{ busy() ? t('consent.accepting') : t('consent.accept') }}
+      </button>
+      <button type="button" class="btn btn-secondary btn-md" [disabled]="busy()" (click)="signOut()">
+        <kh-icon name="sign-out" />
+        {{ t('consent.signOut') }}
+      </button>
+    </div>
+  </section>
+</div>

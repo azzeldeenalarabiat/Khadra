@@ -1363,6 +1363,32 @@ $md: 1023px;
   border-block-start: 1px solid var(--divider);
   padding-block-start: var(--s-4);
 }
+
+// The consent prompt (Wave 4, W4-8): the page, while a legal text awaits the signed-in customer's acceptance.
+.consent-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-block-start: var(--s-6);
+}
+.consent-prompt__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 52px;
+  block-size: 52px;
+  border-radius: var(--r-feature);
+  background: var(--n-100);
+  color: var(--accent);
+  font-size: 24px;
+}
+.consent-prompt__texts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding-inline-start: var(--s-5);
+}
 .state--plain {
   border: 0;
   padding: var(--s-4) 0;

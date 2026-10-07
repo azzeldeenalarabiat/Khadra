@@ -2,6 +2,7 @@ import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { NotificationFeed, NotificationItem } from '../models/notifications.api';
+import { ConsentGateService } from './consent-gate.service';
 import { LiveRefreshService } from './live-refresh.service';
 import { liveResource } from './live-surface';
 import { SessionService } from './session.service';
@@ -29,6 +30,9 @@ export class NotificationsService {
   /** Anyone signed in has a bell. What fills it differs by what raises rows, not by role. */
   private readonly signedIn = computed(() => !!this.session.user());
 
+  /** Silent behind the consent prompt (Wave 4, W4-8), and asked again the moment it is accepted. */
+  private readonly consent = inject(ConsentGateService);
+
   private readonly live = inject(LiveRefreshService);
 
   readonly page = signal(1);
@@ -43,7 +47,7 @@ export class NotificationsService {
    * while the new one is on its way.
    */
   readonly feed = httpResource<NotificationFeed>(() => {
-    if (!this.signedIn()) return undefined;
+    if (!this.signedIn() || this.consent.blocked()) return undefined;
     return { url: this.base, params: { page: this.page(), pageSize: 25 } };
   });
 

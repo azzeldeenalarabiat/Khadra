@@ -3,6 +3,7 @@ import { Injectable, PLATFORM_ID, computed, effect, inject, signal } from '@angu
 import { isPlatformBrowser } from '@angular/common';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, firstValueFrom } from 'rxjs';
+import { ConsentGateService } from '../session/consent-gate.service';
 import { SessionService } from '../session/session.service';
 import { SAVE_INTENT_PARAM } from '../session/return-address';
 
@@ -20,6 +21,7 @@ const VEHICLE_ID = /^[0-9a-f-]{36}$/i;
 export class ShortlistService {
   private readonly http = inject(HttpClient);
   private readonly session = inject(SessionService);
+  private readonly consent = inject(ConsentGateService);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
   private readonly saved = signal<ReadonlySet<string>>(new Set());
@@ -47,10 +49,11 @@ export class ShortlistService {
         const id = this.router.parseUrl(this.router.url).queryParams[SAVE_INTENT_PARAM];
         this.intent.set(typeof id === 'string' && VEHICLE_ID.test(id) ? id.toLowerCase() : null);
       });
-      // Once somebody is signed in, the car they chose before signing in is saved, once, and the address forgets it.
+      // Once somebody is signed in, the car they chose before signing in is saved, once, and the address forgets it —
+      // and only once they are known to owe no legal consent (Wave 4, W4-8), or the save would only be refused.
       effect(() => {
         const vehicleId = this.intent();
-        if (!vehicleId || !this.session.isSignedIn()) return;
+        if (!vehicleId || !this.session.isSignedIn() || !this.consent.clear()) return;
         this.intent.set(null);
         void this.saveIntended(vehicleId);
       });

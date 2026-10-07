@@ -38,6 +38,11 @@ export interface RenterDocumentTile {
   readonly isImage: boolean;
   /** Part of the licence check spec 5.1 asks the gallery to perform. */
   readonly isLicence: boolean;
+  /**
+   * Khadra asked the renter for a new file in place of this one (Wave 4, W4-9): it no longer counts as filed, and
+   * the tile says so in place of the dealership's own review, which is not offered on a file that does not count.
+   */
+  readonly newUploadRequested: boolean;
 }
 
 /**
@@ -115,10 +120,19 @@ export function toRenterDocumentsPanel(
 
   if (!value) return { kind: 'loading' };
 
+  // A file Khadra asked to be replaced is still owed, but its tile already says so: the missing line names only what
+  // has no tile at all, so one document is never reported twice (Wave 4, W4-9).
+  const replacing = new Set(
+    value.documents.filter((document) => document.rejectedByPlatform).map((document) => document.type),
+  );
+
   return {
     kind: 'ready',
     tiles: value.documents.map((document) => toTile(document, bookingId, href, t, formatDate)),
-    missing: missingSentence(value.missing, t),
+    missing: missingSentence(
+      value.missing.filter((type) => !replacing.has(type)),
+      t,
+    ),
     isComplete: value.isComplete,
   };
 }
@@ -132,6 +146,7 @@ function toTile(
 ): RenterDocumentTile {
   const typeKey = TYPE_LABELS[document.type];
   const review = document.dealerReview;
+  const newUploadRequested = document.rejectedByPlatform === true;
   return {
     documentId: document.documentId,
     // An unknown type falls back to the server's own word rather than to a blank tile: a gallery
@@ -140,14 +155,19 @@ function toTile(
     isReviewed: review !== null,
     // "Reviewed by dealer", never "verified". The tone follows: `ok` means THIS GALLERY has recorded
     // a check, not that anybody authenticated the document.
-    status: review ? t('renterDocs.reviewedByDealer') : t('renterDocs.notReviewed'),
-    tone: review ? 'ok' : 'warn',
+    status: newUploadRequested
+      ? t('renterDocs.newUploadRequested')
+      : review
+        ? t('renterDocs.reviewedByDealer')
+        : t('renterDocs.notReviewed'),
+    tone: newUploadRequested ? 'bad' : review ? 'ok' : 'warn',
     reviewedBy: review ? `${review.reviewedByName} · ${formatDate(review.reviewedAt)}` : null,
     format: formatLabel(document.contentType, t),
     uploadedAt: formatDate(document.uploadedAt),
     href: href(bookingId, document.documentId),
     isImage: document.contentType.startsWith('image/'),
     isLicence: document.type === 'DrivingLicenceFront' || document.type === 'DrivingLicenceBack',
+    newUploadRequested,
   };
 }
 

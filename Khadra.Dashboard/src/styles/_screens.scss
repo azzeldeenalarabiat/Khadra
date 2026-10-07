@@ -1261,6 +1261,10 @@
 .modal-icon-wrap kh-icon {
   font-size: 16px;
 }
+/* What a dialog asks you to open before deciding (Wave 4, W4-9): sized to its words, not stretched. */
+.modal-link {
+  align-self: flex-start;
+}
 .notif-icon-wrap kh-icon {
   font-size: 15px;
 }
@@ -1688,6 +1692,22 @@
 /* The legal texts in force, linked where somebody joins or signs in (Wave 2 G1). */
 .legal-links {
   gap: 14px;
+}
+
+/* Accepting them where somebody joins (Wave 4, W4-8): the sentence wraps, so the box sits on its first line. */
+.legal-consent {
+  align-items: flex-start;
+  line-height: 1.55;
+}
+
+.legal-consent input {
+  margin-block-start: 3px;
+  flex: none;
+}
+
+/* The consent prompt's heading is the page's only one, and sits in the locked card's head like its title. */
+.consent-title {
+  margin: 0;
 }
 
 /* What a dispute decision does to the money (Wave 2 C1): the server's preview, under the amounts. */

@@ -158,6 +158,11 @@ export interface ModalConfig {
   readonly confirm: string;
   readonly danger?: boolean;
   readonly fields?: readonly ModalField[];
+  /**
+   * Something to open before deciding, in a new tab: the file a rejection is about (Wave 4, W4-9). Inside the dialog
+   * on purpose: an administrator opens a renter's document only on the way to a decision about it.
+   */
+  readonly link?: { readonly href: string; readonly label: string };
   /** Toast shown after confirming. */
   readonly result: { readonly title: string; readonly body: string; readonly tone?: Tone };
 }

@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ConsentGateService } from '../session/consent-gate.service';
 import { SessionService } from '../session/session.service';
 import { NotificationsService } from './notifications.service';
 
@@ -12,6 +13,8 @@ const settle = () => new Promise((resolve) => setTimeout(resolve));
 describe('the bell badge', () => {
   let http: HttpTestingController;
   let service: NotificationsService;
+  /** Whether a legal text awaits the customer's consent (Wave 4, W4-8). */
+  const consentBlocked = signal(false);
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
@@ -20,6 +23,7 @@ describe('the bell badge', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: SessionService, useValue: { isSignedIn: signal(true) } },
+        { provide: ConsentGateService, useValue: { blocked: consentBlocked } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -31,7 +35,24 @@ describe('the bell badge', () => {
     expect(service.unread()).toBe(3);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    consentBlocked.set(false);
+  });
+
+  // Wave 4, W4-8: every answer behind the prompt would be a refusal, so the badge waits, then asks the moment it lifts.
+  it('is not asked behind the consent prompt, and is asked again once the texts are accepted', async () => {
+    consentBlocked.set(true);
+    TestBed.tick();
+    await service.refresh();
+    http.expectNone(COUNT);
+
+    consentBlocked.set(false);
+    TestBed.tick();
+    http.expectOne(COUNT).flush(5);
+    await settle();
+    expect(service.unread()).toBe(5);
+  });
 
   it('drops the moment a notification is opened, then settles on the server count', async () => {
     const marking = service.markRead('n1');

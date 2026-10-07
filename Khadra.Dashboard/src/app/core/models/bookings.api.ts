@@ -349,6 +349,13 @@ export interface RenterDocument {
    * two dates here.
    */
   readonly dealerReview: DealerDocumentReview | null;
+  /**
+   * Khadra could not accept this file and asked the renter for a new one (Wave 4, W4-9). It no longer counts as filed:
+   * its type is owed, and the tile says so instead of a missing line beside it. A refusal, never a check — nothing on
+   * the platform says a document is genuine — and its reason is the renter's, never on this shape. Absent from an
+   * older API, which is read as false.
+   */
+  readonly rejectedByPlatform?: boolean;
 }
 
 /** What the gallery may see about the renter's paperwork, while the booking is live. */

@@ -6,7 +6,13 @@
          away from the figure it is about. Renders nothing unless the API itself reports Sandbox. -->
     <kh-sandbox-banner />
     <main #page class="page">
-      <router-outlet />
+      <!-- While a legal text in force waits for this person's consent, the server answers nothing else, so the page
+           is the prompt (Wave 4, W4-8). Administrators are never asked. -->
+      @if (consent.blocked()) {
+        <kh-consent-prompt />
+      } @else {
+        <router-outlet />
+      }
     </main>
   </div>
 </div>

@@ -92,13 +92,17 @@
                     </div>
                     <div class="page-sub">{{ documentDetail(document) }}</div>
                     @if (document.reviewNote) {
-                      <div class="queue-desc">{{ document.reviewNote }}</div>
+                      <!-- The reason the customer was given, as the administrator wrote it. -->
+                      <div class="queue-desc user-text">{{ document.reviewNote }}</div>
                     }
                   </div>
+                  <!-- The file is opened from inside this decision, never browsed (Wave 4, W4-9). -->
+                  <button type="button" class="btn btn-secondary btn-xs" (click)="rejectDocument(document)">
+                    {{ t('customerProfile.rejectDocumentButton') }}
+                  </button>
                 </div>
               }
-              <!-- Why there is no "view" here. This is a limit of what has been decided, not an
-                   oversight, so the screen says which decision is missing rather than going quiet. -->
+              <!-- Khadra rejects; it never verifies, and every opening of a file is recorded. -->
               <div class="note-box is-plain">
                 {{ t('customerProfile.thePlatformHoldsThese') }}
               </div>

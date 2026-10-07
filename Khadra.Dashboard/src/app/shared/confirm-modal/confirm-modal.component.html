@@ -25,6 +25,13 @@
         </button>
       </div>
 
+      @if (m.link; as link) {
+        <a class="btn btn-secondary btn-sm modal-link" [href]="link.href" target="_blank" rel="noopener">
+          <kh-icon name="arrow-square-out" class="icon-mirrored" />
+          {{ link.label }}
+        </a>
+      }
+
       @for (field of m.fields ?? []; track field.name) {
         <div class="field">
           <label [attr.for]="'modal-field-' + $index">{{ field.label }}</label>

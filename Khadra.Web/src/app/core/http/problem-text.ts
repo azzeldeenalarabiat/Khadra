@@ -41,6 +41,10 @@ const WORDED: Readonly<Record<string, TranslationKey>> = {
   'dispute.already_resolved': 'dispute.closedNow',
   'dispute.already_withdrawn': 'dispute.closedNow',
   'dispute.only_opener_can_withdraw': 'dispute.onlyOpener',
+  // Consent to the legal texts (Wave 4, W4-8).
+  'legal.consent_required': 'consent.required',
+  'legal.version_not_current': 'consent.versionChanged',
+  'legal.consent_pending': 'consent.pending',
 };
 
 export function problemText(

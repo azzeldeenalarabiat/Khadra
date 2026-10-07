@@ -37,11 +37,10 @@ const FORMAT_LABELS: Readonly<Record<string, TranslationKey>> = {
 /**
  * One customer: their account, what they have on file, and their history with the platform.
  *
- * The documents are DESCRIBED and not linked. Spec 7 keeps identity papers private, and the domain
- * scopes viewing to the customer themselves and to a dealer with an active booking request — an
- * administrator is not named there, and the review mechanism spec 5.1 anticipates has not been
- * decided. So the screen says what is on file, in what state, and stops: minting a signed URL for a
- * passport is a decision for the owner, not a convenience to add quietly.
+ * The documents are DESCRIBED, and no signed URL for a passport is ever minted. An administrator may reject one
+ * (Wave 4, W4-9; owner D3: Khadra may refuse a document, and never calls one verified), and opens the file from inside
+ * that decision, through a route that records every opening — the log is the control, so the screen offers no
+ * browsing of identity papers outside it.
  */
 @Component({
   selector: 'kh-customer-profile',
@@ -196,6 +195,57 @@ export class CustomerProfileComponent {
         this.service.refresh();
       },
       { title: this.t('customerProfile.accountReactivated'), body: '' },
+    );
+  }
+
+  /**
+   * The decision about one document, with the file opened from inside it (Wave 4, W4-9). The customer is told and must
+   * upload a new file before their next request; bookings already made are not touched. The upload being judged is
+   * the one this profile showed: a file replaced since is refused by the server, and the profile re-reads either way.
+   */
+  protected rejectDocument(document: CustomerDocumentSummary): void {
+    const customer = this.customer();
+    if (!customer) return;
+    this.ui.openAction(
+      {
+        icon: 'file-x',
+        tone: 'bad',
+        danger: true,
+        title: this.t('customerProfile.rejectDocumentQuestion', { document: this.documentLabel(document) }),
+        body: this.t('customerProfile.rejectDocumentBody'),
+        note: this.t('customerProfile.rejectDocumentNote'),
+        link: {
+          href: this.service.documentUrl(customer.userId, document.documentId),
+          label: this.t('customerProfile.openTheFile'),
+        },
+        fields: [
+          {
+            // A machine name, read back as values['reason'] below: never a translation.
+            name: 'reason',
+            label: this.t('dealerDecide.reject.reasonLabel'),
+            type: 'text',
+            placeholder: this.t('customerProfile.rejectReasonPlaceholder'),
+          },
+        ],
+        confirm: this.t('customerProfile.rejectDocument'),
+        result: { title: this.t('customerProfile.documentRejected'), body: '', tone: 'bad' },
+      },
+      async (values) => {
+        try {
+          await this.service.rejectDocument(
+            customer.userId,
+            document.documentId,
+            values['reason'] ?? '',
+            document.uploadedAt,
+          );
+        } finally {
+          this.service.refresh();
+        }
+      },
+      {
+        title: this.t('customerProfile.documentRejected'),
+        body: this.t('customerProfile.documentRejectedBody'),
+      },
     );
   }
 

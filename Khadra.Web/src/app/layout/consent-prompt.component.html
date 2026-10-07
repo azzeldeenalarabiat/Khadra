@@ -1,0 +1,38 @@
+<section class="container page page--narrow">
+  <div class="card card--pad consent-prompt" aria-labelledby="consent-title">
+    <span class="consent-prompt__icon"><kh-icon name="scales" /></span>
+    <h1 id="consent-title">{{ i18n.t('consent.title') }}</h1>
+    <p class="muted">{{ i18n.t('consent.body') }}</p>
+
+    <ul class="consent-prompt__texts">
+      @for (text of texts(); track text.versionId) {
+        <li>
+          @if (text.slug) {
+            <a class="link" [routerLink]="i18n.link(text.slug)" target="_blank" rel="noopener">{{ text.label }}</a>
+          } @else {
+            {{ text.label }}
+          }
+          · {{ i18n.t('consent.version') }} <bdi>{{ text.version }}</bdi>
+        </li>
+      }
+    </ul>
+
+    @if (problem(); as key) {
+      <div class="notice notice--warn" role="alert"><kh-icon name="warning-circle" /><p>{{ i18n.t(key) }}</p></div>
+    }
+
+    <label class="check">
+      <input type="checkbox" name="consent" [checked]="agreed()" [disabled]="busy()" (change)="agreed.set(checked($event))" />
+      <span>{{ i18n.t('consent.agree') }}</span>
+    </label>
+
+    <div class="row-actions">
+      <button type="button" class="btn btn--primary" [disabled]="!agreed() || busy()" (click)="accept()">
+        {{ i18n.t(busy() ? 'consent.accepting' : 'consent.accept') }}
+      </button>
+      <button type="button" class="btn btn--secondary" [disabled]="busy()" (click)="signOut()">
+        <kh-icon name="sign-out" />{{ i18n.t('nav.signOut') }}
+      </button>
+    </div>
+  </div>
+</section>

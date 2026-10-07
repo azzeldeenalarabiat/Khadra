@@ -1007,7 +1007,7 @@ export const AR = {
   'customerProfile.suspendingEndsEverySession':
     'الإيقاف ينهي كل الجلسات دفعةً واحدة. ولا يلغي حجوزات أُنشئت من قبل، ولا يحرّك أي أموال. ويُنسب القرار إليك في',
   'customerProfile.thePlatformHoldsThese':
-    'تحفظ المنصة هذه الوثائق لكنها لا تفتحها هنا. فأوراق الهوية خاصة (البند 7)، ولا يتيح نموذج المجال الاطّلاع عليها إلا للعميل ولمكتب تأجير لديه طلب قائم؛ أما هل يجوز للمشرف ذلك، وهل مراجعة المشرف هي ما يجعل الوثيقة موثَّقة، فقرار للمالك لم يُتخذ بعد.',
+    'لا تَسِم خضرا أي وثيقة بأنها موثَّقة. افتح الوثيقة فقط في طريقك إلى تقرير ما إذا كان يجب استبدالها: يُسجَّل كل فتح باسمك ووقته.',
   'customerProfile.theirBookings': 'حجوزاته',
   'customerProfile.thisCustomerCannotComplete':
     'لا يستطيع هذا العميل إتمام حجز إلى أن تُسجَّل رخصته وهويته.',
@@ -1172,6 +1172,7 @@ export const AR = {
     'لا تتحقق خضرا من هذه الوثائق. ما تراه هو ما رفعه المستأجر.',
 
   'renterDocs.reviewedByDealer': 'تمت مراجعتها من المكتب',
+  'renterDocs.newUploadRequested': 'طلبت خضرا رفع نسخة جديدة',
   'renterDocs.notReviewed': 'لم تُراجَع',
   'renterDocs.markAsReviewed': 'تمت المراجعة',
   'renterDocs.reviewedAt': 'تاريخ المراجعة',
@@ -1303,6 +1304,7 @@ export const AR = {
   'activity.dealerReactivated': 'أُعيد تفعيل المكتب {subject} من قِبل {actor}',
   'activity.customerSuspended': 'أُوقف حساب العميل {subject} من قِبل {actor}',
   'activity.customerReactivated': 'أُعيد تفعيل حساب العميل {subject} من قِبل {actor}',
+  'activity.customerDocumentRejected': 'رُفضت وثيقة للعميل {subject} من قِبل {actor}',
   'activity.disputeOpened': 'فُتح نزاع على الحجز {subject} من قِبل {actor}',
   'activity.disputeAssigned': 'أُسند النزاع على الحجز {subject} إلى {actor}',
   'activity.disputeResolved': 'حُسم النزاع على الحجز {subject} من قِبل {actor}',
@@ -1450,6 +1452,17 @@ export const AR = {
   'customerProfile.theyCanSignIn':
     'يستطيع تسجيل الدخول والحجز مجددًا فورًا. ولم تتغيّر حالة التحقق من بياناته.',
   'customerProfile.accountReactivated': 'أُعيد تفعيل الحساب',
+  'customerProfile.rejectDocumentButton': 'رفض…',
+  'customerProfile.rejectDocumentQuestion': 'رفض {document}؟',
+  'customerProfile.rejectDocumentBody':
+    'افتح الملف واقرأه قبل أن تقرر. إذا رفضته، يُبلَّغ العميل بإشعار وبريد إلكتروني، وعليه رفع ملف جديد قبل طلب الحجز التالي. لا تتأثر الحجوزات القائمة.',
+  'customerProfile.openTheFile': 'افتح الملف في علامة تبويب جديدة',
+  'customerProfile.rejectDocumentNote':
+    'يُسجَّل فتحك للملف باسمك. يظهر السبب للعميل كما تكتبه تمامًا، ويُحفظ بشكل دائم في سجل التدقيق: لا تُدرج بيانات شخصية.',
+  'customerProfile.rejectReasonPlaceholder': 'مثلًا: الصورة غير واضحة بما يكفي لقراءة رقم الرخصة.',
+  'customerProfile.rejectDocument': 'رفض الملف',
+  'customerProfile.documentRejected': 'رُفض الملف',
+  'customerProfile.documentRejectedBody': 'أُبلغ العميل وطُلب منه رفع ملف جديد.',
   'dealerApply.theRegistrationCertificateFor': 'شهادة تسجيل النشاط التجاري.',
   'dealerApply.greenPlateVehicleRegistration': 'تسجيل السيارات باللوحة الخضراء',
   'dealerApply.proofThatYourCars': 'ما يثبت أن سياراتك مسجَّلة كسيارات تأجير مرخَّصة.',
@@ -2058,6 +2071,9 @@ export const AR = {
   'problem.signedOut': 'انتهت جلستك. سجّل الدخول ثم أعد المحاولة.',
   'problem.notPermitted': 'حسابك لا يملك صلاحية هذا الإجراء.',
   'problem.notFound': 'هذا السجل لم يعد موجودًا. أعد تحميل الشاشة.',
+  'problem.documentChangedSinceViewed':
+    'رفع العميل ملفًا جديدًا بعد أن فتحت هذا الملف. أغلق هذه النافذة ثم افتح الملف مرة أخرى قبل أن تقرر.',
+  'problem.documentNotFound': 'لم يعد هذا الملف في سجل العميل. أعد تحميل الصفحة.',
   'problem.conflict': 'هذا يتعارض مع حالة السجل الحالية. أعد التحميل وراجعه.',
   'problem.tooMany': 'محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.',
   'problem.unavailable': 'تعذّر على الخدمة إتمام العملية. لم يتغيّر شيء.',
@@ -2848,6 +2864,7 @@ export const AR = {
   'auditLog.actionDealerReactivated': 'أُعيد تفعيل المكتب',
   'auditLog.actionCustomerSuspended': 'أُوقف حساب العميل',
   'auditLog.actionCustomerReactivated': 'أُعيد تفعيل حساب العميل',
+  'auditLog.actionCustomerDocumentRejected': 'رُفضت وثيقة لعميل',
   'auditLog.actionDisputeOpened': 'فُتح نزاع',
   'auditLog.actionDisputeAssigned': 'أُسند النزاع',
   'auditLog.actionDisputeResolved': 'حُسم النزاع',
@@ -4004,6 +4021,23 @@ export const AR = {
   'legal.reasonNesting': 'يضع القوائم أو الاقتباسات أو التنسيق بعضها داخل بعض بعمق لا تعرضه الصفحة',
   'legal.reasonUnsupported': 'يستخدم صيغة Markdown لا تُنشر',
   'legal.linksLabel': 'قانوني',
+  'consent.agreeLead': 'قرأت وأوافق على ',
+  'consent.agreeAnd': ' و',
+  'consent.required': 'ضع علامة في المربع للموافقة على النصوص السارية.',
+  'consent.versionChanged':
+    'حُدّثت النصوص أثناء فتح هذه الصفحة. اقرأ الإصدار الحالي ثم ضع علامة في المربع مرة أخرى.',
+  'consent.title': 'قبل المتابعة',
+  'consent.badge': 'موافقتك مطلوبة',
+  'consent.body':
+    'نشرت خضرا النصوص التي تحكم استخدامك للمنصة. اقرأها ثم وافق عليها للمتابعة، إذ لا يتاح شيء آخر في لوحة التحكم حتى تفعل ذلك.',
+  'consent.version': 'الإصدار',
+  'consent.agree': 'قرأت هذه النصوص وأوافق عليها.',
+  'consent.accept': 'أوافق وأتابع',
+  'consent.accepting': 'جارٍ تسجيل موافقتك…',
+  'consent.signOut': 'تسجيل الخروج',
+  'consent.changed':
+    'دخل إصدار أحدث حيّز التنفيذ أثناء فتح هذه الصفحة. اقرأ النصوص المعروضة الآن ثم وافق مرة أخرى.',
+  'consent.failed': 'لم تُسجَّل موافقتك. حاول مرة أخرى.',
   'auditLog.actionLegalDocumentPublished': 'نُشر مستند قانوني',
   'auditLog.entityLegalDocument': 'مستند قانوني',
   'activity.legalDocumentPublished': 'نُشر إصدار جديد من {subject} من قِبل {actor}',

@@ -9,6 +9,7 @@ import { CustomerDocuments } from '../../core/api/documents.api';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
 import { problemText } from '../../core/http/problem-text';
+import { owesARejectedDocument, rejectedDocumentTypes } from './documents-refusal';
 import { quoteRefusalText } from './quote-refusal';
 import { RequestState, canSendRequest, waitsOnTheCustomer } from './request-gate';
 import { TranslationKey } from '../../core/i18n/en';
@@ -24,6 +25,14 @@ import { SearchFormComponent, SearchFormValue } from '../../shared/search-form/s
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { EMPTY_SEARCH, parseSearch, searchToParams } from '../cars/car-search';
 import { httpData } from '../../core/http/http-data';
+
+/** The document types this website has words for. */
+const DOCUMENT_TYPES: Readonly<Record<string, true>> = {
+  DrivingLicenceFront: true,
+  DrivingLicenceBack: true,
+  NationalId: true,
+  Passport: true,
+};
 
 /**
  * Requesting a car. Everything the customer agrees to is the server's: the quote prices it (days,
@@ -103,6 +112,10 @@ export class BookComponent {
 
   protected readonly emailUnverified = computed(() => this.session.user()?.isEmailVerified === false);
   protected readonly documentsIncomplete = computed(() => this.documents.value()?.isComplete === false);
+  /** What is owed includes a file Khadra asked to be replaced (Wave 4, W4-9): the notice says so, rather than "upload". */
+  protected readonly documentsRejected = computed(() => owesARejectedDocument(this.documents.value()));
+  /** The types a refusal said Khadra rejected, when it said so. */
+  private readonly rejectedTypes = signal<readonly string[]>([]);
 
   protected readonly busy = signal(false);
   protected readonly problem = signal<ProblemSnapshot | null>(null);
@@ -135,6 +148,16 @@ export class BookComponent {
 
   /** A booking refusal in the reader's words: the codes this page knows, then the shared table. */
   private wordRefusal(problem: ProblemSnapshot, fallback?: TranslationKey): string {
+    // A refusal over documents names the ones Khadra rejected, so the customer learns which to replace (Wave 4, W4-9).
+    const rejected = this.rejectedTypes();
+    if (problem.code === 'booking.documents_incomplete' && rejected.length > 0) {
+      const names = rejected.map((type) =>
+        type in DOCUMENT_TYPES ? this.i18n.t(`documents.type.${type}` as TranslationKey) : type,
+      );
+      return this.i18n.t('book.refusal.documentsRejected', {
+        documents: names.join(this.i18n.isArabic() ? '، ' : ', '),
+      });
+    }
     const key = `book.refusal.${problem.code}` as TranslationKey;
     if (problem.code && key in this.refusalKeys) return this.i18n.t(key);
     if (fallback && problem.status === 400) return this.i18n.t(fallback);
@@ -189,6 +212,7 @@ export class BookComponent {
     if (!car || !when || !this.canSubmit()) return;
     this.busy.set(true);
     this.problem.set(null);
+    this.rejectedTypes.set([]);
     const point = this.point();
     try {
       const booking = await firstValueFrom(
@@ -204,9 +228,12 @@ export class BookComponent {
       void this.router.navigate(this.i18n.link('bookings', booking.bookingId), { queryParams: { created: 1 }, replaceUrl: true });
     } catch (error) {
       const problem = snapshotProblem(error);
+      this.rejectedTypes.set(rejectedDocumentTypes(error));
       this.problem.set(problem);
       // Someone else booked it first: ask again, so the page shows the car as taken.
       if (problem.code === 'booking.vehicle_unavailable') this.quote.reload();
+      // The documents changed since this page read them (Khadra rejected one): ask again, so the notice above is true.
+      if (problem.code === 'booking.documents_incomplete') this.documents.reload();
       this.busy.set(false);
     }
   }

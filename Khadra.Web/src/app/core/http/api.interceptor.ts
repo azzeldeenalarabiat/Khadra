@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, catchError, from, of, switchMap, tap, throwError, timeout } from 'rxjs';
 import { I18nService } from '../i18n/i18n.service';
+import { ConsentGateService, isConsentPending } from '../session/consent-gate.service';
 import { SessionService } from '../session/session.service';
 import { readServerCache, serverCacheKey, writeServerCache } from './server-cache';
 import { injectServerContext } from './server-context';
@@ -57,6 +58,7 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
   const session = inject(SessionService);
   const router = inject(Router);
   const i18n = inject(I18nService);
+  const consent = inject(ConsentGateService);
 
   // The BFF answers 401 once the API has disowned a session (password changed elsewhere, account
   // suspended, refresh expired) and has already signed it out. Say so, and send the customer to sign
@@ -75,6 +77,9 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
             queryParams: { returnUrl: router.url, reason: 'ended' },
           });
         }
+        // A legal text came into force while this page was open (Wave 4, W4-8): the server now answers nothing else
+        // until it is accepted, so the prompt takes the page. The refusal still reaches the caller.
+        if (isConsentPending(error)) consent.raise();
         return throwError(() => error);
       }),
     );

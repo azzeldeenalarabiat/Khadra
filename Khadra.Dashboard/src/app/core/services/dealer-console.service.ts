@@ -2,6 +2,7 @@ import { HttpClient, HttpParams, httpResource } from '@angular/common/http';
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
+import { ConsentGateService } from './consent-gate.service';
 import { LiveRefreshService } from './live-refresh.service';
 import { liveResource } from './live-surface';
 import {
@@ -76,8 +77,14 @@ export class DealerConsoleService {
     return role === 'DealerOwner' || role === 'DealerEmployee';
   });
 
+  /**
+   * Nor while a legal text in force awaits this person's consent (Wave 4, W4-8): the server would refuse every one of
+   * these, so they stay idle behind the prompt and are sent the moment it is accepted.
+   */
+  private readonly consent = inject(ConsentGateService);
+
   private dealerUrl(path = ''): string | undefined {
-    return this.isDealer() ? `${this.base}${path}` : undefined;
+    return this.isDealer() && !this.consent.blocked() ? `${this.base}${path}` : undefined;
   }
 
   /**

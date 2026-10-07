@@ -126,6 +126,9 @@
         />
       </div>
 
+      <!-- The legal texts in force, accepted with the account (Wave 4, W4-8). Absent while none is published. -->
+      <kh-legal-consent [(agreed)]="agreed" [disabled]="busy()" />
+
       <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="busy()">
         {{ busy() ? t('auth.register.busy') : t('auth.register.submit') }}
       </button>

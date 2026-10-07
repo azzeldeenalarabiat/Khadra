@@ -29,6 +29,7 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   DealerReactivated: 'auditLog.actionDealerReactivated',
   CustomerSuspended: 'auditLog.actionCustomerSuspended',
   CustomerReactivated: 'auditLog.actionCustomerReactivated',
+  CustomerDocumentRejected: 'auditLog.actionCustomerDocumentRejected',
   DisputeOpened: 'auditLog.actionDisputeOpened',
   DisputeAssigned: 'auditLog.actionDisputeAssigned',
   DisputeResolved: 'auditLog.actionDisputeResolved',

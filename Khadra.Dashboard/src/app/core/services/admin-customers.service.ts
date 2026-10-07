@@ -59,6 +59,23 @@ export class AdminCustomersService {
 
   reactivate = (userId: string) => this.act(userId, 'reactivate');
 
+  /**
+   * Where one of the customer's documents is opened (Wave 4, W4-9): streamed through the BFF under the Admin policy,
+   * never a signed link, and the server records the view before it sends a byte. Built from the two ids the profile
+   * was given, and nothing else.
+   */
+  documentUrl(userId: string, documentId: string): string {
+    return `${this.base}/${encodeURIComponent(userId)}/documents/${encodeURIComponent(documentId)}`;
+  }
+
+  /**
+   * Rejects one of the customer's documents with the reason they will read (Wave 4, W4-9). `uploadedAt` is the
+   * profile's own string, sent back exactly: it names which upload was judged, and a `Date` would drop the
+   * microseconds the server compares it by.
+   */
+  rejectDocument = (userId: string, documentId: string, reason: string, uploadedAt: string) =>
+    this.act(userId, `documents/${encodeURIComponent(documentId)}/reject`, { reason, uploadedAt });
+
   refresh(): void {
     this.customer.reload();
     this.list.reload();

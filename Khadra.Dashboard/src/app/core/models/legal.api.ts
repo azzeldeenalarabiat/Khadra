@@ -69,3 +69,24 @@ export interface LegalConfigDocument {
   /** Null while the API has no website address: no link is invented then. */
   readonly pageUrls: LegalTexts | null;
 }
+
+/** One acceptance on a person's record (Wave 4, W4-8). */
+export interface AcceptedLegalConsent {
+  readonly kind: string;
+  readonly versionId: string;
+  readonly versionLabel: string;
+  readonly acceptedAt: string;
+  /** `Website`, `App` or `Console`. */
+  readonly channel: string;
+  /** The language of the text the person read: `ar` or `en`. */
+  readonly language: string;
+}
+
+/**
+ * `GET`/`POST /api/v1/auth/me/legal-consents` (Wave 4, W4-8): every acceptance on this person's record, and the texts
+ * in force they have still to accept, listed as `/app-config` lists them, with their pages.
+ */
+export interface MyLegalConsents {
+  readonly accepted: readonly AcceptedLegalConsent[];
+  readonly pending: readonly LegalConfigDocument[];
+}

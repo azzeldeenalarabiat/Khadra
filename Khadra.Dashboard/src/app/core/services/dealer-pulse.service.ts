@@ -1,5 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { Injectable, computed, effect, inject, untracked } from '@angular/core';
+import { ConsentGateService } from './consent-gate.service';
 import { LiveRefreshService } from './live-refresh.service';
 import { liveResource } from './live-surface';
 import { SessionService } from './session.service';
@@ -32,15 +33,19 @@ interface DealerPulse {
 export class DealerPulseService {
   private readonly live = inject(LiveRefreshService);
   private readonly session = inject(SessionService);
+  private readonly consent = inject(ConsentGateService);
 
   private readonly isDealer = computed(() => {
     const role = this.session.user()?.role;
     return role === 'DealerOwner' || role === 'DealerEmployee';
   });
 
-  /** Undefined keeps the resource idle, so an admin never asks a dealer question. */
+  /**
+   * Undefined keeps the resource idle, so an admin never asks a dealer question — and nobody polls behind the consent
+   * prompt (Wave 4, W4-8), where every answer would be a refusal.
+   */
   private readonly pulse = httpResource<DealerPulse>(() =>
-    this.isDealer() ? '/api/v1/dealers/me/pulse' : undefined,
+    this.isDealer() && !this.consent.blocked() ? '/api/v1/dealers/me/pulse' : undefined,
   );
 
   private seen: string | null = null;

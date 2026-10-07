@@ -73,4 +73,20 @@ export class PlatformConfigService {
       // Deliberately swallowed. See the class comment: the console still works.
     }
   }
+
+  /**
+   * Reads the legal texts in force again, past the browser's cache (Wave 4, W4-8): a sign-up refused because a text it
+   * showed was replaced (409 `legal.version_not_current`), or because the server requires a text this page never
+   * showed (400 `legal.consent_required`), re-presents what is current rather than failing.
+   */
+  async reloadLegal(): Promise<void> {
+    try {
+      const config = await firstValueFrom(
+        this.http.get<AppConfigResponse>('/api/v1/app-config', { cache: 'no-store' }),
+      );
+      this.legalDocuments.set(config?.legal?.documents ?? []);
+    } catch {
+      // The texts already shown stay; the server goes on refusing a version that is not in force.
+    }
+  }
 }

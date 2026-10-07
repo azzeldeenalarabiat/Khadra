@@ -67,6 +67,16 @@
           <span>{{ i18n.t('auth.foreignNational') }}<span class="field__hint d-block">{{ i18n.t('auth.foreignNationalHelp') }}</span></span>
         </label>
 
+        @if (consentParts().length) {
+          <!-- The legal texts in force, accepted with the account (Wave 4, W4-8). One line on purpose: the words carry
+               their own spaces, and Arabic joins "و" to the name that follows. -->
+          <label class="check">
+            <input type="checkbox" name="legalConsent" required [checked]="agreed()" (change)="agreed.set(checked($event))" [attr.aria-invalid]="consentMissing()" />
+            <span>@for (part of consentParts(); track $index) {@if (part.slug) {<a class="link" [routerLink]="i18n.link(part.slug)" target="_blank" rel="noopener">{{ part.text }}</a>} @else {<span>{{ part.text }}</span>}}</span>
+          </label>
+          @if (consentMissing()) { <span class="field__error">{{ i18n.t('consent.required') }}</span> }
+        }
+
         @if (message(); as text) {
           <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
         }

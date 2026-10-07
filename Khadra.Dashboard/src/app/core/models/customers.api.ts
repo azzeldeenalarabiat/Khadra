@@ -1,10 +1,9 @@
 /**
  * Customers as the API returns them (Khadra.Application/IdentityAccess/ReadModels).
  *
- * Documents are DESCRIBED, never linked. Spec 7 keeps identity papers private and the domain scopes
- * viewing to the customer themselves and to a dealer with an active request; an administrator is not
- * named there, and the review mechanism spec 5.1 anticipates has not been decided. So the profile
- * says what is on file and what state it is in, and no signed URL for a passport is ever minted.
+ * Documents are DESCRIBED, never linked: no signed URL for a passport is ever minted. An administrator opens one
+ * through its own streaming route, on the way to deciding whether to reject it, and the server records each opening
+ * (Wave 4, W4-9; owner D3: Khadra may reject a document, and never calls one verified).
  */
 
 export type AccountStatus = 'Active' | 'Suspended';
