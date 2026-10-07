@@ -392,9 +392,37 @@ public sealed class CreateBookingTests
     }
 
     /// <summary>
-    /// The documents rule is a CHECKBOX. Nothing can move a document out of PendingReview yet, so a
-    /// booking must not require verification — and this pins that, because the day review exists,
-    /// somebody will have to decide deliberately whether to tighten it (checklist item 63).
+    /// What a refusal over documents names (Wave 4, W4-9; additive): every required type not filed, and
+    /// which of those an administrator rejected, so a screen can say "upload a new one" without
+    /// working anything out for itself. Type names only — the reason is the customer's to read on
+    /// their documents page, never carried in a booking refusal.
+    /// </summary>
+    [Fact]
+    public async Task A_refusal_over_documents_names_what_is_missing_and_what_was_rejected()
+    {
+        var context = new Context();
+        var customer = Build.Customer(hasIdentity: false);
+        var front = customer.Documents.Single(document => document.Type == CustomerDocumentType.DrivingLicenceFront);
+        customer.RejectDocument(front.Id, "The photo is too blurred to read.", front.UploadedAt);
+        context.WithCustomer(customer);
+
+        var result = await context.Handler().Handle(context.Command(), CancellationToken.None);
+
+        Assert.Equal(BookingErrors.RenterDocumentsIncompleteCode, result.Error.Code);
+        Assert.Equal(ErrorKind.Forbidden, result.Error.Kind);
+        Assert.NotNull(result.Error.Extensions);
+        Assert.Equal(["DrivingLicenceFront", "NationalId"], (string[])result.Error.Extensions["missingDocumentTypes"]!);
+        Assert.Equal(["DrivingLicenceFront"], (string[])result.Error.Extensions["rejectedDocumentTypes"]!);
+        Assert.DoesNotContain("blurred", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(context.Added);
+    }
+
+    /// <summary>
+    /// The documents rule is a CHECKBOX. Nothing verifies a document, so a booking must not require
+    /// verification — and this pins that, because the day review exists, somebody will have to decide
+    /// deliberately whether to tighten it (checklist item 63). The one thing that moves a document out
+    /// of PendingReview is an administrator rejecting it (Wave 4, W4-9), and a rejected file counts as
+    /// not filed: the test above.
     /// </summary>
     [Fact]
     public async Task Uploaded_is_enough_documents_are_not_verified_yet()

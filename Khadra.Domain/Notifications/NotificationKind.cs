@@ -142,6 +142,13 @@ public sealed class NotificationKind : Enumeration
     // customer as YourDisputeUpdated, which every installed app already opens at the dispute.
     public static readonly NotificationKind YourDisputeOpened = new(40, "YourDisputeOpened", PushAndEmail);
 
+    // Khadra could not accept one of the customer's documents (Wave 4, W4-9; checklist 27). NO SUBJECT: it is about the
+    // account, not a booking, so the push carries no subjectId (every installed app routes a literal "null" to
+    // /bookings/null) and no subjectReference (installed apps print it raw under the line). Its words never carry the
+    // reason — a lock screen is not a private channel; the documents page says which and why. Installed builds show a
+    // generic line and open nothing; routing it to the documents screen is in the app's 1.4.0 ledger.
+    public static readonly NotificationKind YourDocumentRejected = new(41, "YourDocumentRejected", PushAndEmail);
+
     // Deliberately ABSENT, each for a reason rather than an oversight:
     //
     //   StaffInvited      — an invited account is inert until the link is accepted; there is nobody

@@ -156,4 +156,31 @@ public sealed class OfficeNotificationEmailTests
         Assert.Contains($"{Website}/bookings/{booking.Value}", email.TextBody, StringComparison.Ordinal);
         Assert.DoesNotContain(Console, email.TextBody, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// Wave 4, W4-9: a rejected document is about the account, so it names no booking and leads to the documents page;
+    /// and it never carries the reason, because a lock screen and an inbox preview are not private channels.
+    /// </summary>
+    [Fact]
+    public void A_rejected_document_leads_to_the_documents_page_and_never_says_why()
+    {
+        var rejected = Notification.Raise(Id.New(), NotificationKind.YourDocumentRejected, Notification.PlatformActorName, Now);
+
+        var push = Composer().ComposePush(rejected, Language.English);
+        var pushAr = Composer().ComposePush(rejected, Language.Arabic);
+        var email = Composer().ComposeEmail(rejected, Users.Customer());
+
+        Assert.Equal("A document needs a new upload", push.Title);
+        Assert.Equal("مستند يحتاج إلى رفع جديد", pushAr.Title);
+        foreach (var text in new[] { push.Body, pushAr.Body, email.TextBody })
+        {
+            Assert.DoesNotContain("{", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("null", text, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.Contains($"{Website}/profile/documents", email.TextBody, StringComparison.Ordinal);
+        Assert.Contains("Open your documents", email.HtmlBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("/bookings/", email.TextBody, StringComparison.Ordinal);
+        Assert.DoesNotContain(Console, email.TextBody, StringComparison.Ordinal);
+    }
 }

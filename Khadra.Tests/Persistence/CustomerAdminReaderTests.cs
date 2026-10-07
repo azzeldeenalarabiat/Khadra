@@ -168,4 +168,33 @@ public sealed class CustomerAdminReaderTests : IDisposable
         // The filter and the count are two readings of the same fact and must not disagree.
         Assert.Equal(counts.Suspended, suspendedPage.TotalCount);
     }
+
+    /// <summary>
+    /// The list says "complete to rent" from the customer's documents themselves, as the profile and the booking guard
+    /// do (Wave 4, W4-9). It is read in the list's own query, which does not load the documents, so a rule asked of the
+    /// entity there would see none and call everyone incomplete.
+    /// </summary>
+    [Fact]
+    public async Task The_list_says_complete_to_rent_from_the_documents_themselves()
+    {
+        var complete = Build.Customer();
+        var empty = Build.Customer(hasLicence: false, hasIdentity: false, email: "sami@example.jo", phone: "0791234568");
+        Assert.True(complete.HasCompleteRenterDocuments);
+
+        await using (var write = new KhadraDbContext(_options))
+        {
+            write.Users.AddRange(complete, empty);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = new KhadraDbContext(_options);
+        var page = await new CustomerAdminReader(read).ListAsync(new CustomerListFilter(null, null, null), new PageRequest(1, 20));
+
+        var completeRow = Assert.Single(page.Items, row => row.UserId == complete.Id.Value);
+        var emptyRow = Assert.Single(page.Items, row => row.UserId == empty.Id.Value);
+        Assert.Equal(3, completeRow.DocumentCount);
+        Assert.True(completeRow.HasCompleteRenterDocuments);
+        Assert.Equal(0, emptyRow.DocumentCount);
+        Assert.False(emptyRow.HasCompleteRenterDocuments);
+    }
 }

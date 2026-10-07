@@ -22,9 +22,11 @@ public sealed class CustomerDocumentType : Enumeration
     public bool IsIdentity => this == NationalId || this == Passport;
 }
 
-// Spec 5.1 asks for a legibility and expiry check before a customer can book, but names no mechanism
-// (manual review, OCR, a third-party service). The status is modelled now so the decision has
-// somewhere to land; nothing in this pass moves a document out of PendingReview.
+// Spec 5.1 asks for a legibility and expiry check before a customer can book, but names no mechanism.
+// An administrator may REJECT a file (Wave 4, W4-9; owner, D3): a rejected document counts as not filed
+// until the customer uploads a new one. Nothing marks a document Verified — there is no verification
+// on this platform, and a tick would promise a check nobody makes — but the value stays, because
+// statuses are stored by name and the list is add-only.
 public sealed class CustomerDocumentStatus : Enumeration
 {
     public static readonly CustomerDocumentStatus PendingReview = new(1, "PendingReview");
@@ -63,6 +65,9 @@ public sealed class CustomerDocumentStatus : Enumeration
 public sealed class CustomerDocument : Entity
 {
     public const int MaxStorageKeyLength = 500;
+
+    /// <summary>The width of <c>review_note</c>: a rejection's reason, as the customer reads it.</summary>
+    public const int MaxReviewNoteLength = 500;
 
     public Id UserId { get; private set; }
     public CustomerDocumentType Type { get; private set; } = null!;
@@ -136,15 +141,21 @@ public sealed class CustomerDocument : Entity
         return previous;
     }
 
-    internal void MarkVerified()
-    {
-        Status = CustomerDocumentStatus.Verified;
-        ReviewNote = null;
-    }
+    public bool IsRejected => Status == CustomerDocumentStatus.Rejected;
 
+    /// <summary>
+    /// An administrator could not accept this file (Wave 4, W4-9), and says why: the customer reads the reason on their
+    /// documents page, and uploading a new file starts again (<see cref="Replace"/>). Rejecting a rejected file again,
+    /// with a new reason, is allowed.
+    /// </summary>
     internal void MarkRejected(string reason)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        var trimmed = reason.Trim();
+        if (trimmed.Length > MaxReviewNoteLength)
+            throw new DomainException($"A rejection's reason is at most {MaxReviewNoteLength} characters; the validator says so first.");
+
         Status = CustomerDocumentStatus.Rejected;
-        ReviewNote = reason;
+        ReviewNote = trimmed;
     }
 }

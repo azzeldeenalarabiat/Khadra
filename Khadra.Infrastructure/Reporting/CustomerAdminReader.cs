@@ -40,7 +40,14 @@ internal sealed class CustomerAdminReader(KhadraDbContext context) : ICustomerAd
         if (total == 0)
             return PagedResult.Empty<CustomerListItem>(page.Page, page.PageSize);
 
-        var items = await query
+        var rows = await query
+            // The documents come WITH each customer, because "complete to rent" is the aggregate's own rule
+            // (User.MissingRenterDocumentTypes) and is asked of the loaded customer below, never restated in SQL. It
+            // used to be asked inside the projection, of a customer EF built with no documents, so the list called
+            // every customer incomplete (E2E F86, Wave 4).
+            .AsNoTracking()
+            .Include(user => user.Documents)
+            .AsSplitQuery()
             // Newest first: the people who just arrived are the ones an admin has not seen.
             .OrderByDescending(user => user.CreatedAt)
             // CreatedAt is not unique — the seeder writes many in a second — and a non-total order
@@ -48,21 +55,29 @@ internal sealed class CustomerAdminReader(KhadraDbContext context) : ICustomerAd
             .ThenBy(user => user.Id)
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(user => new CustomerListItem(
-                user.Id.Value,
-                user.Name.Value,
-                user.Email.Value,
-                user.Phone.Value,
-                user.Status.Name,
-                user.IsEmailVerified,
-                user.LastLoginAt,
-                user.CreatedAt,
+            .Select(user => new
+            {
+                User = user,
                 // Correlated rather than joined: Bookings is another bounded context, so there is no
                 // navigation property from User to Booking and there deliberately never will be.
-                context.Bookings.Count(booking => booking.CustomerId == user.Id),
-                user.Documents.Count,
-                user.HasCompleteRenterDocuments))
+                Bookings = context.Bookings.Count(booking => booking.CustomerId == user.Id),
+            })
             .ToListAsync(cancellationToken);
+
+        var items = rows
+            .Select(row => new CustomerListItem(
+                row.User.Id.Value,
+                row.User.Name.Value,
+                row.User.Email.Value,
+                row.User.Phone.Value,
+                row.User.Status.Name,
+                row.User.IsEmailVerified,
+                row.User.LastLoginAt,
+                row.User.CreatedAt,
+                row.Bookings,
+                row.User.Documents.Count,
+                row.User.HasCompleteRenterDocuments))
+            .ToList();
 
         return new PagedResult<CustomerListItem>(items, page.Page, page.PageSize, total);
     }

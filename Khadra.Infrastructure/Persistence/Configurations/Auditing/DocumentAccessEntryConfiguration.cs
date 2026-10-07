@@ -51,5 +51,11 @@ internal sealed class DocumentAccessEntryConfiguration : IEntityTypeConfiguratio
         // is never removed or hidden. There is deliberately no index on document_id alone -- a
         // document is always reached through its subject or its booking, and an index nobody uses is
         // a write cost on the request path of a handover screen.
+
+        // A booking grants an office its access, and the record names both (Wave 4, W4-9). Only an administrator's view
+        // names neither: no booking grants it -- the Admin policy does -- and the database admits the gap for nobody else.
+        entity.ToTable(table => table.HasCheckConstraint(
+            "ck_document_access_entries_scope",
+            $"(dealer_id IS NOT NULL AND booking_id IS NOT NULL) OR actor_role = '{UserRole.Admin.Name}'"));
     }
 }

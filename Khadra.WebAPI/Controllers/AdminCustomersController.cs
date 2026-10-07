@@ -5,6 +5,7 @@ using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Khadra.WebAPI.Controllers;
 
@@ -25,6 +26,10 @@ public sealed class AdminCustomersController : ApiControllerBase
 {
     /// <param name="Reason">Bounded at 500 to match the column that stores it.</param>
     public sealed record SuspendRequest([Required, MaxLength(500)] string Reason);
+
+    /// <param name="Reason">Why the file cannot be accepted, as the customer will read it: at most 500 characters.</param>
+    /// <param name="UploadedAt">The document's <c>uploadedAt</c> exactly as the profile sent it: which upload was judged.</param>
+    public sealed record RejectDocumentRequest([Required, MaxLength(600)] string Reason, [Required] DateTimeOffset? UploadedAt);
 
     [HttpGet]
     [ProducesResponseType<PagedResult<CustomerListItem>>(StatusCodes.Status200OK)]
@@ -55,10 +60,9 @@ public sealed class AdminCustomersController : ApiControllerBase
     /// One customer: their account, what they have on file, and their history with the platform.
     /// </summary>
     /// <remarks>
-    /// Documents are DESCRIBED, not linked. Spec 7 keeps identity papers private and
-    /// <c>CustomerDocument</c> scopes viewing to the customer and to a dealer with an active request;
-    /// an Admin is not named there, and spec 5.1's review mechanism is undecided. No signed URL for a
-    /// passport is minted until the owner says so.
+    /// Documents are DESCRIBED, not linked: no signed URL for a passport is ever minted here. An
+    /// administrator opens one through the streaming route below (Wave 4, W4-9), which records the view
+    /// first.
     /// </remarks>
     [HttpGet("{userId:guid}")]
     [ProducesResponseType<CustomerProfile>(StatusCodes.Status200OK)]
@@ -79,6 +83,43 @@ public sealed class AdminCustomersController : ApiControllerBase
         ArgumentNullException.ThrowIfNull(request);
         var result = await Mediator.Send(
             new SuspendCustomerCommand(Id.From(userId), request.Reason),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Opens one of the customer's documents (Wave 4, W4-9; checklist 27). Streamed through the API, never a
+    /// signed link, with the view recorded before a byte is sent; no-store and nosniff, as every private file.
+    /// </summary>
+    [HttpGet("{userId:guid}/documents/{documentId:guid}")]
+    [EnableRateLimiting(RateLimitPolicies.PrivateDocuments)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> OpenDocument(Guid userId, Guid documentId, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new OpenCustomerDocumentCommand(Id.From(userId), Id.From(documentId)), cancellationToken);
+        return FromResult(result, opened => PrivateDocument(opened.Content, opened.ContentType));
+    }
+
+    /// <summary>
+    /// Rejects one of the customer's documents, with the reason the customer will read (Wave 4, W4-9). The customer
+    /// is told and must upload a new file before their next request. 409 <c>documents.changed_since_viewed</c> when the
+    /// file was replaced after it was opened.
+    /// </summary>
+    [HttpPost("{userId:guid}/documents/{documentId:guid}/reject")]
+    [ProducesResponseType<CustomerProfile>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> RejectDocument(
+        Guid userId,
+        Guid documentId,
+        [FromBody] RejectDocumentRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(
+            new RejectCustomerDocumentCommand(Id.From(userId), Id.From(documentId), request.Reason, request.UploadedAt!.Value),
             cancellationToken);
         return FromResult(result);
     }

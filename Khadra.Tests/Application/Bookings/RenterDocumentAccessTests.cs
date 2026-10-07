@@ -511,4 +511,29 @@ public sealed class RenterDocumentAccessTests
             System.Text.Json.JsonSerializer.Serialize(result.Value),
             StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Wave 4, W4-9: a file Khadra rejected is still listed — the gallery may open what the customer sent — but it is
+    /// flagged, and its type is owed, so the panel reads "needs a new upload" rather than a tile beside a missing line.
+    /// The rejection's reason is the customer's, and does not reach the gallery.
+    /// </summary>
+    [Fact]
+    public async Task A_file_Khadra_rejected_is_flagged_and_owed_and_its_reason_stays_with_the_customer()
+    {
+        var context = new RenterDocumentFixture();
+        var booking = Confirmed(context);
+        var front = context.Renter.Documents.Single(document => document.Type == CustomerDocumentType.DrivingLicenceFront);
+        context.Renter.RejectDocument(front.Id, "The photo is too blurred to read.", front.UploadedAt);
+
+        var result = await context.Handlers().Handle(
+            new ViewRenterDocumentsQuery(context.OwnerUserId, booking.Id), default);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.Documents.Count);
+        Assert.True(result.Value.Documents.Single(document => document.DocumentId == front.Id.Value).RejectedByPlatform);
+        Assert.Equal(2, result.Value.Documents.Count(document => !document.RejectedByPlatform));
+        Assert.False(result.Value.IsComplete);
+        Assert.Equal(["DrivingLicenceFront"], result.Value.Missing);
+        Assert.DoesNotContain("blurred", System.Text.Json.JsonSerializer.Serialize(result.Value), StringComparison.OrdinalIgnoreCase);
+    }
 }

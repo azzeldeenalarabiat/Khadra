@@ -69,11 +69,14 @@ public sealed class DocumentAccessEntry : AggregateRoot, IAppendOnly
 
     public UserRole ActorRole { get; private set; } = null!;
 
-    /// <summary>The dealership they were acting for.</summary>
-    public Id DealerId { get; private set; }
+    /// <summary>The dealership they were acting for; null only for an administrator's view (Wave 4, W4-9).</summary>
+    public Id? DealerId { get; private set; }
 
-    /// <summary>The booking that granted the access. The relationship IS the authorization.</summary>
-    public Id BookingId { get; private set; }
+    /// <summary>
+    /// The booking that granted the access. The relationship IS the authorization. Null only for an administrator's
+    /// view (Wave 4, W4-9), which no booking grants: the Admin policy does, and this record is how it is answered for.
+    /// </summary>
+    public Id? BookingId { get; private set; }
 
     /// <summary>
     /// The renter whose papers these are.
@@ -128,11 +131,51 @@ public sealed class DocumentAccessEntry : AggregateRoot, IAppendOnly
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(actorRole);
+        if (bookingId.IsEmpty)
+            throw new DomainException("A document access entry requires a booking and a document.");
+
+        return Create(
+            action, actorUserId, actorName, actorRole, dealerId, bookingId, subjectUserId, documentId, documentType,
+            documentUploadedAt, occurredAt, correlationId);
+    }
+
+    /// <summary>
+    /// An administrator opened a renter's document (Wave 4, W4-9; checklist 27). No booking grants it — the Admin
+    /// policy does — so no dealership or booking is named, and the database admits that only for an administrator.
+    /// Written before the file is served, as every disclosure is.
+    /// </summary>
+    public static DocumentAccessEntry RecordAdminView(
+        Id actorUserId,
+        string actorName,
+        Id subjectUserId,
+        Id documentId,
+        CustomerDocumentType documentType,
+        DateTimeOffset documentUploadedAt,
+        DateTimeOffset occurredAt,
+        string? correlationId = null) =>
+        Create(
+            DocumentAccessAction.Viewed, actorUserId, actorName, UserRole.Admin, dealerId: null, bookingId: null,
+            subjectUserId, documentId, documentType, documentUploadedAt, occurredAt, correlationId);
+
+    private static DocumentAccessEntry Create(
+        DocumentAccessAction action,
+        Id actorUserId,
+        string actorName,
+        UserRole actorRole,
+        Id? dealerId,
+        Id? bookingId,
+        Id subjectUserId,
+        Id documentId,
+        CustomerDocumentType documentType,
+        DateTimeOffset documentUploadedAt,
+        DateTimeOffset occurredAt,
+        string? correlationId)
+    {
         ArgumentNullException.ThrowIfNull(documentType);
         if (actorUserId.IsEmpty)
             throw new DomainException("A document access entry requires an actor.");
-        if (bookingId.IsEmpty || documentId.IsEmpty)
-            throw new DomainException("A document access entry requires a booking and a document.");
+        if (documentId.IsEmpty)
+            throw new DomainException("A document access entry requires a document.");
         if (subjectUserId.IsEmpty)
             throw new DomainException("A document access entry requires the person the document is about.");
         if (string.IsNullOrWhiteSpace(actorName))

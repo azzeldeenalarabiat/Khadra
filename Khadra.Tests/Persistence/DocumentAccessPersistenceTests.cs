@@ -86,6 +86,54 @@ public sealed class DocumentAccessPersistenceTests : IDisposable
         Assert.Equal("correlation-1", stored.CorrelationId);
     }
 
+    /// <summary>Wave 4, W4-9: an administrator's view names no dealership and no booking, and must read back that way.</summary>
+    [Fact]
+    public async Task An_administrators_view_round_trips_with_no_dealership_and_no_booking()
+    {
+        var subject = Id.New();
+        var entry = DocumentAccessEntry.RecordAdminView(
+            Id.New(), "Dana Saleh", subject, Id.New(), CustomerDocumentType.DrivingLicenceFront, Now.AddDays(-1), Now, "correlation-2");
+        await using (var write = new KhadraDbContext(_options))
+        {
+            write.DocumentAccessEntries.Add(entry);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = new KhadraDbContext(_options);
+        var stored = await read.DocumentAccessEntries.SingleAsync();
+
+        Assert.Null(stored.DealerId);
+        Assert.Null(stored.BookingId);
+        Assert.Equal(UserRole.Admin, stored.ActorRole);
+        Assert.Equal(DocumentAccessAction.Viewed, stored.Action);
+        Assert.Equal(subject, stored.SubjectUserId);
+        Assert.Equal(entry.DocumentId, stored.DocumentId);
+        Assert.Equal(Now.AddDays(-1), stored.DocumentUploadedAt);
+        Assert.Equal("Dana Saleh", stored.ActorName);
+    }
+
+    /// <summary>
+    /// The floor under the factories (<c>ck_document_access_entries_scope</c>): only an administrator's row may leave the
+    /// dealership and the booking empty. An office's view with no booking would be a disclosure nothing authorised.
+    /// </summary>
+    [Fact]
+    public async Task Only_an_administrators_view_may_name_no_booking()
+    {
+        var entry = DocumentAccessEntry.RecordAdminView(
+            Id.New(), "Rami Haddad", Id.New(), Id.New(), CustomerDocumentType.Passport, Now.AddDays(-1), Now);
+        // Reaching past the factory on purpose: this is the row the factories refuse to build.
+        typeof(DocumentAccessEntry).GetProperty(nameof(DocumentAccessEntry.ActorRole))!.SetValue(entry, UserRole.DealerOwner);
+
+        await using (var write = new KhadraDbContext(_options))
+        {
+            write.DocumentAccessEntries.Add(entry);
+            await Assert.ThrowsAsync<DbUpdateException>(() => write.SaveChangesAsync());
+        }
+
+        await using var read = new KhadraDbContext(_options);
+        Assert.Equal(0, await read.DocumentAccessEntries.CountAsync());
+    }
+
     [Fact]
     public async Task A_stored_disclosure_record_cannot_be_edited()
     {

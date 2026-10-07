@@ -58,13 +58,21 @@ public sealed record DealerDocumentReviewDto(
 /// No URL and no storage key, and nowhere to put one. The bytes come from a sibling endpoint that
 /// re-checks the booking relationship on every request.
 /// </para>
+/// <para>
+/// <b>One platform fact, since Wave 4 (W4-9; the advisor's review): <c>RejectedByPlatform</c>.</b> An administrator
+/// may reject a file, and a rejected file counts as not filed, so its type is in <c>Missing</c> while the file is still
+/// listed here. Without the flag the panel would show a tile beside a missing line for the same document; with it, the
+/// tile reads "needs a new upload". It names a decision that was made, never a check promised; the reason stays the
+/// customer's.
+/// </para>
 /// </remarks>
 public sealed record RenterDocumentDto(
     Guid DocumentId,
     string Type,
     string ContentType,
     DateTimeOffset UploadedAt,
-    DealerDocumentReviewDto? DealerReview)
+    DealerDocumentReviewDto? DealerReview,
+    bool RejectedByPlatform = false)
 {
     public static RenterDocumentDto From(CustomerDocument document, RenterDocumentReview? review)
     {
@@ -77,7 +85,8 @@ public sealed record RenterDocumentDto(
             // review screen learned this the hard way, labelling every registration ".jpg".
             DocumentContentTypes.ForStorageKey(document.StorageKey),
             document.UploadedAt,
-            review is null ? null : DealerDocumentReviewDto.From(review));
+            review is null ? null : DealerDocumentReviewDto.From(review),
+            document.IsRejected);
     }
 }
 

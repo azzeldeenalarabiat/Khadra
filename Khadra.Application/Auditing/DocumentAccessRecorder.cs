@@ -62,4 +62,28 @@ public sealed class DocumentAccessRecorder(IDocumentAccessLog log, ICurrentActor
             clock.UtcNow,
             actor.CorrelationId));
     }
+
+    /// <summary>
+    /// An administrator opened a renter's document (Wave 4, W4-9; checklist 27): no booking grants it, so none is named.
+    /// The endpoint cannot know an administrator's intent, so this record is the control.
+    /// </summary>
+    public void RecordAdminView(Id subjectUserId, Id documentId, CustomerDocumentType documentType, DateTimeOffset documentUploadedAt)
+    {
+        ArgumentNullException.ThrowIfNull(documentType);
+
+        // The route sits behind the Admin policy; anyone else here is a wiring mistake, and an administrator's view
+        // recorded under another role would claim an authorization nobody had.
+        if (actor.UserId is not { } actorUserId || actor.Role != UserRole.Admin)
+            throw new InvalidOperationException("An administrator's document view requires an authenticated administrator.");
+
+        log.Record(DocumentAccessEntry.RecordAdminView(
+            actorUserId,
+            actor.Name ?? "Unknown",
+            subjectUserId,
+            documentId,
+            documentType,
+            documentUploadedAt,
+            clock.UtcNow,
+            actor.CorrelationId));
+    }
 }

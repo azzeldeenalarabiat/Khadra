@@ -79,6 +79,11 @@ public sealed class AuditAction : Enumeration
     // and the reason is the administrator's note.
     public static readonly AuditAction PaymentIncidentHandled = new(35, "PaymentIncidentHandled");
 
+    // An administrator rejected one of a customer's documents (Wave 4, W4-9; checklist 27). Labelled by the customer's
+    // short id, never a name; the values carry the document's type with its status before and after
+    // ("DrivingLicenceFront:PendingReview" → "DrivingLicenceFront:Rejected"), and the reason is the one the customer reads.
+    public static readonly AuditAction CustomerDocumentRejected = new(36, "CustomerDocumentRejected");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }

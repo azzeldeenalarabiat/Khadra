@@ -40,6 +40,15 @@ public static class IdentityErrors
     public static readonly Error DocumentNotFound =
         Error.NotFound("documents.not_found", "That document does not exist.");
 
+    /// <summary>
+    /// The customer uploaded a new file after the administrator opened the one they were judging (Wave 4, W4-9): the
+    /// decision was about a file that is no longer there. Open the document again before deciding.
+    /// </summary>
+    public static readonly Error DocumentChangedSinceViewed =
+        Error.Conflict(
+            "documents.changed_since_viewed",
+            "The customer has uploaded a new file since you opened this one. Open it again before deciding.");
+
     public static readonly Error EmailTaken =
         Error.Conflict("auth.email_taken", "An account with this email already exists.");
 

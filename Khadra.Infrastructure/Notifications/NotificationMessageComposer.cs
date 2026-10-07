@@ -111,6 +111,11 @@ internal sealed class NotificationMessageComposer(
         ["YourDisputeOpened"] = new(
             "Dispute opened", "Your dispute on booking {ref} is open. Nothing is charged to you, and nothing held on this booking is released, until Khadra decides. Khadra aims to decide by {due}.",
             "فُتح نزاعك", "نزاعك على الحجز {ref} مفتوح. لن يُحمَّل عليك شيء، ولن يُفرَج عن شيء محجوز على هذا الحجز، حتى تقرّر خضرا. وتسعى خضرا إلى القرار قبل {due}."),
+        // Khadra could not accept one of the customer's documents (Wave 4, W4-9). No {ref} and never the reason: the
+        // notice has no subject, and a lock screen is not a private channel. The documents page says which and why.
+        ["YourDocumentRejected"] = new(
+            "A document needs a new upload", "Khadra could not accept one of your documents. Open your documents to see which and why, and upload a new one.",
+            "مستند يحتاج إلى رفع جديد", "لم تتمكن خضرا من قبول أحد مستنداتك. افتح مستنداتك لمعرفة أيّها والسبب، وارفع نسخة جديدة."),
 
         // The office's (Wave 3, C5), by email only. No {actor}: see the remarks above.
         ["DisputeOpened"] = new(
@@ -221,7 +226,15 @@ internal sealed class NotificationMessageComposer(
         }
 
         var site = app.Value.CustomerAppBaseUrl.TrimEnd('/');
-        return site.Length > 0 && notification.SubjectId is { } booking
+        if (site.Length == 0)
+            return null;
+
+        // About the account, not a booking (Wave 4, W4-9): it leads to the documents page. Language-less, as the
+        // booking links are; the website sends any such path on to the reader's language.
+        if (notification.Kind == NotificationKind.YourDocumentRejected)
+            return new Link($"{site}/profile/documents", "Open your documents", "افتح مستنداتك");
+
+        return notification.SubjectId is { } booking
             ? new Link($"{site}/bookings/{booking.Value}", "Open the booking", "افتح الحجز")
             : null;
     }

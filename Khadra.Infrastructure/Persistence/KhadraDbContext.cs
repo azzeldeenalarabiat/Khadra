@@ -87,12 +87,16 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
         //   are the same row moments apart, and without this the sweep's save could overwrite a Settled refund with
         //   the Sent it had loaded before — last writer wins, with money on the row.
         // - PaymentIncident (Wave 4, B1): two administrators marking the same capture incident handled.
+        // - CustomerDocument (Wave 4, W4-9; the advisor's review): an administrator rejecting a file while the customer
+        //   replaces it. On the document's own row, never on User, whose every sign-in writes last_login_at. The
+        //   rejection that loses answers "changed since you viewed it"; the upload that loses reloads and wins.
         if (Database.IsNpgsql())
         {
             foreach (var type in new[]
                      {
                          typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer), typeof(Payment),
                          typeof(OfficePayable), typeof(OfficePayableHold), typeof(Refund), typeof(PaymentIncident),
+                         typeof(CustomerDocument),
                      })
             {
                 modelBuilder.Entity(type)

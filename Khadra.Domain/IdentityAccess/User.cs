@@ -236,15 +236,20 @@ public sealed class User : AggregateRoot, ISoftDeletable
     /// touches a DbContext with it. A method is invisible to that convention, so no configuration has
     /// to know this computation exists. Anything else derived from <see cref="Documents"/> should be
     /// a method for the same reason.
+    ///
+    /// A REJECTED file does not count as filed (Wave 4, W4-9): an administrator could not accept it, so the slot is
+    /// still owed until the customer uploads a new one. That one rule reaches the booking guard, the customer's own
+    /// checklist, the office's renter panel and the administrator's customer list together.
     /// </remarks>
     public IReadOnlyList<CustomerDocumentType> MissingRenterDocumentTypes()
     {
+        var filed = _documents.Where(document => !document.IsRejected).ToList();
         var missing = new List<CustomerDocumentType>();
-        if (!_documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceFront))
+        if (!filed.Any(document => document.Type == CustomerDocumentType.DrivingLicenceFront))
             missing.Add(CustomerDocumentType.DrivingLicenceFront);
-        if (!_documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceBack))
+        if (!filed.Any(document => document.Type == CustomerDocumentType.DrivingLicenceBack))
             missing.Add(CustomerDocumentType.DrivingLicenceBack);
-        if (!_documents.Any(document => document.Type.IsIdentity))
+        if (!filed.Any(document => document.Type.IsIdentity))
         {
             missing.Add(IsForeignNational
                 ? CustomerDocumentType.Passport
@@ -252,6 +257,42 @@ public sealed class User : AggregateRoot, ISoftDeletable
         }
 
         return missing;
+    }
+
+    /// <summary>
+    /// The documents an administrator rejected that still leave a requirement unmet (Wave 4, W4-9): a subset of what
+    /// <see cref="MissingRenterDocumentTypes"/> owes, named by the type that was rejected. A rejected identity document
+    /// whose slot another identity document fills is not here.
+    /// </summary>
+    public IReadOnlyList<CustomerDocumentType> RejectedRenterDocumentTypes()
+    {
+        var missing = MissingRenterDocumentTypes();
+        var identityMissing = missing.Any(type => type.IsIdentity);
+        return [.. _documents
+            .Where(document => document.IsRejected
+                && (missing.Contains(document.Type) || (document.Type.IsIdentity && identityMissing)))
+            .Select(document => document.Type)
+            .OrderBy(type => type.Id)];
+    }
+
+    /// <summary>
+    /// An administrator rejects one of this person's documents, and says why (Wave 4, W4-9; checklist 27).
+    /// </summary>
+    /// <param name="expectedUploadedAt">
+    /// When the file the administrator opened was uploaded. A document row is a slot whose file is replaced in place,
+    /// so a different instant means the customer has uploaded a new file since: rejecting it would judge a file nobody
+    /// looked at.
+    /// </param>
+    public Result<CustomerDocument, Error> RejectDocument(Id documentId, string reason, DateTimeOffset expectedUploadedAt)
+    {
+        var document = FindDocument(documentId);
+        if (document is null)
+            return IdentityErrors.DocumentNotFound;
+        if (document.UploadedAt != expectedUploadedAt)
+            return IdentityErrors.DocumentChangedSinceViewed;
+
+        document.MarkRejected(reason);
+        return document;
     }
 
     public CustomerDocument? FindDocument(Id documentId) =>

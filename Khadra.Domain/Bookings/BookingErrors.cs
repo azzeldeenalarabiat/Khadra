@@ -51,14 +51,27 @@ public static class BookingErrors
             $"This gallery cannot take the car back at that time — it is {schedule}. Choose a return while they are open.");
 
     /// <summary>
-    /// Spec 5.1. UPLOADED, not verified: nothing can move a document out of PendingReview yet, so
-    /// requiring verification would mean nobody could book at all. See pre-launch checklist item 63,
-    /// which the owner has made a hard requirement before real launch.
+    /// Spec 5.1. UPLOADED and not rejected (Wave 4, W4-9): nothing verifies a document on this platform, but an
+    /// administrator may reject one, and a rejected file counts as not filed. See pre-launch checklist item 63, which
+    /// the owner has made a hard requirement before real launch.
     /// </summary>
-    public static readonly Error RenterDocumentsIncomplete =
-        Error.Forbidden(
-            "booking.documents_incomplete",
-            "Upload both sides of your driving licence and an ID or passport before booking.");
+    /// <remarks>
+    /// Its extensions say what is owed (additive, the advisor's review): <c>missingDocumentTypes</c>, every required
+    /// type not filed, and <c>rejectedDocumentTypes</c>, those of them an administrator rejected — so the refusal is
+    /// the server's whole answer rather than something a screen worked out for itself. Type names, never the reason.
+    /// </remarks>
+    public const string RenterDocumentsIncompleteCode = "booking.documents_incomplete";
+
+    public static Error RenterDocumentsIncomplete(IEnumerable<string> missingTypes, IEnumerable<string> rejectedTypes) =>
+        new(
+            RenterDocumentsIncompleteCode,
+            "Upload both sides of your driving licence and an ID or passport before booking.",
+            ErrorKind.Forbidden,
+            Extensions: new Dictionary<string, object?>
+            {
+                ["missingDocumentTypes"] = missingTypes.ToArray(),
+                ["rejectedDocumentTypes"] = rejectedTypes.ToArray(),
+            });
 
     /// <summary>
     /// The signed-in account cannot make bookings: it is not a customer's, or it is not active.

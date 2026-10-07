@@ -88,6 +88,29 @@ public sealed class DeliverNotificationsHandlerTests
         await _unitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// Wave 4, W4-9: a notice about the account, not a booking, carries no subject at all. Every installed app opens a
+    /// "subjectId" as a booking — a literal "null" would take a customer to /bookings/null — and prints a reference raw.
+    /// </summary>
+    [Fact]
+    public async Task A_notice_about_the_account_wakes_the_phone_with_no_subject_and_no_reference()
+    {
+        var rejected = Notification.Raise(_customer.Id, NotificationKind.YourDocumentRejected, Notification.PlatformActorName, Now);
+        _notifications.GetAsync(rejected.Id, Arg.Any<CancellationToken>()).Returns(rejected);
+        _deliveries.ClaimDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([NotificationDelivery.Owe(rejected.Id, NotificationChannel.Push, Now)]);
+        _devices.ListDeliverableAsync(_customer.Id, Now, Arg.Any<CancellationToken>()).Returns([Device("a", Language.English)]);
+        _push.SendAsync(Arg.Any<PushMessage>(), Arg.Any<CancellationToken>()).Returns(PushSendResult.Delivered);
+
+        await RunAsync();
+
+        await _push.Received(1).SendAsync(
+            Arg.Is<PushMessage>(m => m.Data["kind"] == "YourDocumentRejected"
+                                     && !m.Data.ContainsKey("subjectId")
+                                     && !m.Data.ContainsKey("subjectReference")),
+            Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task No_provider_means_skipped_not_retried_forever()
     {

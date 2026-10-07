@@ -72,10 +72,40 @@ public sealed class UploadCustomerDocumentHandler(
             request.Content,
             cancellationToken);
 
-        var superseded = user.AttachDocument(
-            type, stored.StorageKey, stored.ContentType, stored.SizeBytes, clock.UtcNow);
+        var now = clock.UtcNow;
+        var superseded = user.AttachDocument(type, stored.StorageKey, stored.ContentType, stored.SizeBytes, now);
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            // An administrator rejected the file this replaces between the load and the save (Wave 4, W4-9; the
+            // document's own concurrency token, the advisor's review). The new file wins -- a new upload starts the
+            // review again, which is the domain's own rule -- so the account is read afresh and the upload applied once
+            // more. Never a 409 for the customer, and never a new file left in storage with no row naming it.
+            unitOfWork.DiscardChanges();
+            var reloaded = await users.GetByIdAsync(request.UserId, cancellationToken);
+            if (reloaded is null)
+            {
+                await storage.DeleteAsync(stored.StorageKey, CancellationToken.None);
+                return IdentityErrors.UserNotFound;
+            }
+
+            user = reloaded;
+            superseded = user.AttachDocument(type, stored.StorageKey, stored.ContentType, stored.SizeBytes, now);
+            try
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                // Refused twice: the new file is nobody's, so it does not stay in storage.
+                await storage.DeleteAsync(stored.StorageKey, CancellationToken.None);
+                throw;
+            }
+        }
 
         // Only after the row is committed: deleting first would lose the old file if the save failed,
         // leaving the customer with a record pointing at nothing.

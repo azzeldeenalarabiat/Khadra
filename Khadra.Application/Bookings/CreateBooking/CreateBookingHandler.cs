@@ -280,7 +280,11 @@ public sealed class CreateBookingHandler(
             return UnitResult.Failure(BookingErrors.EmailNotVerified);
 
         if (!customer.HasCompleteRenterDocuments)
-            return UnitResult.Failure(BookingErrors.RenterDocumentsIncomplete);
+        {
+            return UnitResult.Failure(BookingErrors.RenterDocumentsIncomplete(
+                customer.MissingRenterDocumentTypes().Select(type => type.Name),
+                customer.RejectedRenterDocumentTypes().Select(type => type.Name)));
+        }
 
         return UnitResult.Success<Error>();
     }
