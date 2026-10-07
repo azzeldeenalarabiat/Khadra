@@ -116,6 +116,7 @@ public sealed class CreateBookingTests
             TestBusinessRules.Calendar(),
             VehicleLock,
             new DealerTeamNotifier(Notifier, Users),
+            new BookingExpiryAnnouncer(new DealerTeamNotifier(Notifier, Users), Dealers),
             UnitOfWork,
             Clock);
 

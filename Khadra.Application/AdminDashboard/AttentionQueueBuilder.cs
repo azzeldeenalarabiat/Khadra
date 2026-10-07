@@ -36,6 +36,13 @@ public static class AttentionQueueBuilder
         public const string OrphanedCaptureOwed = "OrphanedCaptureOwed";
 
         /// <summary>
+        /// One capture incident nobody has marked handled (Wave 4, B1): a second charge, the provider contradicting
+        /// itself, or a capture another attempt holds. One row each, opening its payment, because each is money a
+        /// person has to deal with at the provider.
+        /// </summary>
+        public const string CaptureIncidentOpen = "CaptureIncidentOpen";
+
+        /// <summary>
         /// Offices' money the ledger holds back until somebody looks (payments Phase 8): a booking whose records
         /// contradict one another or whose penalty cannot be kept, or a payable that no longer matches its records.
         /// It replaced the row that watched a deposit held for a customer penalty (pre-launch item 164), which the
@@ -189,6 +196,22 @@ public static class AttentionQueueBuilder
                 SlaDeadlineAt: null,
                 IsOverdue: false));
         }
+
+        // Money that may have moved twice: never merely Info. No deadline, because nobody has frozen one.
+        foreach (var incident in money.OpenIncidents ?? [])
+        {
+            items.Add(new AttentionItemDto(
+                Id: $"capture-incident-{incident.IncidentId:N}",
+                Kind: Kinds.CaptureIncidentOpen,
+                Severity: Severities.Warning,
+                Count: 1,
+                SubjectIds: [incident.PaymentId],
+                Subtitle: incident.BookingReference,
+                Description: incident.Kind,
+                SlaStartedAt: incident.DetectedAt,
+                SlaDeadlineAt: null,
+                IsOverdue: false));
+        }
     }
 
     /// <summary>
@@ -318,10 +341,12 @@ public static class AttentionQueueBuilder
 }
 
 /// <summary>What the Payments context owes a human, for the work queue (payments Phase 4b).</summary>
+/// <param name="OpenIncidents">Capture incidents not yet marked handled (Wave 4, B1).</param>
 public sealed record MoneyAttention(
     IReadOnlyCollection<FailedRefundItem> FailedRefunds,
-    IReadOnlyCollection<OwedOrphanItem> OwedOrphans)
+    IReadOnlyCollection<OwedOrphanItem> OwedOrphans,
+    IReadOnlyCollection<OpenCaptureIncidentItem>? OpenIncidents = null)
 {
     /// <summary>Nothing owed to anybody's attention.</summary>
-    public static readonly MoneyAttention None = new([], []);
+    public static readonly MoneyAttention None = new([], [], []);
 }

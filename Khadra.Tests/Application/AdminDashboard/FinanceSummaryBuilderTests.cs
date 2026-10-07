@@ -75,6 +75,24 @@ public sealed class FinanceSummaryBuilderTests
         Assert.Equal(2, now.OrphanedCapturesOwedCount);
     }
 
+    /// <summary>
+    /// Open capture incidents are a COUNT on the panel (Wave 4, B1), never money in any figure: what that money is —
+    /// a second charge to return, a contradiction to reconcile — a person decides at the provider.
+    /// </summary>
+    [Fact]
+    public void Open_capture_incidents_are_counted_and_never_added_to_any_figure()
+    {
+        var facts = new FinanceFacts([], [], [Refund(18m, "Sent", "OrphanedCapture")], OpenCaptureIncidents: 2);
+
+        var now = FinanceSummaryBuilder.Build(facts, "JOD", "Sandbox", From, To, Now).RightNow;
+
+        Assert.Equal(2, now.OpenCaptureIncidentsCount);
+        Assert.Equal(18m, now.RefundsInProgress.Amount);
+        Assert.Equal(1, now.RefundsInProgressCount);
+        Assert.Equal(18m, now.OrphanedCapturesOwed.Amount);
+        Assert.Equal(0, FinanceSummaryBuilder.Build(new FinanceFacts([], [], []), "JOD", "Sandbox", From, To, Now).RightNow.OpenCaptureIncidentsCount);
+    }
+
     [Fact]
     public void A_capture_in_another_currency_is_listed_apart_and_never_summed()
     {

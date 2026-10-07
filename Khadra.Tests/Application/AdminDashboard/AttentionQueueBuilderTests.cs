@@ -288,4 +288,72 @@ public sealed class AttentionQueueBuilderTests
     {
         Assert.Empty(Build(money: MoneyAttention.None).Items);
     }
+
+    // ── Capture incidents (Wave 4, B1) ───────────────────────────────────────────────────────────────
+
+    private static OpenCaptureIncidentItem Incident(string? reference, string kind, DateTimeOffset detectedAt) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), reference, kind, detectedAt);
+
+    /// <summary>
+    /// One row EACH, opening its payment: every incident is money a person has to deal with at the provider, and a
+    /// grouped row would leave them hunting for which payment. A warning, with no clock nobody froze.
+    /// </summary>
+    [Fact]
+    public void Each_open_capture_incident_is_its_own_warning_row_opening_its_payment()
+    {
+        var second = Incident("KH-III99999", "SecondCapture", Now.AddHours(-2));
+        var other = Incident(null, "CaptureOnAnotherAttempt", Now.AddHours(-6));
+
+        var result = Build(money: new MoneyAttention([], [], [second, other]));
+
+        Assert.Equal(2, result.Items.Count);
+        var row = Assert.Single(result.Items, item => item.Id == $"capture-incident-{second.IncidentId:N}");
+        Assert.Equal(AttentionQueueBuilder.Kinds.CaptureIncidentOpen, row.Kind);
+        Assert.Equal(AttentionQueueBuilder.Severities.Warning, row.Severity);
+        Assert.Equal(1, row.Count);
+        Assert.Equal([second.PaymentId], row.SubjectIds);
+        Assert.Equal("KH-III99999", row.Subtitle);
+        // The kind's name, which the console words; never an English sentence from the server.
+        Assert.Equal("SecondCapture", row.Description);
+        Assert.Equal(second.DetectedAt, row.SlaStartedAt);
+        Assert.Null(row.SlaDeadlineAt);
+        Assert.False(row.IsOverdue);
+        Assert.Equal(0, result.Queue.OverdueCount);
+
+        // A payment whose booking no longer resolves still has its row; it simply has no reference to show.
+        Assert.Null(Assert.Single(result.Items, item => item.SubjectIds.Contains(other.PaymentId)).Subtitle);
+    }
+
+    /// <summary>Incidents rank with the other money a person must look at — after live deadlines, longest waiting first, and above watched money.</summary>
+    [Fact]
+    public void Capture_incidents_wait_with_the_money_a_person_must_look_at()
+    {
+        var dueSoon = Dispute(Now.AddHours(-40), Now.AddHours(8));
+        var failed = Failed("KH-EEE55555", Now.AddDays(-2));
+        var orphan = Orphan("KH-FFF66666", Now.AddDays(-9));
+        var older = Incident("KH-JJJ00000", "AmountMismatch", Now.AddDays(-3));
+        var newer = Incident("KH-KKK11111", "SecondCapture", Now.AddHours(-1));
+
+        var result = Build(disputes: [dueSoon], money: new MoneyAttention([failed], [orphan], [newer, older]));
+
+        Assert.Equal(
+            [
+                AttentionQueueBuilder.Kinds.DisputeOpen,
+                AttentionQueueBuilder.Kinds.CaptureIncidentOpen,
+                AttentionQueueBuilder.Kinds.RefundFailed,
+                AttentionQueueBuilder.Kinds.CaptureIncidentOpen,
+                AttentionQueueBuilder.Kinds.OrphanedCaptureOwed,
+            ],
+            result.Items.Select(item => item.Kind));
+        Assert.Equal([older.PaymentId], result.Items[1].SubjectIds);
+        Assert.Equal([newer.PaymentId], result.Items[3].SubjectIds);
+    }
+
+    /// <summary>A queue built before incidents existed, or with none open, has no incident row.</summary>
+    [Fact]
+    public void No_open_incident_adds_no_row()
+    {
+        Assert.Empty(Build(money: new MoneyAttention([], [])).Items);
+        Assert.Empty(Build(money: new MoneyAttention([], [], [])).Items);
+    }
 }

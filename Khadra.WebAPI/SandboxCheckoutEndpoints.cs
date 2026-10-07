@@ -98,6 +98,7 @@ internal static class SandboxCheckoutEndpoints
         [FromQuery] string? lang,
         [FromServices] IPaymentRepository payments,
         [FromServices] IPaymentSettings settings,
+        [FromServices] IOptions<PaymentOptions> options,
         [FromServices] IClock clock,
         CancellationToken cancellationToken)
     {
@@ -110,7 +111,11 @@ internal static class SandboxCheckoutEndpoints
             .FirstOrDefault(known => string.Equals(known.Name, lang, StringComparison.Ordinal)) ?? Language.Default;
 
         return Results.Content(
-            Page(payment, clock.UtcNow, settings.ReturnUrlFor(payment.BookingId, language)),
+            Page(
+                payment,
+                clock.UtcNow,
+                settings.ReturnUrlFor(payment.BookingId, language),
+                SandboxEvents.CaptureReferenceFor(reference, options.Value.WebhookSecret)),
             "text/html; charset=utf-8");
     }
 
@@ -123,7 +128,7 @@ internal static class SandboxCheckoutEndpoints
     /// record a refund) and it has to be clickable too. Nothing here decides anything about the
     /// booking; the webhook does, after verifying the signature this returns.
     /// </remarks>
-    private static async Task<IResult> BuildEventAsync(
+    internal static async Task<IResult> BuildEventAsync(
         string reference,
         [FromBody] SandboxOutcome outcome,
         [FromServices] IPaymentRepository payments,
@@ -151,6 +156,12 @@ internal static class SandboxCheckoutEndpoints
 
         // The event id is the tester's, so "deliver this again" is literally sending the same body
         // twice — which is the duplicate-webhook case, with no code behind the button.
+        // A capture carries the capture reference the page shows, which the tester may edit or clear (Wave 4, B1):
+        // left alone it is the same capture said again, changed it is a second charge, cleared it has none.
+        var captureReference = outcome.Kind == "captured" && !string.IsNullOrWhiteSpace(outcome.CaptureReference)
+            ? outcome.CaptureReference.Trim()
+            : null;
+
         var (body, signature) = SandboxEvents.Build(
             outcome.EventId,
             reference,
@@ -159,7 +170,8 @@ internal static class SandboxCheckoutEndpoints
             settings.Value.WebhookSecret,
             outcome.FailureCode,
             clock.UtcNow,
-            isRefund ? outcome.RefundReference : null);
+            isRefund ? outcome.RefundReference : null,
+            captureReference);
 
         return Results.Ok(new { body, signature, header = SandboxEvents.SignatureHeader });
     }
@@ -168,12 +180,14 @@ internal static class SandboxCheckoutEndpoints
     /// <param name="Kind">captured | failed | refund_settled | refund_failed.</param>
     /// <param name="Amount">Major units. Null means "the amount on the row" (or on the named refund).</param>
     /// <param name="RefundReference">The refund a refund event is about; null sends an unnamed one.</param>
+    /// <param name="CaptureReference">The capture a capture event reports; null or empty sends none (Wave 4, B1).</param>
     internal sealed record SandboxOutcome(
         string EventId,
         string Kind,
         decimal? Amount,
         string? FailureCode,
-        string? RefundReference = null);
+        string? RefundReference = null,
+        string? CaptureReference = null);
 
     /// <summary>
     /// One self-contained page. No framework, no build step, and nothing that outlives the sandbox.
@@ -196,10 +210,14 @@ internal static class SandboxCheckoutEndpoints
     /// the only encoding it needs is HTML's.
     /// </para>
     /// </remarks>
-    internal static string Page(Payment payment, DateTimeOffset now, Uri returnUrl)
+    internal static string Page(Payment payment, DateTimeOffset now, Uri returnUrl, string captureReference)
     {
         ArgumentNullException.ThrowIfNull(returnUrl);
+        ArgumentException.ThrowIfNullOrWhiteSpace(captureReference);
         var back = WebUtility.HtmlEncode(returnUrl.AbsoluteUri);
+        // The capture's id at this "provider" (Wave 4, B1): written into the input's value, HTML-encoded, and read back
+        // by the script from the field, never spliced into the script.
+        var capture = WebUtility.HtmlEncode(captureReference);
         var amount = payment.Amount.Amount.ToString("0.000", CultureInfo.InvariantCulture);
         var currency = WebUtility.HtmlEncode(payment.Amount.CurrencyCode);
         var expired = now >= payment.ExpiresAt;
@@ -259,6 +277,8 @@ internal static class SandboxCheckoutEndpoints
             <input id="amount" type="text" inputmode="decimal" value="{{amount}}">
             <label for="evt">Delivery id (send the same one twice to test a replay)</label>
             <input id="evt" type="text" value="">
+            <label for="capture">Capture reference (leave it to send the same capture again; change it for a second charge; clear it to send none)</label>
+            <input id="capture" type="text" value="{{capture}}">
             <button class="pay"     onclick="go('captured')">Pay</button>
             <button class="decline" onclick="go('failed','card_declined')">Decline</button>
             <h2>Refunds</h2>
@@ -308,7 +328,8 @@ internal static class SandboxCheckoutEndpoints
                 kind,
                 amount: kind === 'captured' ? typed : isRefund ? (refundAmount ?? typed) : null,
                 failureCode: failureCode || null,
-                refundReference: refundReference || null
+                refundReference: refundReference || null,
+                captureReference: kind === 'captured' ? (document.getElementById('capture').value.trim() || null) : null
               };
               const signed = await fetch(location.pathname + '/events', {
                 method: 'POST',

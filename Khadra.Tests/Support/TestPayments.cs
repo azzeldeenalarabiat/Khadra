@@ -34,6 +34,9 @@ internal static class TestPayments
 {
     public const string TestProviderName = "TestProvider";
 
+    /// <summary>The shipped refund back-off (Wave 4, B4): one minute, doubling, six hours at most, a person after three.</summary>
+    public static RefundRetryPolicy RetryPolicy { get; } = new(TimeSpan.FromMinutes(1), TimeSpan.FromHours(6), 3);
+
     /// <summary>A provider that is not there, which is what the shipped build has.</summary>
     public static IPaymentProvider NoProvider()
     {
@@ -70,6 +73,7 @@ internal static class TestPayments
         settings.CheckoutSessionLifetime.Returns(sessionLifetime ?? TimeSpan.FromMinutes(30));
         settings.CheckoutClosesBeforeDeadline.Returns(closesBeforeDeadline ?? TimeSpan.FromMinutes(5));
         settings.StaleAttemptGrace.Returns(staleGrace ?? TimeSpan.FromMinutes(15));
+        settings.RefundRetry.Returns(RetryPolicy);
         settings.ReturnUrlFor(Arg.Any<Id>(), Arg.Any<Language>())
             .Returns(call => new Uri($"https://app.test/{call.Arg<Language>().Name}/bookings/{call.Arg<Id>().Value}"));
         return settings;
@@ -79,8 +83,9 @@ internal static class TestPayments
         string providerReference,
         Money amount,
         DateTimeOffset occurredAt,
-        string eventId = "evt_1") =>
-        new(eventId, providerReference, ProviderEventKind.Captured, amount, null, occurredAt);
+        string eventId = "evt_1",
+        string? captureReference = null) =>
+        new(eventId, providerReference, ProviderEventKind.Captured, amount, null, occurredAt, null, captureReference);
 
     public static ProviderEvent Failed(
         string providerReference,
@@ -88,4 +93,14 @@ internal static class TestPayments
         string failureCode = "card_declined",
         string eventId = "evt_1") =>
         new(eventId, providerReference, ProviderEventKind.Failed, null, failureCode, occurredAt);
+}
+
+/// <summary>A refund refused the way most tests need it: by a notice, under the shipped retry policy.</summary>
+internal static class RefundTestExtensions
+{
+    public static void MarkFailed(this Refund refund, string failureCode, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(refund);
+        refund.MarkFailed(failureCode, now, TestPayments.RetryPolicy);
+    }
 }

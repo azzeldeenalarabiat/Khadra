@@ -73,6 +73,9 @@ public sealed record AdminRefundFilter(
 /// <see cref="Amount"/> is what is owed. The split into booking money and processing fee is on the
 /// payment's own page, where the payment it came from is read.
 /// </remarks>
+/// <param name="RefusalCount">How many sends the provider has refused (Wave 4, B4). Added last.</param>
+/// <param name="NextAttemptAt">When a refused refund is sent again; null when nothing waits.</param>
+/// <param name="NeedsAPerson">Refused often enough that an administrator must look, by the server's setting.</param>
 public sealed record AdminRefundListItem(
     Guid RefundId,
     Guid PaymentId,
@@ -92,7 +95,10 @@ public sealed record AdminRefundListItem(
     DateTimeOffset? FailedAt,
     string? FailureCode,
     string? ProviderReference,
-    bool IsSandbox);
+    bool IsSandbox,
+    int RefusalCount = 0,
+    DateTimeOffset? NextAttemptAt = null,
+    bool NeedsAPerson = false);
 
 /// <summary>The booking a payment belongs to, and its parties, for the payment's page.</summary>
 public sealed record PaymentBookingLink(
@@ -110,6 +116,7 @@ public sealed record PaymentBookingLink(
 /// reference — a receipt that arrived before the checkout's reference was saved, and the one an
 /// investigation needs.
 /// </param>
+/// <param name="CaptureReference">The capture reference a capture notice carried, if any (Wave 4, B1).</param>
 public sealed record ProviderEventItem(
     Guid ReceiptId,
     string ProviderEventId,
@@ -117,7 +124,28 @@ public sealed record ProviderEventItem(
     string Outcome,
     MoneyDto? Amount,
     DateTimeOffset ReceivedAt,
-    string TiedBy);
+    string TiedBy,
+    string? CaptureReference = null);
+
+/// <summary>
+/// One capture incident on a payment, as the administrator sees it (Wave 4, B1): what the notice said, what the
+/// payment had taken, and whether somebody has dealt with the money at the provider.
+/// </summary>
+/// <param name="Expected">What this payment had taken; for a capture on another attempt, what it asked for.</param>
+/// <param name="OtherPaymentId">For a capture on another attempt: the attempt that holds the capture.</param>
+/// <param name="HandledBy">The administrator who marked it handled, by name: this is the administrator's own screen.</param>
+public sealed record PaymentIncidentItem(
+    Guid IncidentId,
+    string Kind,
+    Guid ReceiptId,
+    string? CaptureReference,
+    MoneyDto Reported,
+    MoneyDto Expected,
+    Guid? OtherPaymentId,
+    DateTimeOffset DetectedAt,
+    DateTimeOffset? HandledAt,
+    string? HandledBy,
+    string? HandledNote);
 
 /// <summary>The administrator's reading of payments and refunds across the platform (payments Phase 4b).</summary>
 public interface IPaymentAdminReader
@@ -150,4 +178,7 @@ public interface IPaymentAdminReader
         string provider,
         string? providerReference,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Every capture incident on the payment, the open ones first, then oldest first (Wave 4, B1).</summary>
+    Task<IReadOnlyList<PaymentIncidentItem>> IncidentsAsync(Id paymentId, CancellationToken cancellationToken = default);
 }

@@ -15,7 +15,7 @@ namespace Khadra.WebAPI.Controllers;
 /// </summary>
 [Authorize(Policy = SecurityPolicies.Admin)]
 [Route("api/v1/admin")]
-public sealed class AdminPaymentsController : ApiControllerBase
+public sealed class AdminPaymentsController(ICurrentActor actor) : ApiControllerBase
 {
     /// <summary>Every attempt, newest first, filtered by status, purpose, office, customer, booking reference and Amman days.</summary>
     [HttpGet("payments")]
@@ -48,6 +48,30 @@ public sealed class AdminPaymentsController : ApiControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Payment(Guid paymentId, CancellationToken cancellationToken) =>
         FromResult(await Mediator.Send(new GetAdminPaymentQuery(Id.From(paymentId)), cancellationToken));
+
+    /// <summary>
+    /// Closes a capture incident with the administrator's account of how its money was dealt with at the provider,
+    /// audited (Wave 4, B1). Moves no money. 404 <c>payments.incident_not_found</c>; 409
+    /// <c>payments.incident_already_handled</c>.
+    /// </summary>
+    [HttpPost("payments/{paymentId:guid}/incidents/{incidentId:guid}/handled")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> MarkIncidentHandled(
+        Guid paymentId,
+        Guid incidentId,
+        [FromBody] MarkIncidentHandledRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return FromResult(await Mediator.Send(
+            new MarkPaymentIncidentHandledCommand(Id.From(paymentId), Id.From(incidentId), actor.UserId!.Value, request.Note),
+            cancellationToken));
+    }
+
+    public sealed record MarkIncidentHandledRequest(string? Note);
 
     /// <summary>
     /// The refunds queue. With no status, the live queue: refused first, then recorded, then sent, each

@@ -85,6 +85,25 @@ describe('the money panel', () => {
     expect(panel.otherCurrencies).toEqual(['USD: 0 USD استُرد هذا الشهر · 25.4 USD مستحق']);
   });
 
+  it('counts open capture incidents apart from the money owed back, raised while any is open', () => {
+    const open = financePanel(summary({ rightNow: { ...summary().rightNow, openCaptureIncidentsCount: 2 } }), en, format);
+    const none = financePanel(summary({ rightNow: { ...summary().rightNow, openCaptureIncidentsCount: 0 } }), en, format);
+    const arabic = financePanel(summary({ rightNow: { ...summary().rightNow, openCaptureIncidentsCount: 1 } }), ar, format);
+
+    expect([open.incidents?.label, open.incidents?.value, open.incidents?.hi]).toEqual([
+      'Captures to check at the provider',
+      '2 incidents',
+      true,
+    ]);
+    // Zero is a figure the server sent, and it is said; it is just not raised.
+    expect([none.incidents?.value, none.incidents?.hi]).toEqual(['0 incidents', false]);
+    expect(arabic.incidents?.value).toBe('حالة واحدة');
+    // Never one of the money lines: the stock owed back is unchanged by it.
+    expect(open.now).toHaveLength(3);
+    // An API that sent no count gets no line, rather than an invented zero.
+    expect(financePanel(summary(), en, format).incidents).toBeNull();
+  });
+
   it('never names a mode it does not know as one it does', () => {
     expect(financePanel(summary({ paymentMode: 'Paused' }), en, format).mode).toBe('Paused');
     expect(financePanel(summary({ paymentMode: 'None' }), en, format).mode).toBe('Payments are not accepted');

@@ -155,7 +155,7 @@ describe('toQueueItems, the money rows', () => {
   it('words refused refunds as money still owed, with how long they have waited and no meter', () => {
     const [row] = toQueueItems(queue(money({})), now, t);
 
-    expect(row.title).toBe('2 refunds refused — still owed');
+    expect(row.title).toBe('2 refunds refused repeatedly — still owed');
     expect(row.severity).toBe('Needs a look');
     expect(row.sla).toBe('Waiting 2d');
     expect(row.hasClock).toBe(false);
@@ -248,6 +248,42 @@ describe('toQueueItems, the money rows', () => {
     expect(arabic(3)).toBe('3 إيصالات لم تُرسَل بالبريد — تعذّر إرسالها أو طال انتظارها');
     expect(arabic(11)).toBe('11 إيصالًا لم يُرسَل بالبريد — تعذّر إرسالها أو طال انتظارها');
     expect(arabic(100)).toBe('100 إيصال لم يُرسَل بالبريد — تعذّر إرسالها أو طال انتظارها');
+  });
+
+  it('opens the payment a capture incident is on, and words its kind in either language', () => {
+    const incident = (kind: string) =>
+      money({
+        id: 'capture-incident-0a1b',
+        kind: 'CaptureIncidentOpen',
+        count: 1,
+        subjectIds: ['p9'],
+        subtitle: 'KH-III99999',
+        description: kind,
+      });
+    const [row] = toQueueItems(queue(incident('SecondCapture')), now, t);
+
+    expect(row.title).toBe('A capture needs checking at the provider');
+    expect(row.description).toBe('Second capture');
+    expect(row.route).toBe('/payments/p9');
+    expect(row.queryParams).toBeUndefined();
+    expect(row.severity).toBe('Needs a look');
+    expect(row.hasClock).toBe(false);
+    expect(row.entity).toBe('KH-III99999');
+    expect(toQueueItems(queue(incident('CaptureOnAnotherAttempt')), now, t)[0].description).toBe('Capture held by another attempt');
+    // A kind this build has no word for is spelled out rather than shown raw or dropped.
+    expect(toQueueItems(queue(incident('SomethingNew')), now, t)[0].description).toBe('Something new');
+
+    const tAr: Translate = (key, params) =>
+      (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[⁨⁩]/g, '');
+    const [arabic] = toQueueItems(queue(incident('AmountMismatch')), now, tAr);
+    expect(arabic.title).toBe('خصم يحتاج إلى مراجعة لدى المزوّد');
+    expect(arabic.description).toBe('مبلغ يناقض الخصم');
+  });
+
+  it('keeps every other row\'s description as the server wrote it', () => {
+    const [row] = toQueueItems(queue(money({ kind: 'RefundFailed', description: 'Kept as sent.' })), now, t);
+
+    expect(row.description).toBe('Kept as sent.');
   });
 
   it('keeps a clock and a meter on the rows that have a deadline', () => {

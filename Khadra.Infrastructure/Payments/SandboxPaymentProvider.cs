@@ -187,7 +187,11 @@ internal sealed class SandboxPaymentProvider(IOptions<PaymentOptions> options, I
                 amount,
                 body.FailureCode,
                 body.OccurredAt ?? clock.UtcNow,
-                string.IsNullOrWhiteSpace(body.RefundReference) ? null : body.RefundReference.Trim()));
+                string.IsNullOrWhiteSpace(body.RefundReference) ? null : body.RefundReference.Trim(),
+                // Only a capture names a capture (Wave 4, B1); a reference on any other kind is ignored.
+                kind == ProviderEventKind.Captured && !string.IsNullOrWhiteSpace(body.CaptureReference)
+                    ? body.CaptureReference.Trim()
+                    : null));
         }
         catch (JsonException)
         {

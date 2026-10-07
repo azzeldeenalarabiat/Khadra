@@ -19,6 +19,7 @@ using Khadra.Domain.Notifications.Repositories;
 using Khadra.Domain.Payments;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Tests.Support;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -43,6 +44,7 @@ public sealed class PaymentUseCaseTests
         public IBookingRepository Bookings { get; } = Substitute.For<IBookingRepository>();
         public IPaymentRepository Payments { get; } = Substitute.For<IPaymentRepository>();
         public IProviderEventReceiptRepository Receipts { get; } = Substitute.For<IProviderEventReceiptRepository>();
+        public IPaymentIncidentRepository Incidents { get; } = Substitute.For<IPaymentIncidentRepository>();
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
         public INotifier Notifier { get; } = Substitute.For<INotifier>();
@@ -54,6 +56,7 @@ public sealed class PaymentUseCaseTests
 
         public List<Payment> Added { get; } = [];
         public List<ProviderEventReceipt> Recorded { get; } = [];
+        public List<PaymentIncident> Raised { get; } = [];
 
         public Context()
         {
@@ -61,6 +64,8 @@ public sealed class PaymentUseCaseTests
                 .Do(call => Added.Add(call.Arg<Payment>()));
             Receipts.When(repository => repository.Add(Arg.Any<ProviderEventReceipt>()))
                 .Do(call => Recorded.Add(call.Arg<ProviderEventReceipt>()));
+            Incidents.When(repository => repository.Add(Arg.Any<PaymentIncident>()))
+                .Do(call => Raised.Add(call.Arg<PaymentIncident>()));
 
             var customer = Build.Customer(email: "renter@khadra.test");
             Users.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(customer);
@@ -83,6 +88,24 @@ public sealed class PaymentUseCaseTests
         public void GivenLive(Payment payment) =>
             Payments.GetLiveForBookingAsync(payment.BookingId, Arg.Any<CancellationToken>()).Returns(payment);
 
+        /// <summary>
+        /// The sweep's view of these payments: listed while one of their refunds is due by its own schedule, as the
+        /// repository's query decides, and each loaded by its id.
+        /// </summary>
+        public void GivenOwing(params Payment[] owing)
+        {
+            Payments.ListIdsWithRefundsDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+                .Returns(call => Task.FromResult<IReadOnlyList<Id>>(
+                [
+                    .. owing
+                        .Where(payment => payment.ProviderReference is not null
+                            && payment.Refunds.Any(refund => refund.IsDueToSend(call.Arg<DateTimeOffset>())))
+                        .Select(payment => payment.Id),
+                ]));
+            foreach (var payment in owing)
+                Payments.GetByIdAsync(payment.Id, Arg.Any<CancellationToken>()).Returns(payment);
+        }
+
         public void GivenReference(Payment payment) =>
             Payments.GetByProviderReferenceAsync(
                     TestPayments.TestProviderName,
@@ -98,12 +121,16 @@ public sealed class PaymentUseCaseTests
                 Provider,
                 Payments,
                 Receipts,
+                Incidents,
                 Bookings,
                 Dealers,
                 new DealerTeamNotifier(Notifier, Users),
                 Clock,
+                Settings,
                 UnitOfWork,
-                NullLogger<ReceiveProviderEventHandler>.Instance);
+                ReceiveLog);
+
+        public RecordingLogger<ReceiveProviderEventHandler> ReceiveLog { get; } = new();
 
         public RecordingLogger<SettlePaymentsHandler> SweepLog { get; } = new();
 
@@ -895,7 +922,7 @@ public sealed class PaymentUseCaseTests
         var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
         payment.Orphan(booking.Pricing.DepositAmount, Now, "BookingExpired", Now);
         context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        context.GivenOwing(payment);
 
         var report = await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
 
@@ -913,7 +940,7 @@ public sealed class PaymentUseCaseTests
         var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
         payment.Orphan(booking.Pricing.DepositAmount, Now, "BookingExpired", Now);
         context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        context.GivenOwing(payment);
         context.Provider.RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>())
             .Returns(Result.Failure<ProviderRefund, Error>(PaymentErrors.ProviderRefused));
 
@@ -937,7 +964,7 @@ public sealed class PaymentUseCaseTests
         BookingEndingRefunds.Record(booking, payment, Now);
         context.GivenReference(payment);
         context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        context.GivenOwing(payment);
         return (booking, payment);
     }
 
@@ -1032,7 +1059,12 @@ public sealed class PaymentUseCaseTests
         Assert.Equal("refund_declined", refund.FailureCode);
         context.Notifier.DidNotReceive().Raise(Arg.Is<Notification>(n => n.Kind == NotificationKind.YourDepositRefunded));
 
+        // Not before its wait (Wave 4, B4): the first refusal waits the policy's first delay.
         context.Provider.ClearReceivedCalls();
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+        await context.Provider.DidNotReceive().RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>());
+
+        context.Clock.Advance(TestPayments.RetryPolicy.FirstDelay);
         await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
 
         Assert.Same(RefundStatus.Sent, refund.Status);
@@ -1042,9 +1074,13 @@ public sealed class PaymentUseCaseTests
     }
 
     /// <summary>
-    /// A late capture for the payment that already paid is refused as already captured: it cannot be
-    /// orphaned, so it creates no second refund beside the free cancellation's.
+    /// A late capture for the payment that already paid is the capture it already took, said again: it
+    /// creates no second refund beside the free cancellation's, and no incident.
     /// </summary>
+    /// <remarks>
+    /// Neither side carries a capture reference here, so the money alone decides and the match is only ASSUMED
+    /// (Wave 4, B1). Before Wave 4 this notice was refused, failed to orphan, and logged money "UNACCOUNTED FOR".
+    /// </remarks>
     [Fact]
     public async Task A_late_capture_for_the_paid_attempt_creates_no_second_refund()
     {
@@ -1056,6 +1092,9 @@ public sealed class PaymentUseCaseTests
 
         Assert.Single(payment.Refunds);
         Assert.Same(PaymentStatus.Applied, payment.Status);
+        Assert.Same(ProviderEventOutcome.AssumedDuplicate, Assert.Single(context.Recorded).Outcome);
+        Assert.Empty(context.Raised);
+        Assert.False(context.ReceiveLog.Logged(2304));
     }
 
     /// <summary>A gallery that has since left the platform does not cost the customer the news that their money is back.</summary>
@@ -1495,7 +1534,8 @@ public sealed class PaymentUseCaseTests
         context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
 
         context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        context.GivenOwing(payment);
+        context.Clock.Advance(TestPayments.RetryPolicy.FirstDelay);
         await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
 
         Assert.Same(RefundStatus.Sent, above.Status);
@@ -1563,5 +1603,609 @@ public sealed class PaymentUseCaseTests
         Assert.Contains(payment.Id.Value.ToString(), context.SweepLog.AllText, StringComparison.Ordinal);
         Assert.Empty(payment.Refunds);
         await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    // ---------------------------------------------------------------- a capture notice for money already taken (Wave 4, B1; E2E F30)
+
+    /// <summary>
+    /// A booking whose deposit this handler has already applied, under <paramref name="captureReference"/>. What the
+    /// first capture recorded, raised, logged and saved is cleared, so a test reads only the notice after it.
+    /// </summary>
+    private static async Task<(Booking Booking, Payment Payment)> PaidAsync(Context context, string? captureReference)
+    {
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        Deliver(context, TestPayments.Captured(
+            "sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_first", captureReference));
+        Assert.True((await Receive(context)).IsSuccess);
+        Assert.Same(PaymentStatus.Applied, payment.Status);
+
+        // What the database now answers: this attempt holds its capture's reference.
+        if (captureReference is not null)
+        {
+            context.Payments.GetByCaptureReferenceAsync(
+                    TestPayments.TestProviderName, captureReference, Arg.Any<CancellationToken>())
+                .Returns(payment);
+        }
+
+        context.Recorded.Clear();
+        context.Raised.Clear();
+        context.ReceiveLog.Entries.Clear();
+        context.UnitOfWork.ClearReceivedCalls();
+        context.Notifier.ClearReceivedCalls();
+        return (booking, payment);
+    }
+
+    private static bool LoggedAt(Context context, int eventId, LogLevel level) =>
+        context.ReceiveLog.Entries.Exists(entry => entry.Id.Id == eventId && entry.Level == level);
+
+    [Fact]
+    public async Task The_first_capture_keeps_its_reference_on_the_payment_and_on_its_receipt()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        Deliver(context, TestPayments.Captured(
+            "sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_1", " cap_1 "));
+
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Equal("cap_1", payment.ProviderCaptureReference);
+        var receipt = Assert.Single(context.Recorded);
+        Assert.Same(ProviderEventOutcome.Acted, receipt.Outcome);
+        Assert.Equal("cap_1", receipt.CaptureReference);
+        Assert.Empty(context.Raised);
+        // Asked once, trimmed, before anything was applied: no other attempt held it.
+        await context.Payments.Received(1).GetByCaptureReferenceAsync(
+            TestPayments.TestProviderName, "cap_1", Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The same capture said again under a new event id, which every provider does. Recorded as a duplicate in its own
+    /// save, and nothing else happens: no refund, no incident, no second notification, no change to the payment.
+    /// </summary>
+    [Fact]
+    public async Task The_same_capture_said_again_is_recorded_as_a_duplicate_and_changes_nothing()
+    {
+        var context = new Context();
+        var (booking, payment) = await PaidAsync(context, "cap_1");
+
+        Deliver(context, TestPayments.Captured(
+            "sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_again", "cap_1"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        var receipt = Assert.Single(context.Recorded);
+        Assert.Same(ProviderEventOutcome.Duplicate, receipt.Outcome);
+        Assert.Equal(payment.Id, receipt.PaymentId);
+        Assert.Equal("cap_1", receipt.CaptureReference);
+        Assert.Empty(context.Raised);
+        Assert.Empty(payment.Refunds);
+        Assert.Same(PaymentStatus.Applied, payment.Status);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        Assert.True(LoggedAt(context, 2309, LogLevel.Information));
+        Assert.False(context.ReceiveLog.Logged(2304));
+    }
+
+    /// <summary>The same capture with other money: the provider contradicts itself, and a person has to look.</summary>
+    [Fact]
+    public async Task The_same_reference_with_other_money_raises_an_amount_mismatch_and_refunds_nothing()
+    {
+        var context = new Context();
+        var (booking, payment) = await PaidAsync(context, "cap_1");
+        var deposit = booking.Pricing.DepositAmount.Amount;
+
+        Deliver(context, TestPayments.Captured("sess_1", Money.Jod(deposit + 5m), Now, "evt_more", "cap_1"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        var receipt = Assert.Single(context.Recorded);
+        Assert.Same(ProviderEventOutcome.AmountMismatch, receipt.Outcome);
+        var incident = Assert.Single(context.Raised);
+        Assert.Same(PaymentIncidentKind.AmountMismatch, incident.Kind);
+        Assert.Equal(payment.Id, incident.PaymentId);
+        Assert.Equal(receipt.Id, incident.ReceiptId);
+        Assert.Equal(TestPayments.TestProviderName, incident.Provider);
+        Assert.Equal("cap_1", incident.CaptureReference);
+        Assert.Equal(Money.Jod(deposit + 5m), incident.Reported);
+        Assert.Equal(Money.Jod(deposit), incident.Expected);
+        Assert.Null(incident.OtherPaymentId);
+        Assert.Equal(Now, incident.DetectedAt);
+        Assert.False(incident.IsHandled);
+
+        // The payment keeps what it took, and nothing is owed back by code.
+        Assert.Equal(Money.Jod(deposit), payment.AmountCaptured);
+        Assert.Empty(payment.Refunds);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        Assert.True(LoggedAt(context, 2318, LogLevel.Error));
+    }
+
+    /// <summary>
+    /// A different capture on an attempt that already took its money: the card was charged twice. It is an incident,
+    /// and it is NEVER refunded automatically — a refund the platform cannot prove is owed is not code's to send.
+    /// </summary>
+    [Fact]
+    public async Task Another_capture_on_a_paid_attempt_is_a_second_capture_and_is_never_refunded_automatically()
+    {
+        var context = new Context();
+        var (booking, payment) = await PaidAsync(context, "cap_1");
+
+        Deliver(context, TestPayments.Captured(
+            "sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_second", "cap_2"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        var receipt = Assert.Single(context.Recorded);
+        Assert.Same(ProviderEventOutcome.SecondCapture, receipt.Outcome);
+        Assert.Equal("cap_2", receipt.CaptureReference);
+        var incident = Assert.Single(context.Raised);
+        Assert.Same(PaymentIncidentKind.SecondCapture, incident.Kind);
+        Assert.Equal("cap_2", incident.CaptureReference);
+        Assert.Equal(receipt.Id, incident.ReceiptId);
+
+        // The payment keeps its own capture; the second one is recorded, not adopted.
+        Assert.Equal("cap_1", payment.ProviderCaptureReference);
+        Assert.Empty(payment.Refunds);
+
+        // And the sweep, which sends what is recorded, finds nothing to send for it.
+        context.GivenOwing(payment);
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+        await context.Provider.DidNotReceive().RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>());
+        Assert.True(LoggedAt(context, 2318, LogLevel.Error));
+    }
+
+    /// <summary>
+    /// No reference on one side or the other: the money alone decides, and a match is only ASSUMED to be the same
+    /// capture. A warning, because a genuine second charge of the same amount would look exactly like this.
+    /// </summary>
+    [Fact]
+    public async Task With_no_reference_to_compare_the_same_money_is_assumed_the_same_capture_and_warned()
+    {
+        var context = new Context();
+        var (booking, payment) = await PaidAsync(context, captureReference: null);
+
+        Deliver(context, TestPayments.Captured(
+            "sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_again"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        var receipt = Assert.Single(context.Recorded);
+        Assert.Same(ProviderEventOutcome.AssumedDuplicate, receipt.Outcome);
+        Assert.Null(receipt.CaptureReference);
+        Assert.Empty(context.Raised);
+        Assert.Empty(payment.Refunds);
+        Assert.True(LoggedAt(context, 2317, LogLevel.Warning));
+        // Nobody else can hold a reference the notice does not carry, so nobody was asked.
+        await context.Payments.DidNotReceive().GetByCaptureReferenceAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task With_no_reference_to_compare_other_money_is_a_second_capture()
+    {
+        var context = new Context();
+        var (booking, payment) = await PaidAsync(context, captureReference: null);
+        var deposit = booking.Pricing.DepositAmount.Amount;
+
+        Deliver(context, TestPayments.Captured("sess_1", Money.Jod(deposit + 1m), Now, "evt_other"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(ProviderEventOutcome.SecondCapture, Assert.Single(context.Recorded).Outcome);
+        var incident = Assert.Single(context.Raised);
+        Assert.Same(PaymentIncidentKind.SecondCapture, incident.Kind);
+        Assert.Null(incident.CaptureReference);
+        Assert.Equal(Money.Jod(deposit + 1m), incident.Reported);
+        Assert.Equal(Money.Jod(deposit), incident.Expected);
+        Assert.Empty(payment.Refunds);
+    }
+
+    /// <summary>
+    /// Orphaned money is captured money too. Its repeat notice is the same capture, and the refund the orphaning
+    /// recorded stays the only one.
+    /// </summary>
+    [Fact]
+    public async Task An_orphaned_payments_repeat_notice_is_a_duplicate_and_records_no_second_refund()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved(paymentWindow: TimeSpan.FromHours(24));
+        booking.ExpireUnpaid(booking.PaymentDeadline!.Value);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        var deposit = Money.Jod(booking.Pricing.DepositAmount.Amount);
+
+        Deliver(context, TestPayments.Captured("sess_1", deposit, Now, "evt_first", "cap_1"));
+        Assert.True((await Receive(context)).IsSuccess);
+        Assert.Same(PaymentStatus.Orphaned, payment.Status);
+        Assert.Equal("cap_1", payment.ProviderCaptureReference);
+        var refund = Assert.Single(payment.Refunds);
+        context.Payments.GetByCaptureReferenceAsync(TestPayments.TestProviderName, "cap_1", Arg.Any<CancellationToken>())
+            .Returns(payment);
+        context.Recorded.Clear();
+
+        Deliver(context, TestPayments.Captured("sess_1", deposit, Now, "evt_again", "cap_1"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(ProviderEventOutcome.Duplicate, Assert.Single(context.Recorded).Outcome);
+        Assert.Empty(context.Raised);
+        Assert.Same(PaymentStatus.Orphaned, payment.Status);
+        Assert.Same(refund, Assert.Single(payment.Refunds));
+    }
+
+    /// <summary>
+    /// A capture whose reference ANOTHER attempt already holds. Applying it would collide with the index that keeps
+    /// one capture on one attempt, and that 5xx would bring the notice back for days; so it is judged first, before
+    /// the attempt's own status, and recorded as an incident on the attempt the notice named.
+    /// </summary>
+    [Fact]
+    public async Task A_capture_another_attempt_already_holds_is_an_incident_and_confirms_nothing()
+    {
+        var context = new Context();
+        var (_, holder) = await PaidAsync(context, "cap_1");
+        var other = context.GivenApproved();
+        context.GivenDealerFor(other);
+        var named = PendingFor(other, other.Pricing.DepositAmount.Amount, "sess_2");
+        context.GivenReference(named);
+
+        Deliver(context, TestPayments.Captured(
+            "sess_2", Money.Jod(other.Pricing.DepositAmount.Amount), Now, "evt_other_attempt", "cap_1"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        var receipt = Assert.Single(context.Recorded);
+        Assert.Same(ProviderEventOutcome.OtherAttempt, receipt.Outcome);
+        Assert.Equal(named.Id, receipt.PaymentId);
+        Assert.Equal("cap_1", receipt.CaptureReference);
+
+        var incident = Assert.Single(context.Raised);
+        Assert.Same(PaymentIncidentKind.CaptureOnAnotherAttempt, incident.Kind);
+        Assert.Equal(named.Id, incident.PaymentId);
+        Assert.Equal(holder.Id, incident.OtherPaymentId);
+        Assert.Equal(receipt.Id, incident.ReceiptId);
+        Assert.Equal(named.Amount, incident.Expected);
+
+        // Nothing applied, orphaned or refunded on either attempt, and the named booking is not confirmed.
+        Assert.Same(PaymentStatus.Pending, named.Status);
+        Assert.Null(named.ProviderCaptureReference);
+        Assert.Empty(named.Refunds);
+        Assert.Same(BookingStatus.Approved, other.Status);
+        Assert.Null(other.DepositPaymentId);
+        Assert.Same(PaymentStatus.Applied, holder.Status);
+        Assert.Empty(holder.Refunds);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        Assert.True(LoggedAt(context, 2319, LogLevel.Error));
+    }
+
+    /// <summary>
+    /// The race the index settles: two attempts claim one capture at the same instant, both pass the read, and this
+    /// one loses at the save. It is answered 2xx with a receipt and an incident, read afresh after the tracker is
+    /// discarded — never the 5xx the uncaught index would produce, which the provider would redeliver for days.
+    /// </summary>
+    /// <remarks>
+    /// The substitutes here hand back the same in-memory objects the refused save mutated, so this proves the
+    /// handler's DECISIONS. That the refused save leaves the database untouched and the second save commits a receipt
+    /// and an incident is proved against PostgreSQL in <c>PostgresCaptureReferenceRaceTests</c>.
+    /// </remarks>
+    [Fact]
+    public async Task Losing_the_race_for_one_capture_is_recorded_as_a_capture_on_another_attempt()
+    {
+        var context = new Context();
+        var winnerBooking = context.GivenApproved();
+        var winner = PendingFor(winnerBooking, winnerBooking.Pricing.DepositAmount.Amount, "sess_1");
+        Assert.True(winner.Apply(Money.Jod(winnerBooking.Pricing.DepositAmount.Amount), Now, Now, "cap_1").IsSuccess);
+
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var loser = PendingFor(booking, booking.Pricing.DepositAmount.Amount, "sess_2");
+        context.GivenReference(loser);
+        Deliver(context, TestPayments.Captured(
+            "sess_2", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_loser", "cap_1"));
+
+        // The read before the save finds nobody holding the reference; by the save, the winner has committed.
+        context.Payments.GetByCaptureReferenceAsync(TestPayments.TestProviderName, "cap_1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Payment?>(null), Task.FromResult<Payment?>(winner));
+        var saves = 0;
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                if (++saves == 1)
+                {
+                    throw new UniqueConstraintConflictException(
+                        "lost the race", UniqueConstraintConflictException.ProviderCaptureReferenceConstraint, new InvalidOperationException());
+                }
+                return Task.FromResult(1);
+            });
+
+        var result = await Receive(context);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, saves);
+        context.UnitOfWork.Received(1).DiscardChanges();
+
+        // The first receipt went with the refused save; the one that commits says what happened.
+        var receipt = context.Recorded[^1];
+        Assert.Same(ProviderEventOutcome.OtherAttempt, receipt.Outcome);
+        Assert.Equal(loser.Id, receipt.PaymentId);
+        Assert.Equal("cap_1", receipt.CaptureReference);
+        var incident = Assert.Single(context.Raised);
+        Assert.Same(PaymentIncidentKind.CaptureOnAnotherAttempt, incident.Kind);
+        Assert.Equal(loser.Id, incident.PaymentId);
+        Assert.Equal(winner.Id, incident.OtherPaymentId);
+        Assert.Equal(receipt.Id, incident.ReceiptId);
+        Assert.True(LoggedAt(context, 2319, LogLevel.Error));
+    }
+
+    /// <summary>
+    /// The same index refusing a save that is NOT that race — the reference resolves to nobody, or to this very
+    /// attempt — is not swallowed: it escapes as before, and the provider's redelivery meets a clean context.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_capture_reference_conflict_that_is_not_that_race_still_escapes(bool resolvesToThisAttempt)
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        Deliver(context, TestPayments.Captured(
+            "sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_1", "cap_1"));
+        if (resolvesToThisAttempt)
+        {
+            context.Payments.GetByCaptureReferenceAsync(TestPayments.TestProviderName, "cap_1", Arg.Any<CancellationToken>())
+                .Returns(payment);
+        }
+
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new UniqueConstraintConflictException(
+                "not that race", UniqueConstraintConflictException.ProviderCaptureReferenceConstraint, new InvalidOperationException()));
+
+        await Assert.ThrowsAsync<UniqueConstraintConflictException>(() => Receive(context));
+
+        context.UnitOfWork.Received(1).DiscardChanges();
+        Assert.Empty(context.Raised);
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The incident's own save losing to the receipt index means a redelivery of this very notice recorded it first:
+    /// recorded once either way, and answered 2xx.
+    /// </summary>
+    [Fact]
+    public async Task A_lost_race_whose_notice_was_already_recorded_is_acknowledged()
+    {
+        var context = new Context();
+        var winnerBooking = context.GivenApproved();
+        var winner = PendingFor(winnerBooking, winnerBooking.Pricing.DepositAmount.Amount, "sess_1");
+        Assert.True(winner.Apply(Money.Jod(winnerBooking.Pricing.DepositAmount.Amount), Now, Now, "cap_1").IsSuccess);
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var loser = PendingFor(booking, booking.Pricing.DepositAmount.Amount, "sess_2");
+        context.GivenReference(loser);
+        Deliver(context, TestPayments.Captured(
+            "sess_2", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_loser", "cap_1"));
+        context.Payments.GetByCaptureReferenceAsync(TestPayments.TestProviderName, "cap_1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Payment?>(null), Task.FromResult<Payment?>(winner));
+
+        var saves = 0;
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new UniqueConstraintConflictException(
+                "refused",
+                ++saves == 1
+                    ? UniqueConstraintConflictException.ProviderCaptureReferenceConstraint
+                    : UniqueConstraintConflictException.ProviderEventReceiptConstraint,
+                new InvalidOperationException()));
+
+        Assert.True((await Receive(context)).IsSuccess);
+        Assert.Equal(2, saves);
+        Assert.True(context.ReceiveLog.Logged(2306));
+    }
+
+    // ---------------------------------------------------------------- a refused refund waits (Wave 4, B4; checklist 157)
+
+    /// <summary>An orphaned capture's refund: owed, never sent, with a provider that refuses every send.</summary>
+    private static Payment OwedToARefusingProvider(Context context, string reference = "sess_1")
+    {
+        var booking = context.GivenApproved();
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount, reference);
+        Assert.True(payment.Orphan(Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "BookingExpired", Now).IsSuccess);
+        context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+        context.Provider.RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<ProviderRefund, Error>(PaymentErrors.ProviderRefused));
+        return payment;
+    }
+
+    private static async Task SweepAt(Context context, TimeSpan after)
+    {
+        context.Clock.UtcNow = Now + after;
+        context.Provider.ClearReceivedCalls();
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+    }
+
+    /// <summary>
+    /// The schedule, send by send: 1, 2 and 4 minutes between refusals, nothing sent early, every refused send
+    /// counted, and a warning that becomes an error at the third refusal, when a person must look.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_refund_is_sent_again_only_when_its_wait_is_over_and_each_send_is_counted()
+    {
+        var context = new Context();
+        var payment = OwedToARefusingProvider(context);
+        context.GivenOwing(payment);
+        var refund = Assert.Single(payment.Refunds);
+
+        async Task Sends(TimeSpan after, int expected)
+        {
+            await SweepAt(context, after);
+            await context.Provider.Received(expected).RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>());
+        }
+
+        await Sends(TimeSpan.Zero, 1);
+        await Sends(TimeSpan.FromSeconds(59), 0);
+        await Sends(TimeSpan.FromMinutes(1), 1);
+        await Sends(TimeSpan.FromMinutes(2), 0);
+        await Sends(TimeSpan.FromMinutes(3), 1);
+        await Sends(TimeSpan.FromMinutes(6), 0);
+        await Sends(TimeSpan.FromMinutes(7), 1);
+
+        Assert.Same(RefundStatus.Failed, refund.Status);
+        Assert.Equal(4, refund.RefusalCount);
+        Assert.Equal(Now.AddMinutes(7), refund.FailedAt);
+        Assert.Equal(Now.AddMinutes(15), refund.NextAttemptAt);
+        // Never abandoned, and never a second refund: the same refund each time, under its own id.
+        Assert.Single(payment.Refunds);
+        Assert.Equal(2, context.SweepLog.Entries.Count(entry => entry.Id.Id == 2315 && entry.Level == LogLevel.Warning));
+        Assert.Equal(2, context.SweepLog.Entries.Count(entry => entry.Id.Id == 2323 && entry.Level == LogLevel.Error));
+    }
+
+    /// <summary>One payment can owe a refund that is due and one still waiting; only the due one is sent.</summary>
+    [Fact]
+    public async Task Of_two_refunds_on_one_payment_only_the_one_that_is_due_is_sent()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(inFull: true, customerId: CustomerId);
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "The car failed its inspection.", Now).IsSuccess);
+        var above = BookingEndingRefunds.Record(booking, payment, Now)!;
+        var deposit = payment.RefundHeldDeposit(Money.Jod(booking.Pricing.DepositAmount.Amount), Now).Value!;
+        above.RecordRefusedSend("card_closed", Now, TestPayments.RetryPolicy);
+        context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+        context.GivenOwing(payment);
+
+        await SweepAt(context, TimeSpan.FromSeconds(30));
+
+        await context.Provider.Received(1).RefundAsync(
+            Arg.Is<RefundRequest>(request => request.RefundId == deposit.Id), Arg.Any<CancellationToken>());
+        await context.Provider.DidNotReceive().RefundAsync(
+            Arg.Is<RefundRequest>(request => request.RefundId == above.Id), Arg.Any<CancellationToken>());
+        Assert.Same(RefundStatus.Sent, deposit.Status);
+        Assert.Same(RefundStatus.Failed, above.Status);
+        Assert.Equal(Now.AddMinutes(1), above.NextAttemptAt);
+    }
+
+    /// <summary>
+    /// A payment whose refunds changed while they were being sent — the webhook settling one — loses only its own
+    /// sends: the next payment is read into a clean tracker and saved.
+    /// </summary>
+    [Fact]
+    public async Task A_conflict_on_one_payment_costs_only_that_payments_sends()
+    {
+        var context = new Context();
+        var first = OwedToARefusingProvider(context, "sess_1");
+        var second = OwedToARefusingProvider(context, "sess_2");
+        context.Provider.RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success<ProviderRefund, Error>(new ProviderRefund("ref_1")));
+        context.GivenOwing(first, second);
+        var saves = 0;
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                if (++saves == 1)
+                    throw new ConcurrencyConflictException();
+                return Task.FromResult(1);
+            });
+
+        var report = await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Equal(2, saves);
+        await context.Provider.Received(2).RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>());
+        // Only what was saved is reported: the first payment's send is sent again next time, as the same refund.
+        Assert.Equal(1, report.Value.RefundsSent);
+        Assert.True(context.SweepLog.Logged(2324));
+        // A clean tracker before each payment, and again after the conflict.
+        context.UnitOfWork.Received(3).DiscardChanges();
+    }
+
+    /// <summary>
+    /// The provider repeating its notice of one refusal, under a new event id, is recorded and changes nothing: the
+    /// refusal is counted once, and its wait does not move.
+    /// </summary>
+    [Fact]
+    public async Task A_refusal_notice_said_again_is_ignored_and_counted_once()
+    {
+        var context = new Context();
+        var (_, payment, above, _) = TwoRefundsOut(context);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundFailed, "evt_refused", "rf_above", failureCode: "refund_declined"));
+        Assert.True((await Receive(context)).IsSuccess);
+        context.Clock.Advance(TimeSpan.FromSeconds(20));
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundFailed, "evt_refused_again", "rf_above", failureCode: "refund_declined"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Equal(1, above.RefusalCount);
+        Assert.Equal(Now, above.FailedAt);
+        Assert.Equal(Now.AddMinutes(1), above.NextAttemptAt);
+        Assert.Equal(
+            [ProviderEventOutcome.Acted, ProviderEventOutcome.Ignored],
+            context.Recorded.Select(receipt => receipt.Outcome));
+    }
+
+    /// <summary>
+    /// A provider that cannot be reached refused nothing (the advisor's review of B4): the refund is left exactly as it
+    /// was — not counted, no wait set — the rest of the tick's sends wait for the next tick, and one line says so. A
+    /// ten-minute outage must not put every refund on the work queue as refused three times.
+    /// </summary>
+    [Fact]
+    public async Task An_unreachable_provider_refuses_nothing_and_nothing_is_counted()
+    {
+        var context = new Context();
+        var first = OwedToARefusingProvider(context, "sess_1");
+        var second = OwedToARefusingProvider(context, "sess_2");
+        context.Provider.RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<ProviderRefund, Error>(PaymentErrors.ProviderUnavailable));
+        context.GivenOwing(first, second);
+
+        var report = await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Equal((0, 0), (report.Value.RefundsSent, report.Value.RefundsFailed));
+        Assert.All(first.Refunds.Concat(second.Refunds), refund =>
+        {
+            Assert.Same(RefundStatus.Requested, refund.Status);
+            Assert.Equal(0, refund.RefusalCount);
+            Assert.Null(refund.NextAttemptAt);
+            Assert.Null(refund.FailedAt);
+        });
+        // Asked once, and then left alone until the next tick.
+        await context.Provider.Received(1).RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>());
+        Assert.Equal(1, context.SweepLog.Entries.Count(entry => entry.Id.Id == 2325 && entry.Level == LogLevel.Warning));
+        Assert.False(context.SweepLog.Logged(2315));
+        Assert.False(context.SweepLog.Logged(2323));
+    }
+
+    /// <summary>
+    /// An outage part-way through one payment's sends keeps what was already sent (the advisor's review of the payments
+    /// half): the refund the provider took is saved as Sent, and the one it could not be asked about is left exactly as
+    /// it was. The outage ends the tick's sends; it never undoes one.
+    /// </summary>
+    [Fact]
+    public async Task An_outage_part_way_through_a_payment_keeps_the_refund_already_sent()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(inFull: true, customerId: CustomerId);
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "The car failed its inspection.", Now).IsSuccess);
+        Assert.NotNull(BookingEndingRefunds.Record(booking, payment, Now));
+        Assert.NotNull(payment.RefundHeldDeposit(Money.Jod(booking.Pricing.DepositAmount.Amount), Now).Value);
+        context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+        context.Provider.RefundAsync(Arg.Any<RefundRequest>(), Arg.Any<CancellationToken>())
+            .Returns(
+                Result.Success<ProviderRefund, Error>(new ProviderRefund("rf_first")),
+                Result.Failure<ProviderRefund, Error>(PaymentErrors.ProviderUnavailable));
+        context.GivenOwing(payment);
+
+        var report = await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Equal(2, payment.Refunds.Count);
+        var sent = Assert.Single(payment.Refunds, refund => refund.Status == RefundStatus.Sent);
+        Assert.Equal(0, sent.RefusalCount);
+        var untouched = Assert.Single(payment.Refunds, refund => refund.Status == RefundStatus.Requested);
+        Assert.Equal(0, untouched.RefusalCount);
+        Assert.Null(untouched.NextAttemptAt);
+        Assert.Null(untouched.FailedAt);
+        // The send that went out is saved with the payment, and reported.
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        Assert.Equal(1, report.Value.RefundsSent);
+        Assert.Equal(1, context.SweepLog.Entries.Count(entry => entry.Id.Id == 2325 && entry.Level == LogLevel.Warning));
     }
 }

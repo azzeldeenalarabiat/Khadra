@@ -37,6 +37,7 @@ public sealed class GetAttentionQueueHandler(
     IBusinessRulesProvider businessRules,
     IAdminDashboardSettings settings,
     IFinancialDocumentEmailSettings documentEmails,
+    IPaymentSettings paymentSettings,
     IClock clock)
     : IRequestHandler<GetAttentionQueueQuery, Result<AttentionQueueDto, Error>>
 {
@@ -52,8 +53,10 @@ public sealed class GetAttentionQueueHandler(
         // is ACROSS panels — each is its own request with its own scope — not inside one handler.
         var live = await disputes.LiveAsync(cancellationToken);
         var pending = await dealers.PendingApplicationsAsync(cancellationToken);
-        var failedRefunds = await payments.FailedRefundsAsync(cancellationToken);
+        // Only refunds refused often enough to need a person (Wave 4, B4); below that the back-off is handling them.
+        var failedRefunds = await payments.FailedRefundsAsync(paymentSettings.RefundRetry.RefusalsBeforeAlert, cancellationToken);
         var owedOrphans = await payments.OwedOrphansAsync(cancellationToken);
+        var openIncidents = await payments.OpenCaptureIncidentsAsync(cancellationToken);
         var payablesOnHold = await ledger.SystemHoldsSummaryAsync(cancellationToken);
         var documentsOnHold = await financialDocuments.OpenHoldsSummaryAsync(cancellationToken);
         var emailsNotSent = await financialDocuments.EmailsNotSentSummaryAsync(now.Subtract(documentEmails.StaleAfter), cancellationToken);
@@ -73,7 +76,7 @@ public sealed class GetAttentionQueueHandler(
             settings.SlaWarningThreshold,
             rules.AdminSlaHours,
             now,
-            new MoneyAttention(failedRefunds, owedOrphans),
+            new MoneyAttention(failedRefunds, owedOrphans, openIncidents),
             documentsOnHold,
             emailsNotSent,
             payablesOnHold);

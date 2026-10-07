@@ -62,13 +62,20 @@ public static class BookingLapse
                     && now >= booking.PaymentDeadline));
 
     /// <summary>
-    /// Settles a lapse if there is one, and says whether anything changed.
+    /// Settles a lapse if there is one, and says which: a request nobody answered, or an approval nobody paid.
+    /// Null when nothing changed.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Idempotent by construction: it asks the aggregate's own predicate first, and the aggregate's
     /// expiry methods refuse a booking in the wrong status anyway. Calling it on a booking that has
-    /// not lapsed, or on one already settled, does nothing and reports <c>false</c>.
+    /// not lapsed, or on one already settled, does nothing and reports null.
+    /// </para>
+    /// <para>
+    /// It says WHICH lapse (Wave 4, checklist 234; the advisor's review) because the two are announced differently —
+    /// the office is told when an approval it gave lapsed unpaid, never when a request it let lapse did — and the
+    /// branch below is the one place that knows. Returned rather than read back from the pending event, so a change
+    /// to the event's shape cannot silently change who is told.
     /// </para>
     /// <para>
     /// It does NOT save. The caller's unit of work decides that, which is what keeps a read from
@@ -78,18 +85,33 @@ public static class BookingLapse
     /// retries into a context that reads it already settled.
     /// </para>
     /// </remarks>
-    public static bool Settle(Booking booking, DateTimeOffset now)
+    public static BookingLapseKind? Settle(Booking booking, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(booking);
-        if (!booking.HasLapsed(now)) return false;
+        if (!booking.HasLapsed(now)) return null;
 
-        var settled = booking.Status == BookingStatus.Requested
+        var kind = booking.Status == BookingStatus.Requested ? BookingLapseKind.Unanswered : BookingLapseKind.Unpaid;
+        var settled = kind == BookingLapseKind.Unanswered
             ? booking.ExpireUnanswered(now)
             : booking.ExpireUnpaid(now);
 
         // A refusal here would mean the predicate and the expiry methods disagree, which the tests
         // forbid. Swallowed rather than thrown because this runs on the read path: a booking nobody
         // can settle must not take down the screen that merely wanted to show it.
-        return settled.IsSuccess;
+        return settled.IsSuccess ? kind : null;
+    }
+}
+
+/// <summary>Which window closed on a booking: the office's to answer, or the customer's to pay.</summary>
+public sealed class BookingLapseKind : Enumeration
+{
+    /// <summary>A request the office did not answer in time.</summary>
+    public static readonly BookingLapseKind Unanswered = new(1, "Unanswered");
+
+    /// <summary>An approval the customer did not pay for in time.</summary>
+    public static readonly BookingLapseKind Unpaid = new(2, "Unpaid");
+
+    private BookingLapseKind(int id, string name) : base(id, name)
+    {
     }
 }

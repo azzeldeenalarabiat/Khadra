@@ -54,7 +54,7 @@ public sealed class BookingLapseTests
         var booking = Build.RequestedBooking();
         var before = booking.Status;
 
-        Assert.False(BookingLapse.Settle(booking, Now));
+        Assert.Null(BookingLapse.Settle(booking, Now));
         Assert.Same(before, booking.Status);
     }
 
@@ -71,11 +71,11 @@ public sealed class BookingLapseTests
         var booking = Build.RequestedBooking();
         var after = booking.DecisionDeadline.AddMinutes(1);
 
-        Assert.True(BookingLapse.Settle(booking, after));
+        Assert.Same(BookingLapseKind.Unanswered, BookingLapse.Settle(booking, after));
         Assert.Same(BookingStatus.Expired, booking.Status);
 
         // Second call: nothing left to do, and it says so rather than throwing or transitioning again.
-        Assert.False(BookingLapse.Settle(booking, after));
+        Assert.Null(BookingLapse.Settle(booking, after));
         Assert.Same(BookingStatus.Expired, booking.Status);
     }
 
@@ -86,9 +86,9 @@ public sealed class BookingLapseTests
         var booking = Build.ApprovedBooking();
         var after = booking.PaymentDeadline!.Value.AddMinutes(1);
 
-        Assert.True(BookingLapse.Settle(booking, after));
+        Assert.Same(BookingLapseKind.Unpaid, BookingLapse.Settle(booking, after));
         Assert.Same(BookingStatus.Expired, booking.Status);
-        Assert.False(BookingLapse.Settle(booking, after));
+        Assert.Null(BookingLapse.Settle(booking, after));
     }
 
     /// <summary>

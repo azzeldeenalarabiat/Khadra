@@ -28,6 +28,11 @@ export interface FinancePanel {
   readonly period: string;
   readonly month: readonly FinanceLine[];
   readonly now: readonly FinanceLine[];
+  /**
+   * Capture incidents nobody has marked handled (Wave 4, B1): a count, set apart from the money owed back because
+   * it is not part of it. Null when the API sent no count.
+   */
+  readonly incidents: FinanceLine | null;
   readonly otherCurrencies: readonly string[];
 }
 
@@ -82,6 +87,15 @@ export function financePanel(summary: FinanceSummary, t: Translate, format: Fina
         part: true,
       },
     ],
+    incidents:
+      typeof now.openCaptureIncidentsCount === 'number'
+        ? {
+            label: t('adminDashboard.captureIncidents'),
+            value: t('adminDashboard.incidentsCount', { count: now.openCaptureIncidentsCount }),
+            note: null,
+            hi: now.openCaptureIncidentsCount > 0,
+          }
+        : null,
     otherCurrencies: summary.otherCurrencies.map((other) =>
       t('adminDashboard.otherCurrency', {
         currency: other.currency,

@@ -119,6 +119,9 @@ export interface BalanceRow {
   /** The balance due as a number, sent back when it is settled: the figure the administrator was shown. */
   readonly dueAmount: number;
   readonly dueCount: number;
+  /** Held back — by an administrator, or because the records no longer match (Wave 4, F56 a). Never "not due yet". */
+  readonly heldBack: string | null;
+  /** Not due yet: a refund on the booking outstanding, or a dispute on it live. */
   readonly notYetDue: string | null;
   readonly lastSettlement: string | null;
   readonly lastSettlementId: string | null;
@@ -139,9 +142,7 @@ export function balanceRow(balance: OfficeBalance, audience: Audience, words: Pa
     dueTone: balance.dueCount === 0 ? 'dim' : due.tone,
     dueAmount: balance.due.amount,
     dueCount: balance.dueCount,
-    notYetDue: balance.notYetDueCount === 0
-      ? null
-      : words.t('payouts.notYetDue', { count: balance.notYetDueCount, amount: netText(balance.notYetDue, audience, words, format).text }),
+    ...waiting(balance, audience, words, format),
     lastSettlement: last
       ? words.t('payouts.lastSettlement', {
           number: last.number,
@@ -153,6 +154,24 @@ export function balanceRow(balance: OfficeBalance, audience: Audience, words: Pa
     // Something is due, one way or the other, or the payables cancel out: all three close by one settlement.
     canSettle: balance.dueCount > 0 && balance.provider !== null,
   };
+}
+
+/**
+ * Held back and not due yet, each netted on its own when the API sends the two parts (Wave 4, F56 a), so a held
+ * credit and a blocked debit never cancel into one figure; from an API that sends only the total, that total, as before.
+ */
+function waiting(
+  balance: OfficeBalance,
+  audience: Audience,
+  words: PayoutWords,
+  format: PayoutFormat,
+): { readonly heldBack: string | null; readonly notYetDue: string | null } {
+  const line = (key: 'payouts.heldBack' | 'payouts.notYetDue', count: number, amount: Money): string | null =>
+    count === 0 ? null : words.t(key, { count, amount: netText(amount, audience, words, format).text });
+  const { heldCount, held, blockedCount, blocked } = balance;
+  if (heldCount === undefined || held === undefined || blockedCount === undefined || blocked === undefined)
+    return { heldBack: null, notYetDue: line('payouts.notYetDue', balance.notYetDueCount, balance.notYetDue) };
+  return { heldBack: line('payouts.heldBack', heldCount, held), notYetDue: line('payouts.notYetDue', blockedCount, blocked) };
 }
 
 // ── Payables ────────────────────────────────────────────────────────────────────────────────────
@@ -257,7 +276,8 @@ export function payableRow(payable: OfficePayable, audience: Audience, words: Pa
     holds,
     blocks: (payable.blocks ?? []).map((block) => words.label('payableBlock', block.kind)),
     isTest: payable.isTest === true,
-    canHold: audience === 'admin' && open && !holds.some((hold) => hold.manual),
+    // Never on a payable that moves no money (Wave 4, F56 c): the server refuses it, and nothing would be held back.
+    canHold: audience === 'admin' && open && payable.net.amount !== 0 && !holds.some((hold) => hold.manual),
     canRelease: audience === 'admin' && open && holds.some((hold) => hold.manual),
   };
 }

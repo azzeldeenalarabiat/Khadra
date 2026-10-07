@@ -4,18 +4,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
-import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
+import { problemMessage, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { AdminPaymentsService } from '../../core/services/admin-payments.service';
+import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { DocumentFormat, DocumentWords, documentRow } from './financial-documents.presenter';
-import { paymentPage } from './payment-detail.presenter';
+import { PaymentIncidentView, paymentPage } from './payment-detail.presenter';
 
 /**
  * One payment (payments Phase 4b): the attempt as its booking's financial state describes it, its
  * refunds with booking money and fee apart, the booking it belongs to, and every event the provider
  * sent about it — including one that arrived before the payment's reference was saved, which only its
- * reference ties to it. Read-only; the live checkout link is never on this page.
+ * reference ties to it. The live checkout link is never on this page. Its one action closes a capture incident
+ * with the administrator's account of it (Wave 4, B1), which moves no money.
  */
 @Component({
   selector: 'kh-payment-detail',
@@ -29,6 +31,7 @@ export class PaymentDetailComponent {
   private readonly formats = inject(FormatService);
   private readonly service = inject(AdminPaymentsService);
   private readonly route = inject(ActivatedRoute);
+  private readonly ui = inject(ConsoleUiService);
 
   private readonly paymentId = toSignal(
     this.route.paramMap.pipe(map((params) => params.get('paymentId'))),
@@ -87,5 +90,43 @@ export class PaymentDetailComponent {
 
   protected reload(): void {
     this.resource.reload();
+  }
+
+  /**
+   * Closes one capture incident with the administrator's account of how its money was dealt with at the provider
+   * (Wave 4, B1). The dialog states that nothing moves; the note is required, and is audited against their name.
+   */
+  protected markHandled(incident: PaymentIncidentView): void {
+    const paymentId = this.paymentId();
+    if (!paymentId || !incident.open) return;
+    this.ui.openAction(
+      {
+        icon: 'check-circle',
+        tone: 'accent',
+        title: this.t('paymentDetail.handle.title', { kind: incident.kind }),
+        body: this.t('paymentDetail.handle.body'),
+        fields: [{ name: 'note', label: this.t('paymentDetail.handle.note'), type: 'text' }],
+        confirm: this.t('paymentDetail.handle.confirm'),
+        result: { title: this.t('paymentDetail.handle.done'), body: '', tone: 'ok' },
+      },
+      async (values) => {
+        try {
+          await this.service.markIncidentHandled(paymentId, incident.id, values['note'] ?? '');
+          this.resource.reload();
+          return { title: this.t('paymentDetail.handle.done'), body: '', tone: 'ok' as const };
+        } catch (error) {
+          const problem = snapshotProblem(error);
+          // Somebody else's account got there first: it stands, the page shows it, and this one is told so.
+          if (problem.code !== 'payments.incident_already_handled') throw error;
+          this.resource.reload();
+          return {
+            title: this.t('common.thatDidNotGoThrough'),
+            body: problemMessage(problem, this.i18n.lang(), this.t) ?? this.t('common.serviceDidNotRespond'),
+            tone: 'bad' as const,
+          };
+        }
+      },
+      { title: this.t('paymentDetail.handle.done'), body: '' },
+    );
   }
 }

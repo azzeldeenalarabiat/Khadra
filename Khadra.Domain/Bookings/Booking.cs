@@ -86,6 +86,14 @@ public sealed class Booking : AggregateRoot
     // a payment's fee: the currency is the booking's and a second column could only disagree with it.
     private decimal _onlinePaid;
 
+    // When the dispute window this booking's ending opened closes, STORED when it opens (Wave 4, B5; checklist 210),
+    // so the ledger's pass and the sweep can find ended bookings by their own frozen window in SQL rather than by
+    // today's. Written by the four transitions that open a window and never cleared: at completion
+    // DisputeWindowEndsAt reads null, while this keeps the end the window had. Private on purpose (the advisor's
+    // review): DisputeWindowEndsAt stays the one statement of the window for every reader; this is the queries' copy.
+    // Null on a booking that ended before the column existed: the queries then read it as they always did.
+    private DateTimeOffset? _disputeWindowEndsAt;
+
     /// <summary>
     /// What the customer has paid ONLINE towards the booking (processing fees excluded): zero until a
     /// payment confirms it, then the deposit or the full total.
@@ -821,6 +829,7 @@ public sealed class Booking : AggregateRoot
         CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         Penalty = assessment;
         FinishedAt = now;
+        _disputeWindowEndsAt = now.Add(Terms.PostReturnSettlementWindow);
         Transition(BookingStatus.Cancelled, cancelledBy, actorUserId, reason, now, reasonCode?.Name);
         AddDomainEvent(new BookingCancelled(
             Id,
@@ -882,6 +891,7 @@ public sealed class Booking : AggregateRoot
             PenaltyReason.DealerDidNotHandOver,
             now);
         FinishedAt = now;
+        _disputeWindowEndsAt = now.Add(Terms.PostReturnSettlementWindow);
         Transition(BookingStatus.Cancelled, BookingParty.Customer, customerUserId, reason, now);
         AddDomainEvent(new BookingCancelled(
             Id,
@@ -922,6 +932,7 @@ public sealed class Booking : AggregateRoot
                 now);
 
         FinishedAt = now;
+        _disputeWindowEndsAt = now.Add(Terms.PostReturnSettlementWindow);
         Transition(BookingStatus.NoShow, PartyFor(actorUserId), actorUserId, "No-show window elapsed.", now);
         AddDomainEvent(new BookingMarkedNoShow(Id, VehicleId, Penalty.AttributedTo.Name, now));
         return UnitResult.Success<Error>();
@@ -988,6 +999,7 @@ public sealed class Booking : AggregateRoot
 
         _handovers.Add(record.Value);
         ReturnedAt = now;
+        _disputeWindowEndsAt = now.Add(Terms.PostReturnSettlementWindow);
         Transition(BookingStatus.Returned, recordedBy, recordedByUserId, null, now);
         AddDomainEvent(new BookingReturned(Id, VehicleId, now));
         return record.Value;

@@ -21,6 +21,20 @@ public interface IPaymentRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The attempt that already took the capture this reference names, if any (Wave 4, B1).
+    /// </summary>
+    /// <remarks>
+    /// Asked before anything else when a capture notice carries a reference: a capture another attempt already
+    /// applied or orphaned is an incident, answered 2xx, never a second application. The unique index on
+    /// (provider, provider_capture_reference) is the floor under this read, as the receipt's is under the replay
+    /// check.
+    /// </remarks>
+    Task<Payment?> GetByCaptureReferenceAsync(
+        string provider,
+        string captureReference,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The attempt this booking is currently paying through, if there is one.
     /// </summary>
     /// <remarks>
@@ -59,6 +73,17 @@ public interface IPaymentRepository
     Task<IReadOnlyList<Payment>> ListWithOutstandingRefundsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The payments with a refund the sweep may send at <paramref name="now"/>: owed, not with the provider, and
+    /// never refused or past the wait its last refusal set (Wave 4, B4). Ids only, oldest payment first.
+    /// </summary>
+    /// <remarks>
+    /// Ids, so the sweep loads and saves ONE payment at a time: a refund the webhook settled while the sweep held it
+    /// then costs that payment's sends only, not the whole tick's. Only payments with a provider reference, the one
+    /// thing a refund is sent against.
+    /// </remarks>
+    Task<IReadOnlyList<Id>> ListIdsWithRefundsDueAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// The safety net under the ending refunds (Phase 3): applied payments IN FULL whose booking ended
     /// before pickup with no refund recorded for the ending, and payments whose booking an
     /// administrator cancelled before pickup with no whole-payment refund. Normally empty; a row here
@@ -84,4 +109,13 @@ public interface IProviderEventReceiptRepository
     /// never the guard.
     /// </summary>
     Task<bool> HasSeenAsync(string provider, string providerEventId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Capture incidents waiting for, or dealt with by, a person (Wave 4, B1).</summary>
+public interface IPaymentIncidentRepository
+{
+    /// <summary>Staged beside the receipt that raised it, in the same save.</summary>
+    void Add(PaymentIncident incident);
+
+    Task<PaymentIncident?> GetByIdAsync(Id id, CancellationToken cancellationToken = default);
 }

@@ -92,6 +92,33 @@ describe('an office balance', () => {
     expect(row.lastSettlement).toBe('TEST-SET-2026-000001 · Paid to the office · on 2026-10-01');
   });
 
+  it('says held back and not due yet apart, each netted on its own, so they never cancel out (F56 a)', () => {
+    const split = balanceRow(
+      balance({ notYetDueCount: 2, notYetDue: jod(0), heldCount: 1, held: jod(12), blockedCount: 1, blocked: jod(-12) }),
+      'admin',
+      words('en'),
+      format,
+    );
+    const arabic = balanceRow(
+      balance({ notYetDueCount: 1, notYetDue: jod(12), heldCount: 1, held: jod(12), blockedCount: 0, blocked: jod(0) }),
+      'office',
+      words('ar'),
+      format,
+    );
+
+    expect(split.heldBack).toBe('1 booking held back: Khadra owes the office 12 JOD');
+    expect(split.notYetDue).toBe('1 booking not due yet: The office owes Khadra 12 JOD');
+    expect(arabic.heldBack).toBe('حجز واحد معلّق: تدين لك خضرا بمبلغ 12 JOD');
+    expect(arabic.notYetDue).toBeNull();
+  });
+
+  it('falls back to the one figure from an API that sends only the total', () => {
+    const row = balanceRow(balance(), 'admin', words('en'), format);
+
+    expect(row.heldBack).toBeNull();
+    expect(row.notYetDue).toBe('1 booking not due yet: Khadra owes the office 7 JOD');
+  });
+
   it('has nothing to settle when nothing is due, and the office never gets the kind of money', () => {
     expect(balanceRow(balance({ dueCount: 0, due: jod(0) }), 'admin', words('en'), format)).toMatchObject({ canSettle: false, due: 'Nothing due' });
     expect(balanceRow(balance({ provider: null, isTest: null }), 'office', words('en'), format).canSettle).toBe(false);
@@ -114,6 +141,15 @@ describe('a payable', () => {
     expect(held.holds[0].reason).toBe('Held by an administrator');
     expect([settled.canHold, settled.canRelease]).toEqual([false, false]);
     expect(settled.settlement).toEqual({ id: 's-1', number: 'SET-2026-000001', day: '2026-10-09' });
+  });
+
+  it('is never offered a hold when it moves no money (F56 c), even while a refund still blocks it', () => {
+    const nothingDue = payableRow(payable({ state: 'NothingDue', net: jod(0), lines: [] }), 'admin', words('en'), format);
+    const blockedZero = payableRow(payable({ state: 'Blocked', net: jod(0), lines: [] }), 'admin', words('en'), format);
+
+    expect(nothingDue.canHold).toBe(false);
+    expect(blockedZero.canHold).toBe(false);
+    expect(nothingDue.state).toBe('Nothing due');
   });
 
   it("words a hold's detail by who wrote it (pre-launch item 219)", () => {

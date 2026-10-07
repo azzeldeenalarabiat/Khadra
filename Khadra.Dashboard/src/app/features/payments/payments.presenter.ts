@@ -17,7 +17,7 @@ export interface ListFormat {
 
 export interface PaymentRow {
   readonly id: string;
-  /** The first characters of the id, for a person to quote; the whole id is in the link. */
+  /** What a person quotes to tell this attempt from another (see {@link attemptLabel}); the whole id is in the link. */
   readonly shortId: string;
   readonly created: string;
   readonly bookingId: string;
@@ -50,9 +50,24 @@ export interface RefundRow {
   readonly code: string | null;
   readonly disputeTicketId: string | null;
   readonly sandbox: boolean;
+  /** "Refused 3 times · sent again 14:05" (Wave 4, B4); null for a refund never refused. */
+  readonly refusals: string | null;
+  /** Refused often enough that a person must look, as the server judged it. */
+  readonly needsAPerson: boolean;
 }
 
 const PAYMENT_TONES: Readonly<Record<string, Tone>> = { Applied: 'ok', Orphaned: 'warn', Failed: 'bad' };
+
+/**
+ * What tells one checkout attempt from another (Wave 4, F38): the provider's own reference — what anyone looking at
+ * the provider's side would search for — or, before the provider answered, the RANDOM tail of the id.
+ *
+ * Never the id's first characters: a v7 id begins with its timestamp, so two attempts a minute apart read the same
+ * (KH-EGEEZRN2's failed and applied attempts both read "01a10261").
+ */
+export function attemptLabel(paymentId: string, providerReference: string | null | undefined): string {
+  return providerReference || paymentId.replace(/-/g, '').slice(-12);
+}
 const REFUND_TONES: Readonly<Record<string, Tone>> = { Settled: 'ok', Failed: 'bad', Requested: 'warn', Sent: 'warn' };
 
 /**
@@ -63,7 +78,7 @@ const REFUND_TONES: Readonly<Record<string, Tone>> = { Settled: 'ok', Failed: 'b
 export function paymentRow(row: AdminPaymentListItem, t: Translate, label: EnumLabel, format: ListFormat): PaymentRow {
   return {
     id: row.paymentId,
-    shortId: row.paymentId.slice(0, 8),
+    shortId: attemptLabel(row.paymentId, row.providerReference),
     created: format.when(row.createdAt),
     bookingId: row.bookingId,
     reference: row.bookingReference,
@@ -95,7 +110,17 @@ export function refundRow(row: AdminRefundListItem, t: Translate, label: EnumLab
     code: row.failureCode,
     disputeTicketId: row.disputeTicketId,
     sandbox: row.isSandbox,
+    refusals: refusalLine(row, t, format),
+    needsAPerson: row.needsAPerson === true,
   };
+}
+
+/** How often a refund was refused, and when it is sent again; nothing for one never refused. */
+function refusalLine(row: AdminRefundListItem, t: Translate, format: ListFormat): string | null {
+  const count = row.refusalCount ?? 0;
+  if (count < 1) return null;
+  const refused = t('refunds.refusedTimes', { count });
+  return row.nextAttemptAt ? `${refused} · ${t('refunds.sentAgainAt', { when: format.when(row.nextAttemptAt) })}` : refused;
 }
 
 /** A refund view's tab label: the live queue, or one status in its short form, spelled out when unknown. */

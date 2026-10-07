@@ -56,6 +56,12 @@ export interface AdminRefundListItem {
   readonly failureCode: string | null;
   readonly providerReference: string | null;
   readonly isSandbox: boolean;
+  /** How many sends the provider refused (Wave 4, B4). Optional, as the API made it. */
+  readonly refusalCount?: number;
+  /** When a refused refund is sent again; null when nothing waits. */
+  readonly nextAttemptAt?: string | null;
+  /** Refused often enough that an administrator must look: the server's judgement, by its own setting. */
+  readonly needsAPerson?: boolean;
 }
 
 /** The booking a payment belongs to, with its parties. */
@@ -74,12 +80,41 @@ export interface ProviderEvent {
   readonly receiptId: string;
   readonly providerEventId: string;
   readonly kind: string;
-  /** `Acted`, `Orphaned`, `Unknown`, `Ignored` or `Unmatched`. */
+  /**
+   * `Acted`, `Orphaned`, `Unknown`, `Ignored` or `Unmatched`; and for a capture notice about money the payment
+   * had already taken (Wave 4, B1), `Duplicate`, `AssumedDuplicate`, `AmountMismatch`, `SecondCapture` or
+   * `OtherAttempt`.
+   */
   readonly outcome: string;
   readonly amount: Money | null;
   readonly receivedAt: string;
   /** `Payment` when the receipt names the payment; `Reference` when it carries only its reference. */
   readonly tiedBy: 'Payment' | 'Reference' | string;
+  /** The provider's id for the capture a capture notice reported, when it carried one (Wave 4, B1). */
+  readonly captureReference?: string | null;
+}
+
+/**
+ * A capture notice that money may have moved in a way no booking accounts for (Wave 4, B1). Never refunded by
+ * the platform: somebody deals with it at the provider, then marks it handled here with a note.
+ */
+export interface PaymentIncident {
+  readonly incidentId: string;
+  /** `SecondCapture`, `AmountMismatch` or `CaptureOnAnotherAttempt`. */
+  readonly kind: string;
+  readonly receiptId: string;
+  readonly captureReference: string | null;
+  /** What the notice said was captured. */
+  readonly reported: Money;
+  /** What this payment had already taken — or, for a capture on another attempt, what it asked for. */
+  readonly expected: Money;
+  /** For a capture on another attempt: the attempt that holds the capture. */
+  readonly otherPaymentId: string | null;
+  readonly detectedAt: string;
+  readonly handledAt: string | null;
+  /** The administrator who marked it handled, by name. */
+  readonly handledBy: string | null;
+  readonly handledNote: string | null;
 }
 
 /** `GET /api/v1/admin/payments/{id}`: the same description a booking's financial state gives the payment. */
@@ -92,6 +127,8 @@ export interface AdminPayment {
    * without documents sends none, and the page says nothing about them.
    */
   readonly documents?: readonly AdminFinancialDocumentListItem[] | null;
+  /** The payment's capture incidents, open ones first (Wave 4, B1). Optional, as the API made it. */
+  readonly incidents?: readonly PaymentIncident[] | null;
 }
 
 /** The words the payments screens filter on, from the domain's own enumerations: the console keeps no list. */

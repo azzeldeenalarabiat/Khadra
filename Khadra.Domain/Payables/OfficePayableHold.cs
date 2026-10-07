@@ -106,6 +106,9 @@ public sealed class OfficePayableHold : AggregateRoot
             throw new DomainException("A manual hold names its administrator.");
         if (payable.IsSettled)
             return PayableErrors.AlreadySettled;
+        // Nothing would ever move for it, held or not; a hold would only keep it on the Open list for nothing.
+        if (payable.Net == 0m)
+            return PayableErrors.NothingToHold;
 
         var trimmed = reason?.Trim();
         if (string.IsNullOrEmpty(trimmed))

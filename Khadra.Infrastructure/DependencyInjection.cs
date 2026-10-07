@@ -315,6 +315,10 @@ public static class DependencyInjection
             // would be refused before it opened.
             .Validate(options => options.CheckoutClosesBeforeDeadlineMinutes < options.CheckoutSessionMinutes,
                 "Payments: CheckoutClosesBeforeDeadlineMinutes must be less than CheckoutSessionMinutes.")
+            // A refused refund's waits double up to a ceiling (Wave 4, B4); a ceiling below the first wait would make
+            // the second wait shorter than the first.
+            .Validate(options => options.RefundRetryMaxDelayMinutes >= options.RefundRetryFirstDelayMinutes,
+                "Payments: RefundRetryMaxDelayMinutes must be at least RefundRetryFirstDelayMinutes.")
             // A name nothing implements must not quietly resolve to the refusing provider. It would
             // "work" — every checkout refused, the boot log saying PAYMENTS ARE NOT ACCEPTED — and a
             // typo would look exactly like a deliberate None. Name the two that exist, and fail on
@@ -391,6 +395,7 @@ public static class DependencyInjection
         services.AddScoped<IShortlistRepository, ShortlistRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
+        services.AddScoped<IPaymentIncidentRepository, PaymentIncidentRepository>();
         // Issued financial documents (payments Phase 5): append-only documents and voids, the holds on
         // families owed one, and the gapless number counters.
         services.AddScoped<IFinancialDocumentRepository, FinancialDocumentRepository>();

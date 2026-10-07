@@ -266,6 +266,49 @@ public sealed class OfficePayablesTests : IDisposable
         Assert.Equal([completed.Id, cancelled.Id], (await WorkAsync()).BookingsToRecord);
     }
 
+    /// <summary>
+    /// A cancellation is found by ITS OWN frozen window, stored when the window opened (Wave 4, B5; checklist 210),
+    /// not held back until today's longer one has passed too. Each booking is still judged by its own window in the
+    /// step, so nothing can be recorded early.
+    /// </summary>
+    [Fact]
+    public async Task A_cancellation_under_a_shorter_frozen_window_is_a_candidate_once_its_own_window_closes()
+    {
+        _harness.Bookings.Now = _harness.Now;
+        var (booking, _) = await _harness.Bookings.PaidAsync(
+            PaymentProviders.Sandbox, unique: "3101", terms: Build.Terms(settlementWindow: TimeSpan.FromHours(24)));
+        var cancelled = await ChangeBookingAsync(booking.Id, stored =>
+            Assert.True(stored.Cancel(BookingParty.Customer, stored.CustomerId, null, stored.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess));
+        Assert.Equal(cancelled.FinishedAt!.Value.AddHours(24), cancelled.DisputeWindowEndsAt);
+
+        // Inside the finality margin after its own window: not yet.
+        _harness.Now = cancelled.DisputeWindowEndsAt!.Value.AddMinutes(9);
+        Assert.Empty((await WorkAsync()).BookingsToRecord);
+
+        // Past it: a candidate now, where today's 48-hour bound would have kept it out for another day.
+        _harness.Now = cancelled.DisputeWindowEndsAt.Value.AddMinutes(11);
+        Assert.True(cancelled.FinishedAt.Value > _harness.Now.AddMinutes(-10).AddHours(-48));
+        Assert.Equal([cancelled.Id], (await WorkAsync()).BookingsToRecord);
+    }
+
+    /// <summary>A cancellation recorded before the column existed has no stored end, and is bounded by today's window as before.</summary>
+    [Fact]
+    public async Task A_cancellation_with_no_stored_window_end_is_found_exactly_as_before()
+    {
+        var (cancelled, _) = await CancelledLateAsync(unique: "3102");
+        await _harness.Bookings.ChangeAsync(async context =>
+        {
+            var stored = await context.Bookings.SingleAsync(booking => booking.Id == cancelled.Id);
+            context.Entry(stored).Property(Khadra.Infrastructure.Persistence.Configurations.Bookings.BookingConfiguration.DisputeWindowEndsAtField)
+                .CurrentValue = null;
+        });
+
+        _harness.Now = cancelled.DisputeWindowEndsAt!.Value.AddMinutes(-30);
+        Assert.Empty((await WorkAsync()).BookingsToRecord);
+        _harness.Now = cancelled.DisputeWindowEndsAt.Value.AddMinutes(11);
+        Assert.Equal([cancelled.Id], (await WorkAsync()).BookingsToRecord);
+    }
+
     [Fact]
     public async Task Completed_rentals_are_recorded_before_older_cancellations()
     {
@@ -389,6 +432,87 @@ public sealed class OfficePayablesTests : IDisposable
             [AuditAction.OfficePayableHeld, AuditAction.OfficePayableReleased, AuditAction.OfficeSettlementRecorded],
             (await _harness.AuditAsync()).OrderBy(entry => entry.OccurredAt).ThenBy(entry => entry.Id.Value).Select(entry => entry.Action));
         _ = blockedPayment;
+    }
+
+    /// <summary>
+    /// Held back and blocked are two different facts, counted and netted apart (Wave 4, F56 a): a payable an
+    /// administrator held is never "not due yet", and the two can never cancel into one figure nobody can read.
+    /// </summary>
+    [Fact]
+    public async Task Held_and_blocked_payables_are_counted_and_netted_apart()
+    {
+        var (blockedBooking, _) = await CompletedAsync(unique: "2001");
+        var (heldBooking, _) = await CompletedAsync(unique: "2002");
+        await _harness.PassAsync();
+        var held = (await _harness.PayablesAsync()).Single(payable => payable.BookingId == heldBooking.Id);
+        await _harness.Bookings.ChangeAsync(async context =>
+        {
+            context.DisputeTickets.Add(Khadra.Domain.Disputes.DisputeTicket.Open(
+                blockedBooking.Id, blockedBooking.CustomerId, BookingParty.Customer, "Scratch.", TimeSpan.FromHours(48), _harness.Now).Value);
+            await Task.CompletedTask;
+        });
+        Assert.True((await _harness.HoldAsync(held.Id, "Bank details unconfirmed.")).IsSuccess);
+
+        var balances = await _harness.ReadAsync(ledger => ledger.BalancesAsync(null));
+        var heldOffice = balances.Single(balance => balance.DealerId == heldBooking.DealerId);
+        var blockedOffice = balances.Single(balance => balance.DealerId == blockedBooking.DealerId);
+
+        Assert.Equal((1, 12m, 0, 0m), (heldOffice.HeldCount, heldOffice.HeldNet, heldOffice.BlockedCount, heldOffice.BlockedNet));
+        Assert.Equal((0, 0m, 1, 12m), (blockedOffice.HeldCount, blockedOffice.HeldNet, blockedOffice.BlockedCount, blockedOffice.BlockedNet));
+        // The figure both screens had is kept, and is exactly the two parts together.
+        Assert.All(balances, balance =>
+        {
+            Assert.Equal(balance.HeldCount + balance.BlockedCount, balance.NotYetDueCount);
+            Assert.Equal(balance.HeldNet + balance.BlockedNet, balance.NotYetDueNet);
+        });
+    }
+
+    /// <summary>
+    /// A net-zero payable leaves the Open list for Nothing due once nothing holds it back (Wave 4, F56 c) — it used to
+    /// sit in Open for ever, since no settlement closes it. One a refund still blocks stays Open until the refund
+    /// settles. And there is nothing to hold back on a payable that moves no money.
+    /// </summary>
+    [Fact]
+    public async Task A_net_zero_payable_moves_from_open_to_nothing_due_once_nothing_holds_it_back()
+    {
+        _harness.Bookings.Now = _harness.Now;
+        var (zeroBooking, zeroPayment) = await _harness.Bookings.PaidAsync(PaymentProviders.Sandbox, unique: "3001");
+        var (dueBooking, _) = await CompletedAsync(unique: "3002");
+        await _harness.PassAsync();
+        // What the pass records for a booking whose payment went back whole: no lines, net zero.
+        var zero = OfficePayable.Record(
+            new PayableDraft(
+                zeroBooking.Id, zeroBooking.DealerId, zeroBooking.Reference.Value, "JOD", PaymentProviders.Sandbox,
+                PayableOutcome.PaymentReturned, _harness.Now, 2, []),
+            _harness.Now);
+        await _harness.Bookings.ChangeAsync(async context =>
+        {
+            context.OfficePayables.Add(zero);
+            await Task.CompletedTask;
+        });
+        // ...with the refund that returns the money still on its way: blocked, so it stays Open.
+        await ChangePaymentAsync(zeroPayment.Id, payment => Assert.NotNull(payment.RefundHeldDeposit(Money.Jod(18m), _harness.Now).Value));
+
+        async Task<IReadOnlyList<Id>> Listed(string scope) =>
+            [.. (await _harness.ReadAsync(ledger => ledger.ListPayablesAsync(new PayableListFilter(null, scope, null, null, 1, 50))))
+                .Items.Select(payable => payable.PayableId)];
+
+        Assert.Contains(zero.Id, await Listed(PayableListScopes.Open));
+        Assert.Empty(await Listed(PayableListScopes.NothingDue));
+
+        await ChangePaymentAsync(zeroPayment.Id, payment =>
+        {
+            var refund = Assert.Single(payment.Refunds);
+            refund.MarkSent("rf_zero", _harness.Now);
+            refund.MarkSettled(_harness.Now);
+        });
+
+        var due = (await _harness.PayablesAsync()).Single(payable => payable.BookingId == dueBooking.Id);
+        Assert.Equal([due.Id], await Listed(PayableListScopes.Open));
+        Assert.Equal([zero.Id], await Listed(PayableListScopes.NothingDue));
+        Assert.Equal(2, (await Listed(PayableListScopes.All)).Count);
+        Assert.Equal(PayableStates.NothingDue, (await _harness.ReadAsync(ledger => ledger.ForBookingAsync(zeroBooking.Id))).Payable!.State);
+        Assert.Equal("payables.nothing_to_hold", (await _harness.HoldAsync(zero.Id, "Just in case.")).Error.Code);
     }
 
     /// <summary>

@@ -5,7 +5,7 @@ import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
 import { EnumFamily, enumKey, spellEnumName } from '../../core/i18n/status-key';
 import { Money } from '../../core/models/fleet.api';
-import { AdminPayment, AdminPaymentListItem, AdminRefundListItem } from '../../core/models/payments.api';
+import { AdminPayment, AdminPaymentListItem, AdminRefundListItem, PaymentIncident } from '../../core/models/payments.api';
 import { paymentPage } from './payment-detail.presenter';
 import { paymentRow, refundRow, refundViewLabel } from './payments.presenter';
 
@@ -46,10 +46,19 @@ describe('the payments list', () => {
     const row = paymentRow(listed(), en, labelWith(en), format);
 
     expect(row).toMatchObject({
-      shortId: '01a0d99c', reference: 'KH-49UQ364G', customer: 'Rana Sharif', dealer: 'Al-Nadeem Rentals',
+      shortId: 'sb_1', reference: 'KH-49UQ364G', customer: 'Rana Sharif', dealer: 'Al-Nadeem Rentals',
       purpose: 'Deposit', charged: '20 JOD', fee: '0 JOD', status: 'Applied to the booking', tone: 'ok',
       progress: null, sandbox: true,
     });
+  });
+
+  it('tells two attempts a minute apart by their provider reference, or by the random tail of the id (F38)', () => {
+    const failed = paymentRow(listed({ paymentId: '01a10261-6a4c-7b3e-9f10-1c2d3e4f5a6b', providerReference: null }), en, labelWith(en), format);
+    const applied = paymentRow(listed({ paymentId: '01a10261-9b2d-7c4f-8e21-6f5e4d3c2b1a', providerReference: 'sbx_9f2c41a07be3d665' }), en, labelWith(en), format);
+
+    expect(failed.shortId).toBe('1c2d3e4f5a6b');
+    expect(applied.shortId).toBe('sbx_9f2c41a07be3d665');
+    expect(failed.shortId).not.toBe(applied.shortId);
   });
 
   it('shows a partly refunded full payment by the payment verdict, in Arabic', () => {
@@ -76,6 +85,25 @@ describe('the refunds queue', () => {
     expect(
       refundRow(refund({ status: 'Settled', settledAt: '2026-09-27T09:12:00Z', failedAt: null }), en, labelWith(en), format).date,
     ).toBe('2026-09-27T09:12');
+  });
+
+  it('says how often a refund was refused and when it is sent again, and raises it when the server says a person must look', () => {
+    const waiting = refundRow(refund({ refusalCount: 2, nextAttemptAt: '2026-09-26T05:43:00Z', needsAPerson: false }), en, labelWith(en), format);
+    const repeated = refundRow(refund({ refusalCount: 3, nextAttemptAt: '2026-09-26T05:47:00Z', needsAPerson: true }), ar, labelWith(ar), format);
+
+    expect(waiting.refusals).toBe('Refused 2 times · sent again 2026-09-26T05:43');
+    expect(waiting.needsAPerson).toBe(false);
+    expect(repeated.refusals).toBe('رُفض 3 مرات · يُرسل مجددًا 2026-09-26T05:47');
+    expect(repeated.needsAPerson).toBe(true);
+    // One that went through after a refusal keeps its count and has nothing waiting.
+    expect(refundRow(refund({ status: 'Sent', refusalCount: 1, nextAttemptAt: null }), en, labelWith(en), format).refusals).toBe('Refused once');
+  });
+
+  it('says nothing about refusals for a refund never refused, or from an API that sends no count', () => {
+    expect(refundRow(refund({ refusalCount: 0 }), en, labelWith(en), format).refusals).toBeNull();
+    const fromAnOlderApi = refundRow(refund(), en, labelWith(en), format);
+    expect(fromAnOlderApi.refusals).toBeNull();
+    expect(fromAnOlderApi.needsAPerson).toBe(false);
   });
 
   it('names its views, the live queue first, and spells a status it does not know', () => {
@@ -111,7 +139,7 @@ describe("a payment's page", () => {
       format,
     );
 
-    expect(view.title).toBe('Payment 01a0d99c');
+    expect(view.title).toBe('Payment sb_1');
     expect(view.subtitle).toBe('Full payment for KH-NY8AHLNK · 107.25 JOD');
     expect(view.notice).toBeNull();
     expect(view.facts).toContainEqual({ k: 'Processing fee', v: '4.5 JOD · refundable' });
@@ -133,5 +161,140 @@ describe("a payment's page", () => {
     expect(failed.facts.map((fact) => fact.k)).not.toContain('Charged to the card');
     expect(orphaned.notice?.tone).toBe('warn');
     expect(orphaned.notice?.text).toContain('booking.not_awaiting_payment');
+  });
+
+  // ── A capture notice for money already taken, and its incidents (Wave 4, B1) ──
+
+  const notice = (outcome: string, captureReference: string | null = null): AdminPayment['providerEvents'][number] => ({
+    receiptId: `e-${outcome}`,
+    providerEventId: `evt_${outcome}`,
+    kind: 'Captured',
+    outcome,
+    amount: jod(107.25),
+    receivedAt: '2026-09-25T21:00:00Z',
+    tiedBy: 'Payment',
+    captureReference,
+  });
+
+  const incident = (over: Partial<PaymentIncident> = {}): PaymentIncident => ({
+    incidentId: 'i-1',
+    kind: 'SecondCapture',
+    receiptId: 'e-SecondCapture',
+    captureReference: 'cap_2',
+    reported: jod(107.25),
+    expected: jod(107.25),
+    otherPaymentId: null,
+    detectedAt: '2026-09-25T21:00:00Z',
+    handledAt: null,
+    handledBy: null,
+    handledNote: null,
+    ...over,
+  });
+
+  it('colours each notice by what it was: the same capture quiet, an assumed one a warning, an incident an alarm', () => {
+    const view = paymentPage(
+      page({}, ['Acted', 'Duplicate', 'AssumedDuplicate', 'AmountMismatch', 'SecondCapture', 'OtherAttempt', 'Unmatched', 'Novel'].map((outcome) => notice(outcome))),
+      en,
+      labelWith(en),
+      format,
+    );
+
+    expect(view.events.map((event) => [event.outcome, event.tone])).toEqual([
+      ['Acted on', 'ok'],
+      ['Same capture, said again', 'dim'],
+      ['Same amount again — assumed the same capture', 'warn'],
+      ['Same capture, another amount — incident', 'bad'],
+      ['Another capture — incident', 'bad'],
+      ['Capture held by another attempt — incident', 'bad'],
+      ['No refund matched', 'bad'],
+      // An outcome this build does not know is spelled out, and quiet rather than guessed at.
+      ['Novel', 'dim'],
+    ]);
+  });
+
+  it('shows the capture a notice reported, and nothing for one that carried none', () => {
+    const view = paymentPage(page({}, [notice('Duplicate', 'sbxcap_0123'), notice('Acted')]), en, labelWith(en), format);
+
+    expect(view.events.map((event) => event.captureReference)).toEqual(['sbxcap_0123', null]);
+  });
+
+  it('states each incident with its figures, and who handled it and how once somebody has', () => {
+    const view = paymentPage(
+      {
+        ...page(),
+        incidents: [
+          incident({ kind: 'AmountMismatch', reported: jod(110), expected: jod(107.25) }),
+          incident({ incidentId: 'i-2', kind: 'CaptureOnAnotherAttempt', otherPaymentId: 'p-9', expected: jod(20) }),
+          incident({
+            incidentId: 'i-3',
+            handledAt: '2026-09-26T09:00:00Z',
+            handledBy: 'Omar Deeb',
+            handledNote: 'Refunded at the provider, ticket 41.',
+          }),
+        ],
+      },
+      en,
+      labelWith(en),
+      format,
+    );
+
+    const [mismatch, onOther, handled] = view.incidents ?? [];
+    expect(mismatch).toMatchObject({
+      kind: 'Amount contradicts the capture',
+      open: true,
+      status: 'Open',
+      tone: 'bad',
+      detected: 'Detected 2026-09-25T21:00',
+      figures: ['The provider reported 110 JOD', 'This payment had already taken 107.25 JOD'],
+      captureReference: 'cap_2',
+      handled: null,
+    });
+    // Measured against what this attempt ASKED for, and linked to the attempt that holds the capture.
+    expect(onOther.figures).toEqual(['The provider reported 107.25 JOD', 'This attempt asked for 20 JOD']);
+    expect(onOther.otherPaymentId).toBe('p-9');
+    expect(handled).toMatchObject({
+      open: false,
+      status: 'Handled',
+      tone: 'ok',
+      handled: 'Marked handled by Omar Deeb · 2026-09-26T09:00',
+      note: 'Refunded at the provider, ticket 41.',
+    });
+    // Two open: said once above everything.
+    expect(view.incidentNotice).toBe(
+      '2 captures on this payment need checking at the provider: money may have been taken twice, or reported wrongly. Nothing was refunded automatically.',
+    );
+  });
+
+  it('names nobody when the handler no longer resolves, and says nothing above the page once all are handled', () => {
+    const view = paymentPage(
+      { ...page(), incidents: [incident({ handledAt: '2026-09-26T09:00:00Z', handledBy: null, handledNote: 'Done.' })] },
+      ar,
+      labelWith(ar),
+      format,
+    );
+
+    expect(view.incidents?.[0].handled).toBe('عولجت · 2026-09-26T09:00');
+    expect(view.incidents?.[0].kind).toBe('خصم ثانٍ');
+    expect(view.incidentNotice).toBeNull();
+  });
+
+  it('draws no incidents section when the API sent none, and an empty one when it sent an empty list', () => {
+    expect(paymentPage(page(), en, labelWith(en), format).incidents).toBeNull();
+    expect(paymentPage({ ...page(), incidents: [] }, en, labelWith(en), format).incidents).toEqual([]);
+  });
+
+  it('counts one open incident in every Arabic form the notice needs', () => {
+    const open = (count: number) =>
+      paymentPage(
+        { ...page(), incidents: Array.from({ length: count }, (_, index) => incident({ incidentId: `i-${index}` })) },
+        ar,
+        labelWith(ar),
+        format,
+      ).incidentNotice;
+
+    expect(open(1)).toContain('خصم على هذه الدفعة يحتاج');
+    expect(open(2)).toContain('خصمان على هذه الدفعة يحتاجان');
+    expect(open(3)).toContain('3 خصومات');
+    expect(open(11)).toContain('11 خصمًا');
   });
 });

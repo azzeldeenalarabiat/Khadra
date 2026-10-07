@@ -17,6 +17,9 @@ namespace Khadra.Infrastructure.Persistence.Configurations.Bookings;
 // first-class indexed column.
 internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
 {
+    /// <summary>The private field holding the stored end of a dispute window (Wave 4, B5), as the queries name it.</summary>
+    internal const string DisputeWindowEndsAtField = "_disputeWindowEndsAt";
+
     public void Configure(EntityTypeBuilder<Booking> entity)
     {
         ConfigureAggregate(entity, "bookings");
@@ -37,6 +40,11 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             .HasPrecision(18, 3)
             .HasDefaultValue(0m)
             .IsRequired();
+        // When the dispute window an ending opened closes (Wave 4, B5; checklist 210): the queries' copy of the frozen
+        // window, read through EF.Property by the payables pass and the sweep, and by nothing else.
+        entity.Property<DateTimeOffset?>(DisputeWindowEndsAtField).HasColumnName("dispute_window_ends_at");
+        entity.HasIndex(nameof(Booking.Status), DisputeWindowEndsAtField)
+            .HasFilter("dispute_window_ends_at IS NOT NULL");
         ConfigureId(entity.Property(booking => booking.ActedByUserId));
         ConfigureId(entity.Property(booking => booking.ExtendedFromBookingId));
 

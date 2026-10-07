@@ -107,6 +107,22 @@ public sealed class Payment : AggregateRoot
     /// <summary>What the provider actually took. Null until a capture lands.</summary>
     public Money? AmountCaptured { get; private set; }
 
+    /// <summary>
+    /// The provider's own id for the capture that took this payment's money, when its notice carried one (Wave 4,
+    /// B1; E2E F30). Written by <see cref="Apply"/> and by <see cref="Orphan"/>, the two ways money lands here.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It is how a later capture notice is told apart: the same reference is the same capture said again, a
+    /// different one is a second charge. A payment captured before this existed, or by a provider that sends none,
+    /// holds null, and a later notice is then judged by the amount alone (<see cref="ClassifyRepeatCapture"/>).
+    /// </para>
+    /// <para>
+    /// Unique per provider in the database, so one capture can never be applied to two attempts.
+    /// </para>
+    /// </remarks>
+    public string? ProviderCaptureReference { get; private set; }
+
     public DateTimeOffset? CapturedAt { get; private set; }
     public DateTimeOffset? AppliedAt { get; private set; }
     public DateTimeOffset? OrphanedAt { get; private set; }
@@ -294,7 +310,7 @@ public sealed class Payment : AggregateRoot
     /// how to, and deliberately cannot: crossing into Bookings from here would put two aggregates'
     /// invariants in one class.
     /// </remarks>
-    public UnitResult<Error> Apply(Money captured, DateTimeOffset capturedAt, DateTimeOffset now)
+    public UnitResult<Error> Apply(Money captured, DateTimeOffset capturedAt, DateTimeOffset now, string? captureReference = null)
     {
         var guard = CanAcceptCapture(captured);
         if (guard.IsFailure)
@@ -303,6 +319,7 @@ public sealed class Payment : AggregateRoot
         AmountCaptured = captured;
         CapturedAt = capturedAt;
         AppliedAt = now;
+        ProviderCaptureReference = Normalise(captureReference);
         Status = PaymentStatus.Applied;
         // The attempt succeeded, so whatever an earlier pass thought had gone wrong is no longer
         // true of this payment. Leaving it would put a failure reason on a row that took money.
@@ -330,7 +347,8 @@ public sealed class Payment : AggregateRoot
     /// never what this row asked for.
     /// </para>
     /// </remarks>
-    public UnitResult<Error> Orphan(Money captured, DateTimeOffset capturedAt, string reason, DateTimeOffset now)
+    public UnitResult<Error> Orphan(
+        Money captured, DateTimeOffset capturedAt, string reason, DateTimeOffset now, string? captureReference = null)
     {
         ArgumentNullException.ThrowIfNull(captured);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
@@ -341,6 +359,9 @@ public sealed class Payment : AggregateRoot
         CapturedAt = capturedAt;
         OrphanedAt = now;
         OrphanReason = reason;
+        // Kept on an orphan too (Wave 4, the advisor's review): a later notice of the SAME capture must be told
+        // apart from a second charge whether the money was applied or is on its way back.
+        ProviderCaptureReference = Normalise(captureReference);
         Status = PaymentStatus.Orphaned;
         // Same rule as Apply, and reachable by the same route: a swept-Failed attempt whose late
         // capture cannot be used is orphaned, and must not also carry the reason the sweep gave.
@@ -630,4 +651,50 @@ public sealed class Payment : AggregateRoot
             return UnitResult.Failure(PaymentErrors.AmountMismatch);
         return UnitResult.Success<Error>();
     }
+
+    /// <summary>
+    /// What a capture notice for this payment is, once the payment has ALREADY taken its money (Wave 4, B1; E2E F30).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A provider sends several notices for one charge, each under its own event id, so the replay index lets them
+    /// through. Before this existed each one was refused as <c>already_captured</c>, failed to orphan, and was
+    /// logged as money "UNACCOUNTED FOR" on a row whose money was right. The answer now depends on what the notice
+    /// can be compared by:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><b>Both sides carry a capture reference.</b> The same reference with the same amount and currency is a
+    /// <see cref="ProviderEventOutcome.Duplicate"/>; the same reference with another amount is the provider
+    /// contradicting itself (<see cref="ProviderEventOutcome.AmountMismatch"/>); another reference is a second charge
+    /// (<see cref="ProviderEventOutcome.SecondCapture"/>).</item>
+    /// <item><b>Either side has none</b> — a payment captured before references existed, or a provider that sends
+    /// none. The amount alone decides: the same amount and currency is
+    /// <see cref="ProviderEventOutcome.AssumedDuplicate"/>, anything else a second charge. "Assumed", because a
+    /// genuine second charge of the same amount reads exactly the same; that is why a real adapter must send a
+    /// reference (pre-launch item 76).</item>
+    /// </list>
+    /// <para>
+    /// It changes nothing. Neither a duplicate nor an incident may move money, and no refund is ever raised from
+    /// here: a second charge is real money the provider took, and what happens to it is decided by a person.
+    /// </para>
+    /// </remarks>
+    public ProviderEventOutcome ClassifyRepeatCapture(Money reported, string? captureReference)
+    {
+        ArgumentNullException.ThrowIfNull(reported);
+        if (!Status.IsCaptured || AmountCaptured is not { } taken)
+            throw new DomainException($"Payment {Id} has taken no money, so no capture notice can repeat it.");
+
+        var sameMoney = reported == taken;
+        if (Normalise(captureReference) is { } reference && ProviderCaptureReference is { } stored)
+        {
+            if (!string.Equals(reference, stored, StringComparison.Ordinal))
+                return ProviderEventOutcome.SecondCapture;
+            return sameMoney ? ProviderEventOutcome.Duplicate : ProviderEventOutcome.AmountMismatch;
+        }
+
+        return sameMoney ? ProviderEventOutcome.AssumedDuplicate : ProviderEventOutcome.SecondCapture;
+    }
+
+    private static string? Normalise(string? reference) =>
+        string.IsNullOrWhiteSpace(reference) ? null : reference.Trim();
 }

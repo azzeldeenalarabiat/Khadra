@@ -41,6 +41,7 @@ public sealed class CreateBookingHandler(
     IReportingCalendar calendar,
     IVehicleHoldLock vehicleLock,
     DealerTeamNotifier team,
+    BookingExpiryAnnouncer announcer,
     IUnitOfWork unitOfWork,
     IClock clock)
     : IRequestHandler<CreateBookingCommand, Result<BookingDto, Error>>
@@ -240,30 +241,15 @@ public sealed class CreateBookingHandler(
         foreach (var booking in stale)
         {
             // No actor. The clock ended these, not the customer who happened to arrive next, and the
-            // status history should not name them as though they had.
-            var wasApproved = booking.Status == BookingStatus.Approved;
-            var expired = wasApproved
-                ? booking.ExpireUnpaid(now)
-                : booking.ExpireUnanswered(now);
-
-            if (expired.IsFailure)
-            {
-                throw new DomainException(
-                    $"A stale hold the repository selected could not be expired ({expired.Error.Code}). " +
-                    "ListStaleHoldsForVehicleAsync and the aggregate's expiry guards have drifted apart.");
-            }
+            // status history should not name them as though they had. The one lapse rule, as every load applies it.
+            var lapse = BookingLapse.Settle(booking, now)
+                ?? throw new DomainException(
+                    $"A stale hold the repository selected could not be expired (booking {booking.Id.Value}). "
+                    + "ListStaleHoldsForVehicleAsync and the aggregate's expiry guards have drifted apart.");
 
             // The holds are on this car, so the office is this request's. Never the customer whose
-            // request this is: the bookings ended are other people's.
-            await team.NotifyCustomerAsync(
-                booking.CustomerId,
-                dealer.BusinessName.Value,
-                NotificationKind.YourBookingExpired,
-                now,
-                booking.Id,
-                booking.Reference.Value);
-            if (wasApproved)
-                await team.NotifyTeamFromPlatformAsync(dealer, NotificationKind.BookingExpiredUnpaid, now, booking.Id, booking.Reference.Value);
+            // request this is: the bookings ended are other people's. Announced as every expiry is (Wave 4, 234).
+            await announcer.AnnounceAsync(booking, lapse, now, cancellationToken, dealer);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

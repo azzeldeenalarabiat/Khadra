@@ -370,4 +370,224 @@ public sealed class PaymentPersistenceTests : IDisposable
         Assert.Equal(Money.Jod(18m), refund.Amount);
         Assert.Same(RefundReason.FreeCancellation, refund.Reason);
     }
+
+    // ------------------------------------------------------------------ capture references and incidents (Wave 4, B1)
+
+    private static Payment Applied(string reference, string? captureReference, string provider = "TestProvider")
+    {
+        var payment = Payment.Open(Id.New(), Id.New(), Money.Jod(18m), provider, Now.AddMinutes(30), Now);
+        payment.AttachProviderSession(reference, $"https://provider.test/{reference}");
+        Assert.True(payment.Apply(Money.Jod(18m), Now, Now, captureReference).IsSuccess);
+        return payment;
+    }
+
+    private async Task<(Payment Payment, ProviderEventReceipt Receipt)> StoredWithReceiptAsync(string eventId = "evt_2")
+    {
+        var payment = Applied("sess_1", "cap_1");
+        var receipt = ProviderEventReceipt.Record(
+            "TestProvider", eventId, "sess_1", "Captured", payment.Id, ProviderEventOutcome.SecondCapture, Money.Jod(20m), Now, "cap_2");
+        await using var context = NewContext();
+        context.Payments.Add(payment);
+        context.ProviderEventReceipts.Add(receipt);
+        await context.SaveChangesAsync();
+        return (payment, receipt);
+    }
+
+    /// <summary>The capture's own id persists on the payment and on the receipt, and finds the payment within its provider only.</summary>
+    [Fact]
+    public async Task A_capture_reference_round_trips_and_finds_its_payment_within_its_provider()
+    {
+        var payment = Applied("sess_1", "cap_1");
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(payment);
+            context.ProviderEventReceipts.Add(ProviderEventReceipt.Record(
+                "TestProvider", "evt_1", "sess_1", "Captured", payment.Id, ProviderEventOutcome.Acted, Money.Jod(18m), Now, " cap_1 "));
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var repository = new PaymentRepository(reader);
+        var found = await repository.GetByCaptureReferenceAsync("TestProvider", "cap_1");
+        Assert.Equal(payment.Id, found?.Id);
+        Assert.Equal("cap_1", found!.ProviderCaptureReference);
+        Assert.Null(await repository.GetByCaptureReferenceAsync("OtherProvider", "cap_1"));
+        Assert.Null(await repository.GetByCaptureReferenceAsync("TestProvider", "cap_2"));
+        Assert.Equal("cap_1", (await reader.ProviderEventReceipts.SingleAsync()).CaptureReference);
+    }
+
+    /// <summary>
+    /// One capture on one attempt, refused by the DATABASE: the webhook's read can lose a race, and this index is what
+    /// the losing save meets. Within a provider only, and payments that never named a capture never collide.
+    /// </summary>
+    [Fact]
+    public async Task The_database_refuses_one_capture_on_two_attempts()
+    {
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(Applied("sess_1", "cap_1"));
+            context.Payments.Add(Applied("sess_2", "cap_1", provider: "OtherProvider"));
+            context.Payments.Add(Applied("sess_3", captureReference: null));
+            context.Payments.Add(Applied("sess_4", captureReference: null));
+            await context.SaveChangesAsync();
+        }
+
+        await using var racer = NewContext();
+        racer.Payments.Add(Applied("sess_5", "cap_1"));
+        await Assert.ThrowsAnyAsync<DbUpdateException>(() => racer.SaveChangesAsync());
+    }
+
+    /// <summary>Every field of an incident, open and then handled, because a column that does not persist is a fact lost.</summary>
+    [Fact]
+    public async Task An_incident_round_trips_with_every_field_open_and_handled()
+    {
+        var (payment, receipt) = await StoredWithReceiptAsync();
+        var other = Id.New();
+        var incident = PaymentIncident.Raise(
+            PaymentIncidentKind.CaptureOnAnotherAttempt, payment.Id, receipt.Id, "TestProvider", "cap_2",
+            Money.Jod(20m), Money.Jod(18m), other, Now.AddMinutes(1));
+        await using (var context = NewContext())
+        {
+            new PaymentIncidentRepository(context).Add(incident);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var reader = NewContext())
+        {
+            var open = await new PaymentIncidentRepository(reader).GetByIdAsync(incident.Id);
+            Assert.NotNull(open);
+            Assert.Same(PaymentIncidentKind.CaptureOnAnotherAttempt, open.Kind);
+            Assert.Equal(payment.Id, open.PaymentId);
+            Assert.Equal(receipt.Id, open.ReceiptId);
+            Assert.Equal("TestProvider", open.Provider);
+            Assert.Equal("cap_2", open.CaptureReference);
+            Assert.Equal(Money.Jod(20m), open.Reported);
+            Assert.Equal(Money.Jod(18m), open.Expected);
+            Assert.Equal(other, open.OtherPaymentId);
+            Assert.Equal(Now.AddMinutes(1), open.DetectedAt);
+            Assert.False(open.IsHandled);
+            Assert.Null(open.HandledByAdminId);
+            Assert.Null(open.HandledNote);
+
+            var admin = Id.New();
+            Assert.True(open.MarkHandled(admin, "Refunded at the provider.", Now.AddHours(1)).IsSuccess);
+            await reader.SaveChangesAsync();
+        }
+
+        await using var again = NewContext();
+        var handled = await new PaymentIncidentRepository(again).GetByIdAsync(incident.Id);
+        Assert.True(handled!.IsHandled);
+        Assert.Equal(Now.AddHours(1), handled.HandledAt);
+        Assert.NotNull(handled.HandledByAdminId);
+        Assert.Equal("Refunded at the provider.", handled.HandledNote);
+        Assert.Equal(Money.Jod(20m), handled.Reported);
+    }
+
+    /// <summary>One notice raises one incident at most: the receipt is unique on the incident table.</summary>
+    [Fact]
+    public async Task The_database_refuses_a_second_incident_for_one_notice()
+    {
+        var (payment, receipt) = await StoredWithReceiptAsync();
+        await using (var context = NewContext())
+        {
+            context.PaymentIncidents.Add(PaymentIncident.Raise(
+                PaymentIncidentKind.SecondCapture, payment.Id, receipt.Id, "TestProvider", "cap_2",
+                Money.Jod(20m), Money.Jod(18m), null, Now));
+            await context.SaveChangesAsync();
+        }
+
+        await using var second = NewContext();
+        second.PaymentIncidents.Add(PaymentIncident.Raise(
+            PaymentIncidentKind.SecondCapture, payment.Id, receipt.Id, "TestProvider", "cap_2",
+            Money.Jod(20m), Money.Jod(18m), null, Now));
+        await Assert.ThrowsAnyAsync<DbUpdateException>(() => second.SaveChangesAsync());
+    }
+
+    /// <summary>
+    /// The production order: the payment is LOADED and tracked, and the incident is raised from its captured amount.
+    /// The incident must own its own money, not the payment's tracked instance — or one of them saves null.
+    /// </summary>
+    [Fact]
+    public async Task An_incident_raised_from_a_loaded_payments_money_saves_both_whole()
+    {
+        var (payment, receipt) = await StoredWithReceiptAsync();
+
+        await using (var context = NewContext())
+        {
+            var loaded = await new PaymentRepository(context).GetByIdAsync(payment.Id);
+            var taken = loaded!.AmountCaptured!;
+            context.PaymentIncidents.Add(PaymentIncident.Raise(
+                PaymentIncidentKind.SecondCapture, loaded.Id, receipt.Id, "TestProvider", "cap_2",
+                taken, taken, null, Now));
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        Assert.Equal(Money.Jod(18m), (await new PaymentRepository(reader).GetByIdAsync(payment.Id))!.AmountCaptured);
+        var stored = await reader.PaymentIncidents.SingleAsync();
+        Assert.Equal(Money.Jod(18m), stored.Reported);
+        Assert.Equal(Money.Jod(18m), stored.Expected);
+    }
+
+    // ------------------------------------------------------------------ a refused refund waits (Wave 4, B4)
+
+    private static Payment WithOwedRefund(string reference, DateTimeOffset createdAt)
+    {
+        var payment = Payment.Open(Id.New(), Id.New(), Money.Jod(18m), "TestProvider", createdAt.AddMinutes(30), createdAt);
+        payment.AttachProviderSession(reference, $"https://provider.test/{reference}");
+        Assert.True(payment.Orphan(Money.Jod(18m), createdAt, "BookingExpired", createdAt).IsSuccess);
+        return payment;
+    }
+
+    [Fact]
+    public async Task A_refunds_refusals_and_its_next_attempt_round_trip()
+    {
+        var payment = WithOwedRefund("sess_1", Now);
+        var refund = Assert.Single(payment.Refunds);
+        refund.RecordRefusedSend("card_closed", Now, TestPayments.RetryPolicy);
+        refund.RecordRefusedSend("card_closed", Now.AddMinutes(1), TestPayments.RetryPolicy);
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(payment);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = Assert.Single((await new PaymentRepository(reader).GetByIdAsync(payment.Id))!.Refunds);
+        Assert.Equal(2, stored.RefusalCount);
+        Assert.Equal(Now.AddMinutes(3), stored.NextAttemptAt);
+        Assert.Equal(Now.AddMinutes(1), stored.FailedAt);
+        Assert.Equal("card_closed", stored.FailureCode);
+    }
+
+    /// <summary>
+    /// The sweep's list: a payment whose refund is owed and due, by its own schedule — never one still waiting, sent,
+    /// settled, or with no provider reference to send against. Oldest payment first.
+    /// </summary>
+    [Fact]
+    public async Task The_sweep_lists_only_payments_with_a_refund_due_now()
+    {
+        var requested = WithOwedRefund("sess_requested", Now.AddMinutes(-10));
+        var waiting = WithOwedRefund("sess_waiting", Now.AddMinutes(-9));
+        waiting.Refunds.Single().RecordRefusedSend("card_closed", Now, TestPayments.RetryPolicy);
+        var waited = WithOwedRefund("sess_waited", Now.AddMinutes(-8));
+        waited.Refunds.Single().RecordRefusedSend("card_closed", Now.AddMinutes(-1), TestPayments.RetryPolicy);
+        var sent = WithOwedRefund("sess_sent", Now.AddMinutes(-7));
+        sent.Refunds.Single().MarkSent("rf_sent", Now);
+        var settled = WithOwedRefund("sess_settled", Now.AddMinutes(-6));
+        settled.Refunds.Single().MarkSettled(Now);
+        await using (var context = NewContext())
+        {
+            context.Payments.AddRange(waited, sent, settled, waiting, requested);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var due = await new PaymentRepository(reader).ListIdsWithRefundsDueAsync(Now);
+
+        Assert.Equal([requested.Id, waited.Id], due);
+        // The one still waiting becomes due the moment its wait is over, and not before.
+        Assert.DoesNotContain(waiting.Id, await new PaymentRepository(reader).ListIdsWithRefundsDueAsync(Now.AddSeconds(59)));
+        Assert.Contains(waiting.Id, await new PaymentRepository(reader).ListIdsWithRefundsDueAsync(Now.AddMinutes(1)));
+    }
 }

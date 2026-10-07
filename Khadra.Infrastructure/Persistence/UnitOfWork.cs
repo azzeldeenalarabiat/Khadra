@@ -125,4 +125,23 @@ internal sealed class UnitOfWork(KhadraDbContext context, IDomainEventDispatcher
             await dispatcher.DispatchAsync(released, token);
         }, cancellationToken);
     }
+
+    /// <remarks>
+    /// <para>
+    /// For a handler that lost a race at the database and must still record what it saw (Wave 4, B1). After a
+    /// refused save EF keeps every mutation in its tracker — the payment that read Applied, the booking that read
+    /// Confirmed — and a second save would write them again. Clearing the tracker forgets all of it, and the domain
+    /// events those aggregates had already handed over went with the refused save (they are read and cleared
+    /// before it runs), so nothing announces work that never committed.
+    /// </para>
+    /// <para>
+    /// Not for use inside <see cref="ExecuteInTransactionAsync"/>: a transaction that refused a write is already
+    /// rolling back, and its caller decides what follows.
+    /// </para>
+    /// </remarks>
+    public void DiscardChanges()
+    {
+        _held.Clear();
+        context.ChangeTracker.Clear();
+    }
 }

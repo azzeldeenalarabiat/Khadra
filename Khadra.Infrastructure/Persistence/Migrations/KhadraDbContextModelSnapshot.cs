@@ -311,6 +311,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("vehicle_id");
 
+                    b.Property<DateTimeOffset?>("_disputeWindowEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dispute_window_ends_at");
+
                     b.Property<decimal>("_onlinePaid")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(18, 3)
@@ -343,6 +347,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_bookings_status");
+
+                    b.HasIndex("Status", "_disputeWindowEndsAt")
+                        .HasDatabaseName("ix_bookings_status_dispute_window_ends_at")
+                        .HasFilter("dispute_window_ends_at IS NOT NULL");
 
                     b.HasIndex("VehicleId", "HoldStart")
                         .HasDatabaseName("ix_bookings_vehicle_id_hold_start");
@@ -2626,6 +2634,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("provider");
 
+                    b.Property<string>("ProviderCaptureReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("provider_capture_reference");
+
                     b.Property<string>("ProviderReference")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -2674,6 +2687,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_payments_one_live_attempt_per_booking")
                         .HasFilter("status IN ('Initiated', 'Pending')");
 
+                    b.HasIndex("Provider", "ProviderCaptureReference")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_provider_capture_reference")
+                        .HasFilter("provider_capture_reference IS NOT NULL");
+
                     b.HasIndex("Provider", "ProviderReference")
                         .IsUnique()
                         .HasDatabaseName("ix_payments_provider_provider_reference")
@@ -2683,6 +2701,85 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_payments_status_expires_at");
 
                     b.ToTable("payments", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payments.PaymentIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CaptureReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("capture_reference");
+
+                    b.Property<DateTimeOffset>("DetectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("detected_at");
+
+                    b.Property<DateTimeOffset?>("HandledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("handled_at");
+
+                    b.Property<Guid?>("HandledByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("handled_by_admin_id");
+
+                    b.Property<string>("HandledNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("handled_note");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("OtherPaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("other_payment_id");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("receipt_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_incidents");
+
+                    b.HasIndex("DetectedAt")
+                        .HasDatabaseName("ix_payment_incidents_detected_at")
+                        .HasFilter("handled_at IS NULL");
+
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("ix_payment_incidents_payment_id");
+
+                    b.HasIndex("ReceiptId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_incidents_receipt_id");
+
+                    b.ToTable("payment_incidents", (string)null);
                 });
 
             modelBuilder.Entity("Khadra.Domain.Payments.ProviderEventReceipt", b =>
@@ -2695,6 +2792,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)")
                         .HasColumnName("amount");
+
+                    b.Property<string>("CaptureReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("capture_reference");
 
                     b.Property<string>("CurrencyCode")
                         .HasMaxLength(3)
@@ -2774,6 +2876,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("failure_code");
 
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
                     b.Property<Guid>("PaymentId")
                         .HasColumnType("uuid")
                         .HasColumnName("payment_id");
@@ -2788,6 +2894,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("reason");
+
+                    b.Property<int>("RefusalCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("refusal_count");
 
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
@@ -2820,6 +2930,12 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 3)
                         .HasColumnType("numeric(18,3)")
                         .HasColumnName("fee_part");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id")
                         .HasName("pk_payment_refunds");
@@ -4565,6 +4681,81 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("AmountCaptured");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payments.PaymentIncident", b =>
+                {
+                    b.HasOne("Khadra.Domain.Payments.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_incidents_payments_payment_id");
+
+                    b.HasOne("Khadra.Domain.Payments.ProviderEventReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_incidents_payment_provider_events_receipt_id");
+
+                    b.OwnsOne("Khadra.Domain.Common.Money", "Expected", b1 =>
+                        {
+                            b1.Property<Guid>("PaymentIncidentId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 3)
+                                .HasColumnType("numeric(18,3)")
+                                .HasColumnName("expected_amount");
+
+                            b1.Property<string>("CurrencyCode")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("expected_currency");
+
+                            b1.HasKey("PaymentIncidentId");
+
+                            b1.ToTable("payment_incidents");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PaymentIncidentId")
+                                .HasConstraintName("fk_payment_incidents_payment_incidents_id");
+                        });
+
+                    b.OwnsOne("Khadra.Domain.Common.Money", "Reported", b1 =>
+                        {
+                            b1.Property<Guid>("PaymentIncidentId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 3)
+                                .HasColumnType("numeric(18,3)")
+                                .HasColumnName("reported_amount");
+
+                            b1.Property<string>("CurrencyCode")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("reported_currency");
+
+                            b1.HasKey("PaymentIncidentId");
+
+                            b1.ToTable("payment_incidents");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PaymentIncidentId")
+                                .HasConstraintName("fk_payment_incidents_payment_incidents_id");
+                        });
+
+                    b.Navigation("Expected")
+                        .IsRequired();
+
+                    b.Navigation("Reported")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Khadra.Domain.Payments.Refund", b =>

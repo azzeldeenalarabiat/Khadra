@@ -208,6 +208,7 @@ internal static class PayableScope
     public static string Of(string? scope) =>
         string.Equals(scope, PayableListScopes.Settled, StringComparison.OrdinalIgnoreCase) ? PayableListScopes.Settled
         : string.Equals(scope, PayableListScopes.All, StringComparison.OrdinalIgnoreCase) ? PayableListScopes.All
+        : string.Equals(scope, PayableListScopes.NothingDue, StringComparison.OrdinalIgnoreCase) ? PayableListScopes.NothingDue
         : PayableListScopes.Open;
 }
 

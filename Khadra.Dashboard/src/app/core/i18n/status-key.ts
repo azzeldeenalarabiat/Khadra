@@ -57,8 +57,10 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
  * - The office payables ledger (payments Phase 8): how a paid booking ended for its office, where its payable
  *   stands, the kinds of line it is made of, which way a settlement's money went, why a payable is held back, and
  *   why an open one is not due.
+ * - Capture incidents (Wave 4, B1): what a capture notice the platform could not account for is.
  */
 export type EnumFamily =
+  | 'paymentIncidentKind'
   | 'payableOutcome'
   | 'payableState'
   | 'payableLineKind'

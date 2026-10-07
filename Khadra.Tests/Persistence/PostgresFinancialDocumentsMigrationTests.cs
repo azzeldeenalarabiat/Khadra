@@ -269,25 +269,52 @@ WHERE NOT tgisinternal AND tgrelid IN ('financial_documents'::regclass, 'financi
     }
 
     /// <summary>
-    /// Writes payments with their refunds as a database at the PREVIOUS migration holds them: the payment
-    /// through EF (its table does not change), each refund by hand with the columns it had then — no split.
+    /// Writes payments with their refunds as a database at the PREVIOUS migration holds them, both by hand with the
+    /// columns each table had then: a refund with no split, and a payment with no capture reference.
     /// </summary>
+    /// <remarks>
+    /// The payment went through EF until Wave 4, on the ground that its table "does not change". It did: B1 gave
+    /// <c>payments</c> its capture reference, and today's model writes a column this schema has never heard of.
+    /// </remarks>
     private static async Task InsertAsLegacyRowsAsync(Scratch database, IReadOnlyList<Payment> payments)
     {
-        // Captured FIRST: detaching a refund makes EF take it out of its payment's collection too, so the
-        // payment's own list can be neither enumerated while detaching nor read afterwards.
         var refunds = payments.SelectMany(payment => payment.Refunds).ToList();
 
-        await using (var context = new KhadraDbContext(database.Options))
+        await using var connection = await OpenAsync(database);
+        foreach (var payment in payments)
         {
-            context.Payments.AddRange(payments);
-            foreach (var refund in refunds)
-                context.Entry(refund).State = EntityState.Detached;
-
-            await context.SaveChangesAsync();
+            await using var insert = new NpgsqlCommand(@"
+INSERT INTO payments (id, booking_id, customer_id, amount, currency, purpose, processing_fee, fee_refundable, status,
+                      provider, provider_reference, checkout_url, expires_at, created_at, captured_at, amount_captured,
+                      captured_currency, applied_at, orphaned_at, orphan_reason, failed_at, failure_code)
+VALUES (@id, @booking, @customer, @amount, @currency, @purpose, @fee, @refundable, @status, @provider, @reference,
+        @checkout, @expires, @created, @captured, @capturedAmount, @capturedCurrency, @applied, @orphaned,
+        @orphanReason, @failed, @failureCode)", connection);
+            insert.Parameters.AddWithValue("id", payment.Id.Value);
+            insert.Parameters.AddWithValue("booking", payment.BookingId.Value);
+            insert.Parameters.AddWithValue("customer", payment.CustomerId.Value);
+            insert.Parameters.AddWithValue("amount", payment.Amount.Amount);
+            insert.Parameters.AddWithValue("currency", payment.Amount.CurrencyCode);
+            insert.Parameters.AddWithValue("purpose", payment.Purpose.Name);
+            insert.Parameters.AddWithValue("fee", payment.ProcessingFee.Amount);
+            insert.Parameters.AddWithValue("refundable", payment.FeeRefundable);
+            insert.Parameters.AddWithValue("status", payment.Status.Name);
+            insert.Parameters.AddWithValue("provider", payment.Provider);
+            insert.Parameters.AddWithValue("reference", (object?)payment.ProviderReference ?? DBNull.Value);
+            insert.Parameters.AddWithValue("checkout", (object?)payment.CheckoutUrl ?? DBNull.Value);
+            insert.Parameters.AddWithValue("expires", payment.ExpiresAt);
+            insert.Parameters.AddWithValue("created", payment.CreatedAt);
+            insert.Parameters.AddWithValue("captured", (object?)payment.CapturedAt ?? DBNull.Value);
+            insert.Parameters.AddWithValue("capturedAmount", (object?)payment.AmountCaptured?.Amount ?? DBNull.Value);
+            insert.Parameters.AddWithValue("capturedCurrency", (object?)payment.AmountCaptured?.CurrencyCode ?? DBNull.Value);
+            insert.Parameters.AddWithValue("applied", (object?)payment.AppliedAt ?? DBNull.Value);
+            insert.Parameters.AddWithValue("orphaned", (object?)payment.OrphanedAt ?? DBNull.Value);
+            insert.Parameters.AddWithValue("orphanReason", (object?)payment.OrphanReason ?? DBNull.Value);
+            insert.Parameters.AddWithValue("failed", (object?)payment.FailedAt ?? DBNull.Value);
+            insert.Parameters.AddWithValue("failureCode", (object?)payment.FailureCode ?? DBNull.Value);
+            await insert.ExecuteNonQueryAsync();
         }
 
-        await using var connection = await OpenAsync(database);
         foreach (var refund in refunds)
         {
             await using var insert = new NpgsqlCommand(@"

@@ -175,6 +175,62 @@ public sealed class SandboxPaymentProviderTests
         Assert.DoesNotContain(refundId.Value.ToString("N"), first.Value.ProviderReference, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// A capture names the capture it reports (Wave 4, B1), and the name crosses the wire intact, trimmed. A capture
+    /// sent without one, or with a blank one, arrives with none: that is the notice the platform can only judge by its
+    /// money.
+    /// </summary>
+    [Fact]
+    public void A_capture_names_its_capture_across_the_round_trip()
+    {
+        var (named, namedSignature) = SandboxEvents.Build(
+            "evt_c", "sbx_abc", "captured", Money.Jod(18m), Secret, captureReference: " sbxcap_0123 ");
+        var (bare, bareSignature) = SandboxEvents.Build("evt_b", "sbx_abc", "captured", Money.Jod(18m), Secret);
+        var (blank, blankSignature) = SandboxEvents.Build(
+            "evt_e", "sbx_abc", "captured", Money.Jod(18m), Secret, captureReference: "   ");
+
+        Assert.Equal("sbxcap_0123", Provider().ParseEvent(named, Headers(namedSignature)).Value.CaptureReference);
+        Assert.Null(Provider().ParseEvent(bare, Headers(bareSignature)).Value.CaptureReference);
+        Assert.Null(Provider().ParseEvent(blank, Headers(blankSignature)).Value.CaptureReference);
+    }
+
+    /// <summary>
+    /// Only a capture names a capture. The same field on any other kind is dropped, so a failure or a refund can never
+    /// be judged as though it were money taken.
+    /// </summary>
+    [Theory]
+    [InlineData("failed")]
+    [InlineData("refund_settled")]
+    [InlineData("refund_failed")]
+    [InlineData("something_else")]
+    public void No_other_kind_carries_a_capture_reference(string kind)
+    {
+        var (body, signature) = SandboxEvents.Build(
+            "evt_k", "sbx_abc", kind, Money.Jod(18m), Secret, captureReference: "sbxcap_0123");
+
+        var parsed = Provider().ParseEvent(body, Headers(signature));
+
+        Assert.True(parsed.IsSuccess);
+        Assert.Null(parsed.Value.CaptureReference);
+    }
+
+    /// <summary>
+    /// The sandbox's id for a session's capture is stable, as a real provider's id for one charge is, so pressing Pay
+    /// twice on one page says the same capture again. Distinct per session, and keyed by the secret, so it cannot be
+    /// worked out from the session reference.
+    /// </summary>
+    [Fact]
+    public void A_sessions_capture_reference_is_stable_distinct_and_keyed()
+    {
+        var first = SandboxEvents.CaptureReferenceFor("sbx_abc", Secret);
+
+        Assert.StartsWith("sbxcap_", first, StringComparison.Ordinal);
+        Assert.Equal("sbxcap_".Length + 24, first.Length);
+        Assert.Equal(first, SandboxEvents.CaptureReferenceFor("sbx_abc", Secret));
+        Assert.NotEqual(first, SandboxEvents.CaptureReferenceFor("sbx_abd", Secret));
+        Assert.NotEqual(first, SandboxEvents.CaptureReferenceFor("sbx_abc", "a-different-secret-that-is-long-enough"));
+    }
+
     // ------------------------------------------------------------------ the signature
 
     /// <summary>One changed byte and the body is refused. The endpoint is anonymous; this is the lock.</summary>

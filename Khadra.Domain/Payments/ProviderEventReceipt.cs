@@ -31,6 +31,30 @@ public sealed class ProviderEventOutcome : Enumeration
     /// </summary>
     public static readonly ProviderEventOutcome Unmatched = new(5, "Unmatched");
 
+    // The five below are a capture notice for a payment that has ALREADY taken its money (Wave 4, B1; E2E F30). A
+    // provider sends several events per charge, under new event ids, so the replay index cannot catch them. Before
+    // these existed, each such notice was refused as `already_captured`, failed to orphan, and was logged as money
+    // "UNACCOUNTED FOR" on a row whose money was right. Each name fits the column's twenty characters.
+
+    /// <summary>The same capture, said again: the same capture reference and the same amount. Nothing changed.</summary>
+    public static readonly ProviderEventOutcome Duplicate = new(6, "Duplicate");
+
+    /// <summary>
+    /// A capture notice with no capture reference to compare, for the same amount and currency this payment took.
+    /// Taken as the same capture said again, and logged as a warning: without a reference, a genuine second charge
+    /// of the same amount reads exactly the same (which is why a real adapter must send one, pre-launch item 76).
+    /// </summary>
+    public static readonly ProviderEventOutcome AssumedDuplicate = new(7, "AssumedDuplicate");
+
+    /// <summary>The same capture reference with a different amount: the provider contradicts itself. An incident.</summary>
+    public static readonly ProviderEventOutcome AmountMismatch = new(8, "AmountMismatch");
+
+    /// <summary>A different capture on a payment that already took its money: the card was charged twice. An incident.</summary>
+    public static readonly ProviderEventOutcome SecondCapture = new(9, "SecondCapture");
+
+    /// <summary>A capture whose reference another attempt already applied or orphaned. An incident.</summary>
+    public static readonly ProviderEventOutcome OtherAttempt = new(10, "OtherAttempt");
+
     private ProviderEventOutcome(int id, string name) : base(id, name)
     {
     }
@@ -77,6 +101,12 @@ public sealed class ProviderEventReceipt : AggregateRoot
 
     public string? CurrencyCode { get; private set; }
 
+    /// <summary>
+    /// The provider's id for the CAPTURE a capture event reports, when it sent one (Wave 4, B1). Kept so an
+    /// investigation can see which capture each notice was about. Null on every other kind.
+    /// </summary>
+    public string? CaptureReference { get; private set; }
+
     public DateTimeOffset ReceivedAt { get; private set; }
 
     private ProviderEventReceipt()
@@ -95,7 +125,8 @@ public sealed class ProviderEventReceipt : AggregateRoot
         Id? paymentId,
         ProviderEventOutcome outcome,
         Money? amount,
-        DateTimeOffset receivedAt)
+        DateTimeOffset receivedAt,
+        string? captureReference = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
         ArgumentException.ThrowIfNullOrWhiteSpace(providerEventId);
@@ -112,6 +143,7 @@ public sealed class ProviderEventReceipt : AggregateRoot
             Outcome = outcome,
             Amount = amount?.Amount,
             CurrencyCode = amount?.CurrencyCode,
+            CaptureReference = string.IsNullOrWhiteSpace(captureReference) ? null : captureReference.Trim(),
             ReceivedAt = receivedAt
         };
     }

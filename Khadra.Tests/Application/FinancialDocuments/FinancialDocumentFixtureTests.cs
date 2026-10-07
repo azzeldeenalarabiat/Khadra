@@ -112,8 +112,51 @@ public sealed partial class FinancialDocumentFixtureTests
         Assert.Contains(pages, page => page.GetProperty("voided").ValueKind == JsonValueKind.Object);
         Assert.Contains(pages, page => page.GetProperty("links").GetProperty("paymentReceipt").ValueKind == JsonValueKind.Object);
         Assert.Contains(pages, page => page.GetProperty("links").GetProperty("refundReceipts").GetArrayLength() > 0);
-        foreach (var cause in new[] { "PaymentCaptured", "RefundSettled", "DisputeResolved", "CashRecorded", "Correction", "ReceiptCorrected" })
+        foreach (var cause in new[] { "PaymentCaptured", "RefundSettled", "DisputeResolved", "CashRecorded", "Correction", "ReceiptCorrected", "BookingEnded" })
             Assert.Contains(pages, page => page.GetProperty("cause").GetString() == cause);
+    }
+
+    /// <summary>
+    /// The wording branches pre-launch item 183 asked for, so a change to their words shows as a fixture diff in
+    /// review — and F57's: a payment receipt states the status its payment left the booking in (Wave 4, B6).
+    /// </summary>
+    /// <remarks>
+    /// A penalty stated as a range is not among them, deliberately: a statement states a penalty only when it is
+    /// against the customer, and every penalty the domain assesses against a customer is a fixed amount — a range is
+    /// only ever the office's. The composer's range branch cannot be reached by a real booking, so no page here
+    /// pretends one can.
+    /// </remarks>
+    [Fact]
+    public void The_shared_fixture_carries_every_reachable_wording_branch()
+    {
+        using var fixture = JsonDocument.Parse(Generate());
+        var pages = fixture.RootElement.GetProperty("documents").EnumerateArray()
+            .ToDictionary(entry => entry.GetProperty("name").GetString()!, entry => entry.GetProperty("page"));
+        static IEnumerable<JsonElement> Lines(JsonElement page) =>
+            page.GetProperty("snapshot").GetProperty("content").GetProperty("sections").EnumerateArray()
+                .SelectMany(section => section.GetProperty("lines").EnumerateArray());
+        static string? Key(JsonElement line) => line.GetProperty("key").GetString();
+
+        var ended = pages["booking-statement-booking-ended"];
+        Assert.Equal("BookingEnded", ended.GetProperty("cause").GetString());
+        Assert.Contains(Lines(ended), line => Key(line) == "deliveryFee");
+
+        var stray = pages["booking-statement-nothing-due-yet"];
+        Assert.Contains(Lines(stray), line => Key(line) == "state" && line.GetProperty("text").GetProperty("en").GetString() == "Nothing is due on this booking yet.");
+        Assert.Contains(Lines(stray), line => Key(line) == "status" && line.GetProperty("text").GetProperty("en").GetString() == "Delayed — still owed, and being retried");
+
+        // F57: the correction composed after the cancellation states the status after its payment, under that label.
+        var corrected = pages["payment-receipt-correction-after-cancellation"];
+        var status = Assert.Single(Lines(corrected), line => Key(line) == "statusAfterPayment");
+        Assert.Equal("Booking status after this payment", status.GetProperty("label").GetProperty("en").GetString());
+        Assert.Equal("حالة الحجز بعد هذه الدفعة", status.GetProperty("label").GetProperty("ar").GetString());
+        Assert.Equal("Confirmed", status.GetProperty("text").GetProperty("en").GetString());
+        var booking = corrected.GetProperty("snapshot").GetProperty("booking");
+        Assert.Equal("Cancelled", booking.GetProperty("statusAtIssue").GetString());
+        Assert.Equal("Confirmed", booking.GetProperty("statusAfterPayment").GetString());
+        // A statement keeps the status at issue, and only a payment receipt carries the status after its payment.
+        Assert.DoesNotContain(Lines(ended), line => Key(line) == "statusAfterPayment");
+        Assert.False(ended.GetProperty("snapshot").GetProperty("booking").TryGetProperty("statusAfterPayment", out _));
     }
 
     // ── The documents ──────────────────────────────────────────────────────────────────────────────
@@ -254,6 +297,44 @@ public sealed partial class FinancialDocumentFixtureTests
                 stamp, restatedDeposit.Provider),
             previous: statedFirst);
 
+        // F — a deposit for a car delivered to the customer (a delivery fee), cancelled by the customer after the free
+        // window. Its statement is the cancellation's version (BookingEnded), and its receipt is voided and corrected
+        // AFTER the cancellation: the correction states the status the payment left the booking in — Confirmed — not
+        // the Cancelled it reads now (Wave 4, B6; E2E F57). Pre-launch item 183's BookingEnded and delivery-fee branches.
+        var deliveredAt = start.AddDays(9);
+        var (deliveredBooking, deliveredDeposit) = Build.PaidBooking(now: deliveredAt, customerId: customer, pickupMethod: PickupMethod.Delivery);
+        var deliveredParties = PartiesOf(deliveredBooking);
+        var deliveredReceipt = Issue(issued, "TEST-PAY-2026-000008", deliveredAt.AddMinutes(1), stamp => Composer.PaymentReceipt(
+            new PaymentReceiptFacts(Issuer, deliveredParties, deliveredBooking, deliveredDeposit, [deliveredDeposit]), stamp));
+        var deliveredCancelledAt = deliveredBooking.FreeCancellationDeadline!.Value.AddMinutes(1);
+        Must(deliveredBooking.Cancel(BookingParty.Customer, deliveredBooking.CustomerId, null, deliveredCancelledAt).IsSuccess, "the late cancellation of the delivered booking");
+        var endedStatement = Issue(issued, "TEST-STM-2026-000007", deliveredCancelledAt.AddMinutes(1), stamp => Composer.Statement(
+            new StatementFacts(
+                Issuer, deliveredParties, deliveredBooking,
+                BookingFinancialsCalculator.Calculate(deliveredBooking, [deliveredDeposit], [], false, stamp.IssuedAt),
+                StatementCheckpoints.Of(deliveredBooking, [deliveredDeposit], [], [deliveredReceipt.Row]), false,
+                [Reference(deliveredReceipt)]),
+            stamp, deliveredDeposit.Provider));
+        var deliveredVoidAt = deliveredCancelledAt.AddHours(1);
+        voids[deliveredReceipt.Id] = new FinancialDocumentVoidRecord(
+            deliveredReceipt.Id, deliveredVoidAt, Id.New(), "Fixture Administrator", "Issued with the wrong delivery address.");
+        var afterCancellation = Issue(
+            issued, "TEST-PAY-2026-000009", deliveredVoidAt,
+            stamp => Composer.PaymentReceipt(new PaymentReceiptFacts(Issuer, deliveredParties, deliveredBooking, deliveredDeposit, [deliveredDeposit]), stamp),
+            previous: deliveredReceipt,
+            isCorrection: true);
+
+        // C, stated: the booking still awaits its deposit — nothing is due yet — and the stray capture's refund was
+        // refused once by the provider. Pre-launch item 183's last two branches.
+        Assert.Single(stray.Refunds).RecordRefusedSend("card_closed", strayAt.AddMinutes(10), TestPayments.RetryPolicy);
+        var strayStatement = Issue(issued, "TEST-STM-2026-000006", strayAt.AddMinutes(11), stamp => Composer.Statement(
+            new StatementFacts(
+                Issuer, PartiesOf(strayBooking), strayBooking,
+                BookingFinancialsCalculator.Calculate(strayBooking, [stray], [], false, stamp.IssuedAt),
+                StatementCheckpoints.Of(strayBooking, [stray], [], [strayReceipt.Row]), false,
+                [Reference(strayReceipt)]),
+            stamp, stray.Provider));
+
         // The records, with their standing worked out as the reader works it out.
         var records = issued.ToDictionary(document => document.Id, document => document.Record(
             voided: voids.ContainsKey(document.Id),
@@ -316,6 +397,9 @@ public sealed partial class FinancialDocumentFixtureTests
                 new { name = "refund-receipt-dispute-decision", page = Page(shareReceipt) },
                 new { name = "booking-statement-dispute-decided", page = Page(decidedStatement) },
                 new { name = "booking-statement-receipt-corrected", page = Page(restated) },
+                new { name = "booking-statement-booking-ended", page = Page(endedStatement) },
+                new { name = "payment-receipt-correction-after-cancellation", page = Page(afterCancellation) },
+                new { name = "booking-statement-nothing-due-yet", page = Page(strayStatement) },
             },
             myDocuments = new PagedResult<FinancialDocumentListItem>(rows, 1, 20, rows.Count),
             bookingDocuments = new BookingFinancialDocumentsDto(

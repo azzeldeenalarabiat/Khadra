@@ -81,6 +81,12 @@ public sealed record CheckoutSession(string ProviderReference, string CheckoutUr
 /// 3), and this is how the event says which one it settles or refuses. Null on every other kind, and
 /// on a provider that cannot name refunds, which is then matched only when it cannot be ambiguous.
 /// </param>
+/// <param name="CaptureReference">
+/// For a capture event, the provider's own id for the CAPTURE — stable across every notice it sends about that one
+/// charge (Wave 4, B1; E2E F30). It is how a second notice of the same capture is told from a second charge. Null
+/// on every other kind and on a provider that sends none, which a real adapter must not be (pre-launch item 76):
+/// without it, a second charge of the same amount can only be ASSUMED to be a duplicate.
+/// </param>
 public sealed record ProviderEvent(
     string ProviderEventId,
     string ProviderReference,
@@ -88,7 +94,8 @@ public sealed record ProviderEvent(
     Money? Amount,
     string? FailureCode,
     DateTimeOffset OccurredAt,
-    string? RefundReference = null);
+    string? RefundReference = null,
+    string? CaptureReference = null);
 
 public sealed record ProviderPaymentState(ProviderEventKind Kind, Money? Amount, string? FailureCode);
 
@@ -170,6 +177,13 @@ public interface IPaymentProvider
         string providerReference,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Sends one refund, under the refund's own id as the idempotency key.</summary>
+    /// <remarks>
+    /// Two failures, told apart by the error (Wave 4, the advisor's review of B4): <see cref="Khadra.Domain.Payments.PaymentErrors.ProviderUnavailable"/>
+    /// when the provider could not be ASKED — unreachable, timed out, not configured — which refuses nothing and is not
+    /// counted against the refund; anything else is the provider REFUSING this refund, which is counted and waited out.
+    /// An adapter that answers an outage with any other error turns every outage into refusals on the work queue.
+    /// </remarks>
     Task<Result<ProviderRefund, Error>> RefundAsync(
         RefundRequest request,
         CancellationToken cancellationToken = default);

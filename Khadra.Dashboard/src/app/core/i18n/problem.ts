@@ -162,6 +162,7 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'payables.paid_on_in_future': 'problem.payablesPaidOnInFuture',
   'payables.settlement_already_voided': 'problem.settlementAlreadyVoided',
   'payables.already_held': 'problem.payableAlreadyHeld',
+  'payables.nothing_to_hold': 'problem.payableNothingToHold',
   'payables.not_held': 'problem.payableNotHeld',
   'payables.already_settled': 'problem.payableAlreadySettled',
   'payables.void_reason_required': 'problem.reasonRejected',
@@ -169,6 +170,9 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'payables.hold_reason_required': 'problem.reasonRejected',
   'payables.hold_reason_too_long': 'problem.reasonRejected',
   'payables.finance_span_invalid': 'problem.financeSpanInvalid',
+  // Closing a capture incident (Wave 4, B1).
+  'payments.incident_already_handled': 'problem.incidentAlreadyHandled',
+  'payments.incident_not_found': 'problem.incidentNotFound',
   // Proving a handover. `handover.code_invalid` with a count of tries left is worded in `problemMessage`.
   'handover.code_invalid': 'problem.handoverCodeInvalid',
   'handover.code_expired': 'problem.handoverCodeExpired',
@@ -202,6 +206,9 @@ const WORDED_FIELDS: Readonly<Record<string, TranslationKey>> = {
   // Every reason an administrator types is required and has a length the SERVER sets; the sentence
   // names neither figure, so no limit is written into the console.
   reason: 'problem.reasonRejected',
+  // A note an administrator types — the account of a capture incident (Wave 4, B1), a clarification request — the
+  // same way.
+  note: 'problem.noteRejected',
 };
 
 /** What a bare status means, when nothing more specific is available. */

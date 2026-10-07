@@ -224,12 +224,18 @@
                   <td class="td">
                     <div class="row row-gap-8 row-wrap">
                       <span class="pill" [class]="'s-' + row.tone">{{ row.status }}</span>
+                      @if (row.needsAPerson) {
+                        <span class="pill s-bad">{{ t('refunds.needsALook') }}</span>
+                      }
                       @if (row.sandbox) {
                         <span class="pill s-warn">{{ t('payments.test') }}</span>
                       }
                     </div>
                     @if (row.code) {
                       <div class="td-sub mono ltr">{{ t('refunds.providerCode', { code: row.code }) }}</div>
+                    }
+                    @if (row.refusals) {
+                      <div class="td-sub">{{ row.refusals }}</div>
                     }
                   </td>
                   <td class="td">{{ row.date }}</td>

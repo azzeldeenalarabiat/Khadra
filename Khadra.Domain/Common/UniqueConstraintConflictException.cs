@@ -58,4 +58,16 @@ public sealed class UniqueConstraintConflictException : Exception
 
     public bool IsProviderEventReceipt =>
         string.Equals(ConstraintName, ProviderEventReceiptConstraint, StringComparison.Ordinal);
+
+    /// <summary>
+    /// The index that keeps one provider capture on one payment attempt (Wave 4, B1). See <c>PaymentConfiguration</c>.
+    /// </summary>
+    /// <remarks>
+    /// Losing to it means two attempts claimed the same capture at the same moment: the winner took it, and the
+    /// loser is a capture on another attempt — an incident answered 2xx, never a 5xx the provider would retry.
+    /// </remarks>
+    public const string ProviderCaptureReferenceConstraint = "ux_payments_provider_capture_reference";
+
+    public bool IsProviderCaptureReference =>
+        string.Equals(ConstraintName, ProviderCaptureReferenceConstraint, StringComparison.Ordinal);
 }

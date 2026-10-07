@@ -49,7 +49,20 @@ public sealed class Refund : Entity
     public DateTimeOffset RequestedAt { get; private set; }
     public DateTimeOffset? SentAt { get; private set; }
     public DateTimeOffset? SettledAt { get; private set; }
+
+    /// <summary>The LATEST refusal. The customer's app prints <c>settledAt ?? failedAt ?? requestedAt</c>, so this keeps that meaning.</summary>
     public DateTimeOffset? FailedAt { get; private set; }
+
+    /// <summary>
+    /// How many times the provider has refused this refund: once per refused SEND, never once per notice
+    /// (Wave 4, B4; checklist 157). History, so a later send or settlement does not reset it.
+    /// </summary>
+    public int RefusalCount { get; private set; }
+
+    /// <summary>
+    /// When a refused refund may be sent again; null while nothing is scheduled — never refused, or sent since.
+    /// </summary>
+    public DateTimeOffset? NextAttemptAt { get; private set; }
 
     private Refund()
     {
@@ -106,6 +119,7 @@ public sealed class Refund : Entity
         SentAt ??= now;
         FailureCode = null;
         FailedAt = null;
+        NextAttemptAt = null;
     }
 
     /// <summary>The provider says the money is back with the customer.</summary>
@@ -118,20 +132,56 @@ public sealed class Refund : Entity
         SettledAt = now;
         FailureCode = null;
         FailedAt = null;
+        NextAttemptAt = null;
     }
 
     /// <summary>
-    /// The provider refused. This is NOT terminal in the way a settled refund is: money is still
-    /// owed, and the row stays on the admin's list of refunds that need a human.
+    /// The provider refused a send the sweep made just now (Wave 4, B4). Every refused send is counted, including a
+    /// refund that was already refused before it was sent again, and the next send waits by the policy.
     /// </summary>
-    public void MarkFailed(string failureCode, DateTimeOffset now)
+    /// <remarks>
+    /// NOT terminal in the way a settled refund is: money is still owed. From the policy's alert on, the row is put
+    /// in front of an administrator.
+    /// </remarks>
+    public void RecordRefusedSend(string failureCode, DateTimeOffset now, RefundRetryPolicy policy)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(failureCode);
+        ArgumentNullException.ThrowIfNull(policy);
         if (Status == RefundStatus.Settled)
             return;
 
+        Refuse(failureCode, now, policy);
+    }
+
+    /// <summary>
+    /// A provider's notice that a refund it had taken was refused (Wave 4, B4). Counted once per send: a notice
+    /// about a refund that already reads Failed is the same refusal said again — providers repeat their notices
+    /// under new event ids — and changes nothing.
+    /// </summary>
+    public void MarkFailed(string failureCode, DateTimeOffset now, RefundRetryPolicy policy)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(failureCode);
+        ArgumentNullException.ThrowIfNull(policy);
+        if (Status == RefundStatus.Settled || Status == RefundStatus.Failed)
+            return;
+
+        Refuse(failureCode, now, policy);
+    }
+
+    /// <summary>
+    /// Whether the sweep may send this now: owed and not yet with the provider, and either never refused or past
+    /// the wait its last refusal set.
+    /// </summary>
+    public bool IsDueToSend(DateTimeOffset now) =>
+        (Status == RefundStatus.Requested || Status == RefundStatus.Failed)
+        && (NextAttemptAt is null || NextAttemptAt <= now);
+
+    private void Refuse(string failureCode, DateTimeOffset now, RefundRetryPolicy policy)
+    {
+        RefusalCount++;
         Status = RefundStatus.Failed;
         FailureCode = failureCode;
         FailedAt = now;
+        NextAttemptAt = now + policy.DelayAfter(RefusalCount);
     }
 }

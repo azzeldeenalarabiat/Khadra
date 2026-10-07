@@ -1,4 +1,5 @@
 using Khadra.Domain.Common;
+using Khadra.Domain.Payments;
 
 namespace Khadra.Application.Common.Ports;
 
@@ -28,6 +29,12 @@ public interface IPaymentSettings
     /// provider's own notice and closes the row itself.
     /// </summary>
     TimeSpan StaleAttemptGrace { get; }
+
+    /// <summary>
+    /// How long a refused refund waits before it is sent again, and when its refusals need a person (Wave 4, B4;
+    /// checklist 157). Read from <c>Payments:RefundRetry…</c>; it changes when a refund is sent, never how much.
+    /// </summary>
+    RefundRetryPolicy RefundRetry { get; }
 
     /// <summary>
     /// Where the provider sends the customer back to: the booking's page, in <paramref name="language"/>.

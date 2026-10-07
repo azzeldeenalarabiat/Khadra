@@ -34,6 +34,12 @@
       </div>
     </div>
 
+    @if (p.incidentNotice; as incidentNotice) {
+      <div class="banner s-bad" role="alert">
+        <kh-icon name="warning-circle" />
+        <div>{{ incidentNotice }}</div>
+      </div>
+    }
     @if (p.notice; as notice) {
       <div class="banner" [class]="'s-' + notice.tone">
         <kh-icon name="warning-circle" />
@@ -131,6 +137,54 @@
       </section>
     }
 
+    @if (p.incidents; as incidents) {
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="warning-circle" class="kpi-icon" />
+          <span class="sect-t">{{ t('paymentDetail.incidents') }}</span>
+        </div>
+        <div class="kv-body">
+          @for (incident of incidents; track incident.id) {
+            <div class="kv-split">
+              <div class="kv-key">
+                {{ incident.kind }}
+                <div class="td-sub">{{ incident.detected }}</div>
+                @if (incident.captureReference) {
+                  <div class="td-sub">{{ t('paymentDetail.captureReference', { reference: incident.captureReference }) }}</div>
+                }
+                @if (incident.otherPaymentId) {
+                  <a class="td-sub row-link" [routerLink]="['/payments', incident.otherPaymentId]">{{ t('paymentDetail.incidentOtherAttempt') }}</a>
+                }
+              </div>
+              <div class="kv-val">
+                <div class="row row-gap-8 row-wrap row-end">
+                  <span class="pill" [class]="'s-' + incident.tone">{{ incident.status }}</span>
+                </div>
+                @for (figure of incident.figures; track $index) {
+                  <div class="td-sub num">{{ figure }}</div>
+                }
+                @if (incident.handled) {
+                  <div class="td-sub">{{ incident.handled }}</div>
+                }
+                @if (incident.note) {
+                  <div class="td-sub user-text">{{ incident.note }}</div>
+                }
+                @if (incident.open) {
+                  <div class="row row-gap-8 row-wrap row-end">
+                    <button type="button" class="btn btn-secondary btn-sm" (click)="markHandled(incident)">
+                      {{ t('paymentDetail.markHandled') }}
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          } @empty {
+            <div class="state-text">{{ t('paymentDetail.noIncidents') }}</div>
+          }
+        </div>
+      </section>
+    }
+
     <section class="sect">
       <div class="sect-h">
         <kh-icon name="receipt" class="kpi-icon" />
@@ -147,9 +201,14 @@
               }
             </div>
             <div class="kv-val">
-              <span>{{ event.outcome }}</span>
+              <div class="row row-gap-8 row-wrap row-end">
+                <span class="pill" [class]="'s-' + event.tone">{{ event.outcome }}</span>
+              </div>
               @if (event.amount) {
                 <div class="td-sub num">{{ event.amount }}</div>
+              }
+              @if (event.captureReference) {
+                <div class="td-sub">{{ t('paymentDetail.captureReference', { reference: event.captureReference }) }}</div>
               }
               <div class="td-sub mono ltr">{{ event.id }}</div>
             </div>

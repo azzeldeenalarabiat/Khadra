@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Dtos;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.Payments.AdminPayments;
@@ -40,7 +41,7 @@ public sealed class AdminPaymentQueryTests
             .Returns(Task.FromResult<IReadOnlyList<FinancialDocumentRecord>>([]));
     }
 
-    private AdminPaymentQueryHandlers Handlers() => new(_reader, _payments, _documents, _calendar);
+    private AdminPaymentQueryHandlers Handlers() => new(_reader, _payments, _documents, _calendar, TestPayments.Settings());
 
     [Fact]
     public void Unknown_filter_words_and_a_backwards_range_are_refused()
@@ -92,6 +93,27 @@ public sealed class AdminPaymentQueryTests
             Arg.Is<AdminRefundFilter>(filter => filter.Status == null && filter.Reason == null),
             Arg.Any<PageRequest>(),
             Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Whether a person must look at a refused refund is the server's judgement, by the setting in force (Wave 4,
+    /// B4): the console holds no threshold of its own.
+    /// </summary>
+    [Fact]
+    public async Task The_queue_says_which_refunds_were_refused_often_enough_to_need_a_person()
+    {
+        AdminRefundListItem Row(int refusals) => new(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "KH-AAA11111", null, null, Guid.NewGuid(), null,
+            "OrphanedCapture", "Failed", new MoneyDto(18m, "JOD"), null, Now, null, null, Now, "card_closed", null, true,
+            refusals, Now.AddMinutes(4));
+        _reader.ListRefundsAsync(Arg.Any<AdminRefundFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new PagedResult<AdminRefundListItem>([Row(2), Row(3), Row(7)], 1, 20, 3));
+
+        var page = (await Handlers().Handle(new ListAdminRefundsQuery(null, null, null, null, null, null, null), CancellationToken.None)).Value;
+
+        Assert.Equal([false, true, true], page.Items.Select(row => row.NeedsAPerson));
+        Assert.Equal([2, 3, 7], page.Items.Select(row => row.RefusalCount));
+        Assert.Equal(3, page.TotalCount);
     }
 
     [Fact]

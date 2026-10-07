@@ -108,8 +108,15 @@ public sealed record BookingLedger(LedgerPayable? Payable, IReadOnlyList<LedgerH
 /// <summary>Which recorded payables a list shows.</summary>
 public static class PayableListScopes
 {
-    /// <summary>Every payable not yet settled, whatever holds it back.</summary>
+    /// <summary>
+    /// Every payable not yet settled that still has something to happen: due, blocked or held (Wave 4, F56 c). A net
+    /// zero payable nothing holds back is Nothing due, and leaves this list — it used to stay here for ever, since no
+    /// settlement ever closes it.
+    /// </summary>
     public const string Open = "Open";
+
+    /// <summary>Open, net zero, and neither held nor blocked: recorded so the booking says so, and nothing more.</summary>
+    public const string NothingDue = "NothingDue";
 
     public const string Settled = "Settled";
 
@@ -133,6 +140,11 @@ public sealed record PayableListFilter(
 /// </summary>
 /// <param name="DueNet">The sum of every due payable's net: above zero Khadra owes the office, below zero the office owes.</param>
 /// <param name="NotYetDueNet">The sum of the open payables held back or blocked.</param>
+/// <param name="HeldNet">
+/// Of those, the ones held back (Wave 4, F56 a): netted apart from the blocked ones, so a held payable is never
+/// called "not due yet" and a held credit and a blocked debit never cancel into a zero nobody can read.
+/// </param>
+/// <param name="BlockedNet">Of those, the ones blocked: a refund on the booking outstanding, or a dispute on it live.</param>
 public sealed record OfficeBalance(
     Id DealerId,
     string DealerName,
@@ -143,7 +155,11 @@ public sealed record OfficeBalance(
     decimal DueNet,
     int NotYetDueCount,
     decimal NotYetDueNet,
-    LedgerSettlementSummary? LastSettlement);
+    LedgerSettlementSummary? LastSettlement,
+    int HeldCount,
+    decimal HeldNet,
+    int BlockedCount,
+    decimal BlockedNet);
 
 /// <summary>The newest settlement that was not voided.</summary>
 public sealed record LedgerSettlementSummary(Id SettlementId, string Number, SettlementDirection Direction, decimal Amount, DateOnly PaidOn);

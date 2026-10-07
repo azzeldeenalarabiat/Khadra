@@ -226,6 +226,13 @@
                 <span class="num">{{ line.value }}</span>
               </div>
             }
+            @if (panel.incidents; as incidents) {
+              <!-- Not money owed back, so not under that heading: a count of captures a person must check. -->
+              <div class="money-line" [class.is-hi]="incidents.hi">
+                <span class="k-label">{{ incidents.label }}</span>
+                <span class="num">{{ incidents.value }}</span>
+              </div>
+            }
             @for (other of panel.otherCurrencies; track other) {
               <div class="state-text">{{ other }}</div>
             }

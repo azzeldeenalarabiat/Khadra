@@ -108,6 +108,13 @@ internal static class DocumentWording
 
         public static readonly BilingualText Reference = BilingualText.Of("Booking reference", "الرقم المرجعي");
         public static readonly BilingualText BookingStatus = BilingualText.Of("Booking status", "حالة الحجز");
+
+        /// <summary>
+        /// A payment receipt's booking status (Wave 4, B6; E2E F57): the status the payment left the booking in, not the
+        /// one at issue, which for a correction or a late original is a later moment.
+        /// </summary>
+        public static readonly BilingualText BookingStatusAfterPayment =
+            BilingualText.Of("Booking status after this payment", "حالة الحجز بعد هذه الدفعة");
         public static readonly BilingualText Office = BilingualText.Of("Rental office", "مكتب التأجير");
         public static readonly BilingualText OfficeRegistration = BilingualText.Of("Rental office's commercial registration", "السجل التجاري لمكتب التأجير");
         public static readonly BilingualText OfficeLocation = BilingualText.Of("Rental office's location", "موقع مكتب التأجير");

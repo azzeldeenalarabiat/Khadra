@@ -122,6 +122,28 @@ public sealed class PaymentOptions
     public int StaleAttemptGraceMinutes { get; init; } = 15;
 
     /// <summary>
+    /// How long a refused refund waits before it is sent again the first time (Wave 4, B4; checklist 157). Each
+    /// further refusal doubles the wait, up to <see cref="RefundRetryMaxDelayMinutes"/>.
+    /// </summary>
+    /// <remarks>
+    /// A refund used to be sent again on every sweep, once a minute, for ever; a card closed for good became a log
+    /// flood. The back-off changes WHEN a refund is sent, never whether it is owed or how much.
+    /// </remarks>
+    [Range(1, 1440)]
+    public int RefundRetryFirstDelayMinutes { get; init; } = 1;
+
+    /// <summary>
+    /// The longest wait between two sends of a refused refund. Past it a refund is still sent again, at this
+    /// interval, for as long as it is owed: a refund is never abandoned.
+    /// </summary>
+    [Range(1, 10080)]
+    public int RefundRetryMaxDelayMinutes { get; init; } = 360;
+
+    /// <summary>From this many refusals on, a refund is put in front of an administrator on the work queue.</summary>
+    [Range(1, 100)]
+    public int RefundRefusalsBeforeAlert { get; init; } = 3;
+
+    /// <summary>
     /// Where the provider sends the customer afterwards. Falls back to <c>App:ClientBaseUrl</c>.
     /// </summary>
     /// <remarks>
@@ -166,6 +188,11 @@ internal sealed class PaymentSettings(IOptions<PaymentOptions> options, IOptions
         TimeSpan.FromMinutes(options.Value.CheckoutClosesBeforeDeadlineMinutes);
 
     public TimeSpan StaleAttemptGrace => TimeSpan.FromMinutes(options.Value.StaleAttemptGraceMinutes);
+
+    public RefundRetryPolicy RefundRetry => new(
+        TimeSpan.FromMinutes(options.Value.RefundRetryFirstDelayMinutes),
+        TimeSpan.FromMinutes(options.Value.RefundRetryMaxDelayMinutes),
+        options.Value.RefundRefusalsBeforeAlert);
 
     /// <summary>
     /// Where the provider drops the customer once the card form is done.

@@ -67,7 +67,8 @@ public static class FinanceSummaryBuilder
                 Total(failed.Select(refund => refund.Amount)),
                 failed.Count,
                 Total(orphans.Select(refund => refund.Amount)),
-                orphans.Count),
+                orphans.Count,
+                facts.OpenCaptureIncidents),
             others);
     }
 }

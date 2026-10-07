@@ -3127,6 +3127,15 @@ export const EN = {
   'providerEventOutcome.unknown': 'No payment found',
   'providerEventOutcome.ignored': 'Ignored',
   'providerEventOutcome.unmatched': 'No refund matched',
+  // A capture notice for money the payment had already taken (Wave 4, B1).
+  'providerEventOutcome.duplicate': 'Same capture, said again',
+  'providerEventOutcome.assumedDuplicate': 'Same amount again — assumed the same capture',
+  'providerEventOutcome.amountMismatch': 'Same capture, another amount — incident',
+  'providerEventOutcome.secondCapture': 'Another capture — incident',
+  'providerEventOutcome.otherAttempt': 'Capture held by another attempt — incident',
+  'paymentIncidentKind.secondCapture': 'Second capture',
+  'paymentIncidentKind.amountMismatch': 'Amount contradicts the capture',
+  'paymentIncidentKind.captureOnAnotherAttempt': 'Capture held by another attempt',
   'financialIssue.confirmingPaymentMissing': 'The payment that confirmed this booking cannot be found',
   'financialIssue.endingRefundMissing': "A refund this booking's ending owes was never recorded",
   'financialIssue.refundAmountUnexpected': 'A refund does not match the rule it was recorded under',
@@ -3237,6 +3246,13 @@ export const EN = {
   'refunds.emptyView': 'No refund in this view.',
   'refunds.loadFailed': 'The refunds could not be loaded.',
   'refunds.providerCode': 'Provider said: {code}',
+  // A refused refund waits and is counted (Wave 4, B4); from the server's alert on, a person must look.
+  'refunds.refusedTimes': {
+    one: 'Refused once',
+    other: 'Refused {count} times',
+  },
+  'refunds.sentAgainAt': 'sent again {when}',
+  'refunds.needsALook': 'Needs a look',
   'refunds.note':
     'The payment sweep sends a refused refund again by itself. This queue shows what is still owed, and how long it has waited.',
 
@@ -3276,6 +3292,30 @@ export const EN = {
   'paymentDetail.loadFailed': 'This payment could not be loaded.',
   'paymentDetail.notFound': 'No payment has this id.',
   'paymentDetail.bookingGone': 'The booking this payment belongs to no longer resolves.',
+  // Capture incidents (Wave 4, B1): never refunded by the platform; dealt with at the provider, then marked here.
+  'paymentDetail.incidents': 'Capture incidents',
+  'paymentDetail.noIncidents': 'No capture on this payment has needed checking.',
+  'paymentDetail.incidentOpen': 'Open',
+  'paymentDetail.incidentHandled': 'Handled',
+  'paymentDetail.incidentDetected': 'Detected {when}',
+  'paymentDetail.incidentReported': 'The provider reported {amount}',
+  'paymentDetail.incidentAlreadyTaken': 'This payment had already taken {amount}',
+  'paymentDetail.incidentAskedFor': 'This attempt asked for {amount}',
+  'paymentDetail.incidentHandledBy': 'Marked handled by {name} · {when}',
+  'paymentDetail.incidentHandledAt': 'Marked handled · {when}',
+  'paymentDetail.incidentOtherAttempt': 'Open the attempt that holds this capture',
+  'paymentDetail.captureReference': 'Capture {reference}',
+  'paymentDetail.openIncidentsNotice': {
+    one: 'A capture on this payment needs checking at the provider: money may have been taken twice, or reported wrongly. Nothing was refunded automatically.',
+    other: '{count} captures on this payment need checking at the provider: money may have been taken twice, or reported wrongly. Nothing was refunded automatically.',
+  },
+  'paymentDetail.markHandled': 'Mark as handled',
+  'paymentDetail.handle.title': 'Mark as handled: {kind}',
+  'paymentDetail.handle.body':
+    'Do this once the money has been dealt with at the provider. Nothing moves here: this records how it was dealt with, in the audit log, against your name.',
+  'paymentDetail.handle.note': 'How it was dealt with',
+  'paymentDetail.handle.confirm': 'Mark as handled',
+  'paymentDetail.handle.done': 'Incident marked handled',
 
   // Issued financial documents (payments Phase 5b): the Payments screen's third tab, a document's page,
   // the holds, and a booking's documents. Inside a document every word is the stored document's own.
@@ -3481,6 +3521,12 @@ export const EN = {
   'adminDashboard.refundsRefused': 'Refunds refused — still owed',
   /** A PART of both lines above it (refunds on their way and refused ones), never added to them. */
   'adminDashboard.ofWhichOrphans': 'Included above: captures that could not be applied',
+  /** Not money owed back: a count of capture incidents nobody has marked handled (Wave 4, B1). */
+  'adminDashboard.captureIncidents': 'Captures to check at the provider',
+  'adminDashboard.incidentsCount': {
+    one: '{count} incident',
+    other: '{count} incidents',
+  },
   'adminDashboard.otherCurrency': '{currency}: {settled} settled this month · {outstanding} owed',
   'adminDashboard.moneyLoadFailed': 'The money figures could not be loaded.',
   'adminDashboard.seePayments': 'See payments',
@@ -3488,9 +3534,10 @@ export const EN = {
     "Commission is decided per booking, once its outcome is final. What the platform earned is on Finance, and what each office is owed on Payouts.",
 
   // The work queue's money rows (they have no clock: nobody froze a deadline for money owed back).
+  // Refunds refused often enough that a person must look (Wave 4, B4); below that the back-off handles them.
   'queue.refundsRefused': {
-    one: '{count} refund refused — still owed',
-    other: '{count} refunds refused — still owed',
+    one: '{count} refund refused repeatedly — still owed',
+    other: '{count} refunds refused repeatedly — still owed',
   },
   'queue.capturesBeingRefunded': {
     one: '{count} capture being refunded — it could not be applied',
@@ -3508,6 +3555,7 @@ export const EN = {
     one: '{count} receipt not emailed — its email failed or has waited too long',
     other: '{count} receipts not emailed — their emails failed or have waited too long',
   },
+  'queue.captureIncident': 'A capture needs checking at the provider',
   'queue.needsALook': 'Needs a look',
   'queue.watching': 'Watching',
   'queue.waitingFor': 'Waiting {duration}',
@@ -3558,6 +3606,8 @@ export const EN = {
   'payouts.colOffice': 'Office',
   'payouts.colDue': 'Due now',
   'payouts.colNotYetDue': 'Not due yet',
+  'payouts.colHeldBack': 'Held back',
+  'payouts.colWaiting': 'Held back or not due yet',
   'payouts.colLastSettlement': 'Last settlement',
   'payouts.colReason': 'Why',
   'payouts.colSince': 'Since',
@@ -3581,6 +3631,11 @@ export const EN = {
   'payouts.notYetDue': {
     one: '{count} booking not due yet: {amount}',
     other: '{count} bookings not due yet: {amount}',
+  },
+  // Held back is not "not due yet" (Wave 4, F56 a): somebody, or the records, stopped it.
+  'payouts.heldBack': {
+    one: '{count} booking held back: {amount}',
+    other: '{count} bookings held back: {amount}',
   },
   'payouts.lastSettlement': '{number} · {direction} · on {day}',
   'payouts.net.toOffice': 'Khadra owes the office {amount}',
@@ -3615,6 +3670,7 @@ export const EN = {
   'payouts.record.balanceChanged': 'The balance due changed while you were confirming: it is now {balance}. Nothing was recorded — review it and confirm again.',
   'payouts.payablesTitle': 'Payables',
   'payouts.scopeOpen': 'Open',
+  'payouts.scopeNothingDue': 'Nothing due',
   'payouts.scopeSettled': 'Settled',
   'payouts.scopeAll': 'All',
   'payouts.payablesEmpty': 'No payables here',
@@ -3714,6 +3770,10 @@ export const EN = {
   'problem.payablesPaidOnInFuture': 'The day the money moved cannot be in the future.',
   'problem.settlementAlreadyVoided': 'That settlement has already been voided.',
   'problem.payableAlreadyHeld': 'That payable is already held.',
+  'problem.payableNothingToHold': 'That payable moves no money either way, so there is nothing to hold back.',
+  'problem.incidentAlreadyHandled': 'Somebody has already marked this incident handled. The page now shows their account.',
+  'problem.incidentNotFound': 'This payment has no such incident.',
+  'problem.noteRejected': 'Check the note: it is missing, or longer than the platform allows.',
   'problem.payableNotHeld': 'That payable is not held by an administrator.',
   'problem.payableAlreadySettled': 'That payable is already settled.',
   'problem.financeSpanInvalid': 'Choose a span of up to a year, its end on or after its start.',

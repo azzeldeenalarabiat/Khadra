@@ -15,7 +15,7 @@ import { MessageParams } from '../i18n/language';
 import { formatCalendarDate } from '../i18n/date-format';
 import { formatNumber } from '../i18n/number-format';
 import { clockDuration, relativeTime, slaReading } from '../i18n/relative-time';
-import { spellEnumName } from '../i18n/status-key';
+import { enumKey, spellEnumName } from '../i18n/status-key';
 import { legalKindLabel } from '../i18n/legal-kind';
 import { KpiCard, QueueItem } from '../data/dashboard.data';
 import { auditSubject, subjectValue } from './audit-subject';
@@ -176,6 +176,9 @@ const kindTarget = (
       return { route: '/payments/refunds', action: 'queue.actionOpen' };
     case 'OrphanedCaptureOwed':
       return { route: '/payments', action: 'queue.actionOpen', filter: { key: 'status', value: 'Orphaned' } };
+    // A capture incident (Wave 4, B1) is one row per incident, and opens its payment, where it is marked handled.
+    case 'CaptureIncidentOpen':
+      return { route: only ? `/payments/${only}` : '/payments', action: 'queue.actionOpen' };
     // Offices' money the ledger holds back until somebody looks (payments Phase 8): the payouts screen lists the
     // bookings that cannot be recorded, and each office page the payables no longer matching their records.
     case 'PayablesOnHold':
@@ -245,6 +248,7 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   // The money rows: the count in the reader's language; the subtitle carries the booking references.
   if (item.kind === 'RefundFailed') return t('queue.refundsRefused', { count: item.count });
   if (item.kind === 'OrphanedCaptureOwed') return t('queue.capturesBeingRefunded', { count: item.count });
+  if (item.kind === 'CaptureIncidentOpen') return t('queue.captureIncident');
   if (item.kind === 'PayablesOnHold') return t('queue.payablesOnHold', { count: item.count });
   if (item.kind === 'FinancialDocumentsOnHold') return t('queue.documentsOnHold', { count: item.count });
   if (item.kind === 'FinancialDocumentEmailsNotSent') return t('queue.documentEmailsNotSent', { count: item.count });
@@ -254,6 +258,18 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
     return ageHours < 1 ? t('queue.newDispute') : t('queue.disputeOpenFor', { count: ageHours });
   }
   return item.subtitle ?? t('queue.needsAttention');
+};
+
+/**
+ * The line under the title. A capture incident's is its KIND, a server name the console words (Wave 4, B1); every
+ * other row's is the server's own text, as it was.
+ */
+const queueDescription = (item: AttentionItem, t: Translate): string => {
+  if (item.kind === 'CaptureIncidentOpen' && item.description) {
+    const key = enumKey('paymentIncidentKind', item.description);
+    return key ? t(key) : spellEnumName(item.description);
+  }
+  return item.description ?? '';
 };
 
 export function toQueueItems(
@@ -268,7 +284,7 @@ export function toQueueItems(
       severity: severityLabel(item, now, t),
       tone: severityTone(item.severity),
       title: queueTitle(item, now, t),
-      description: item.description ?? '',
+      description: queueDescription(item, t),
       entity: item.subtitle ?? '',
       sla: slaLabel(item, now, t),
       percent: slaPercent(item, now),

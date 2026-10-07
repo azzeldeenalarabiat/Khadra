@@ -1,3 +1,4 @@
+using Khadra.Domain.Common;
 using Khadra.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -57,6 +58,7 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .IsRequired();
         entity.Property(payment => payment.Provider).HasMaxLength(30).IsRequired();
         entity.Property(payment => payment.ProviderReference).HasMaxLength(200);
+        entity.Property(payment => payment.ProviderCaptureReference).HasMaxLength(200);
         entity.Property(payment => payment.CheckoutUrl).HasMaxLength(2000);
         entity.Property(payment => payment.ExpiresAt).IsRequired();
         entity.Property(payment => payment.FailureCode).HasMaxLength(100);
@@ -77,6 +79,14 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         entity.HasIndex(payment => new { payment.Provider, payment.ProviderReference })
             .IsUnique()
             .HasFilter("provider_reference IS NOT NULL");
+
+        // ONE capture on ONE attempt (Wave 4, B1). The webhook reads first and records a capture another attempt
+        // already holds as an incident; this index is the floor under that read, as the receipt's index is under the
+        // replay check, and the handler expects to lose to it by this name.
+        entity.HasIndex(payment => new { payment.Provider, payment.ProviderCaptureReference })
+            .IsUnique()
+            .HasDatabaseName(UniqueConstraintConflictException.ProviderCaptureReferenceConstraint)
+            .HasFilter("provider_capture_reference IS NOT NULL");
 
         entity.HasIndex(payment => payment.BookingId);
 
@@ -141,6 +151,11 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         entity.Property(refund => refund.FailureCode).HasMaxLength(100);
         entity.Property(refund => refund.RequestedAt).IsRequired();
 
+        // The back-off (Wave 4, B4; checklist 157): refusals counted once per refused send, and when a refused refund
+        // may be sent again. A refund recorded before the count existed reads zero, which its migration writes.
+        entity.Property(refund => refund.RefusalCount).IsRequired();
+        entity.Property(refund => refund.NextAttemptAt);
+
         // The sweep's query: everything still owed, oldest first.
         entity.HasIndex(refund => new { refund.Status, refund.RequestedAt });
     }
@@ -177,9 +192,67 @@ internal sealed class ProviderEventReceiptConfiguration : IEntityTypeConfigurati
         ConfigureEnumeration(entity.Property(receipt => receipt.Outcome), 20);
         entity.Property(receipt => receipt.Amount).HasPrecision(18, 3);
         entity.Property(receipt => receipt.CurrencyCode).HasMaxLength(3);
+        entity.Property(receipt => receipt.CaptureReference).HasMaxLength(200);
         entity.Property(receipt => receipt.ReceivedAt).IsRequired();
 
         entity.HasIndex(receipt => new { receipt.Provider, receipt.ProviderEventId }).IsUnique();
         entity.HasIndex(receipt => receipt.PaymentId);
+    }
+}
+
+/// <summary>
+/// Capture incidents (Wave 4, B1): a notice that money may have moved in a way no booking accounts for.
+/// </summary>
+/// <remarks>
+/// Both references are real foreign keys, RESTRICT: an incident always names a payment and the notice that raised it,
+/// and neither may disappear from under it. Same context, so a key is allowed; there are no navigation properties.
+/// Unique per receipt, so one notice raises one incident at most.
+/// </remarks>
+internal sealed class PaymentIncidentConfiguration : IEntityTypeConfiguration<PaymentIncident>
+{
+    public void Configure(EntityTypeBuilder<PaymentIncident> entity)
+    {
+        ConfigureAggregate(entity, "payment_incidents");
+
+        ConfigureEnumeration(entity.Property(incident => incident.Kind), 30);
+        ConfigureId(entity.Property(incident => incident.PaymentId));
+        entity.Property(incident => incident.PaymentId).IsRequired();
+        ConfigureId(entity.Property(incident => incident.ReceiptId));
+        entity.Property(incident => incident.ReceiptId).IsRequired();
+        entity.Property(incident => incident.Provider).HasMaxLength(30).IsRequired();
+        entity.Property(incident => incident.CaptureReference).HasMaxLength(200);
+
+        entity.OwnsOne(incident => incident.Reported, money =>
+        {
+            money.Property(value => value.Amount).HasColumnName("reported_amount").HasPrecision(18, 3).IsRequired();
+            money.Property(value => value.CurrencyCode).HasColumnName("reported_currency").HasMaxLength(3).IsRequired();
+        });
+        entity.Navigation(incident => incident.Reported).IsRequired();
+        entity.OwnsOne(incident => incident.Expected, money =>
+        {
+            money.Property(value => value.Amount).HasColumnName("expected_amount").HasPrecision(18, 3).IsRequired();
+            money.Property(value => value.CurrencyCode).HasColumnName("expected_currency").HasMaxLength(3).IsRequired();
+        });
+        entity.Navigation(incident => incident.Expected).IsRequired();
+
+        ConfigureId(entity.Property(incident => incident.OtherPaymentId));
+        entity.Property(incident => incident.DetectedAt).IsRequired();
+        ConfigureId(entity.Property(incident => incident.HandledByAdminId));
+        entity.Property(incident => incident.HandledNote).HasMaxLength(PaymentIncident.MaxNoteLength);
+        entity.Ignore(incident => incident.IsHandled);
+
+        entity.HasOne<Payment>()
+            .WithMany()
+            .HasForeignKey(incident => incident.PaymentId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ProviderEventReceipt>()
+            .WithMany()
+            .HasForeignKey(incident => incident.ReceiptId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasIndex(incident => incident.ReceiptId).IsUnique();
+        entity.HasIndex(incident => incident.PaymentId);
+        // The attention queue's read: every incident nobody has handled yet.
+        entity.HasIndex(incident => incident.DetectedAt).HasFilter("handled_at IS NULL");
     }
 }

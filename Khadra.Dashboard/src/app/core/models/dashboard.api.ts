@@ -155,6 +155,11 @@ export interface FinanceSummary {
     /** A PART of the two above, never added to them. */
     readonly orphanedCapturesOwed: PanelMoney;
     readonly orphanedCapturesOwedCount: number;
+    /**
+     * Capture incidents nobody has marked handled (Wave 4, B1): a COUNT, never money in any figure above — what
+     * that money is, a person decides at the provider. Optional, as the API made it.
+     */
+    readonly openCaptureIncidentsCount?: number;
   };
   /** Money in another currency — only ever a capture taken in the wrong one — listed apart. */
   readonly otherCurrencies: readonly {

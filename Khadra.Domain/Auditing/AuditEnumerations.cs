@@ -74,6 +74,11 @@ public sealed class AuditAction : Enumeration
     // names the document, and the entry is the record of who published it.
     public static readonly AuditAction LegalDocumentPublished = new(34, "LegalDocumentPublished");
 
+    // An administrator marked a capture incident handled: the money a second or contradictory capture took was dealt
+    // with at the provider (Wave 4, B1). Labelled by the booking's reference; the new value is the incident's kind,
+    // and the reason is the administrator's note.
+    public static readonly AuditAction PaymentIncidentHandled = new(35, "PaymentIncidentHandled");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }
@@ -104,6 +109,9 @@ public sealed class AuditEntityType : Enumeration
 
     // A published version of a legal text (Wave 2 G1).
     public static readonly AuditEntityType LegalDocument = new(13, "LegalDocument");
+
+    // A capture incident on a payment (Wave 4, B1).
+    public static readonly AuditEntityType PaymentIncident = new(14, "PaymentIncident");
 
     private AuditEntityType(int id, string name) : base(id, name)
     {

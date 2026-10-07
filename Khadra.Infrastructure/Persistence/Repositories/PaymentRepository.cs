@@ -26,6 +26,20 @@ internal sealed class PaymentRepository(KhadraDbContext context) : IPaymentRepos
             cancellationToken);
     }
 
+    public Task<Payment?> GetByCaptureReferenceAsync(
+        string provider,
+        string captureReference,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(provider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(captureReference);
+
+        // Within a provider, as the unique index is: a capture's id means nothing outside the provider that took it.
+        return WithRefunds().FirstOrDefaultAsync(
+            payment => payment.Provider == provider && payment.ProviderCaptureReference == captureReference,
+            cancellationToken);
+    }
+
     public Task<Payment?> GetLiveForBookingAsync(Id bookingId, CancellationToken cancellationToken = default) =>
         WithRefunds()
             .Where(payment => payment.BookingId == bookingId)
@@ -66,6 +80,25 @@ internal sealed class PaymentRepository(KhadraDbContext context) : IPaymentRepos
                 refund.Status == RefundStatus.Requested || refund.Status == RefundStatus.Failed))
             .OrderBy(payment => payment.CreatedAt)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Id>> ListIdsWithRefundsDueAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        // The same rule as Refund.IsDueToSend, written out for SQL; the sweep applies the method itself to each
+        // refund of a payment it loads, because one payment can carry a refund that is due and one that is not.
+        var requested = RefundStatus.Requested;
+        var failed = RefundStatus.Failed;
+        return await context.Payments
+            .Where(payment => payment.ProviderReference != null)
+            .Where(payment => payment.Refunds.Any(refund =>
+                (refund.Status == requested || refund.Status == failed)
+                && (refund.NextAttemptAt == null || refund.NextAttemptAt <= now)))
+            .OrderBy(payment => payment.CreatedAt)
+            .ThenBy(payment => payment.Id)
+            .Select(payment => payment.Id)
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<Payment>> ListEndedWithoutEndingRefundAsync(
         CancellationToken cancellationToken = default)
@@ -146,4 +179,12 @@ internal sealed class ProviderEventReceiptRepository(KhadraDbContext context) : 
             receipt => receipt.Provider == provider && receipt.ProviderEventId == providerEventId,
             cancellationToken);
     }
+}
+
+internal sealed class PaymentIncidentRepository(KhadraDbContext context) : IPaymentIncidentRepository
+{
+    public void Add(PaymentIncident incident) => context.PaymentIncidents.Add(incident);
+
+    public Task<PaymentIncident?> GetByIdAsync(Id id, CancellationToken cancellationToken = default) =>
+        context.PaymentIncidents.FirstOrDefaultAsync(incident => incident.Id == id, cancellationToken);
 }

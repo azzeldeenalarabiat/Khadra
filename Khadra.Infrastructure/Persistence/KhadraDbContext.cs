@@ -41,6 +41,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<CustomerShortlist> Shortlists => Set<CustomerShortlist>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<ProviderEventReceipt> ProviderEventReceipts => Set<ProviderEventReceipt>();
+    public DbSet<PaymentIncident> PaymentIncidents => Set<PaymentIncident>();
     public DbSet<FinancialDocument> FinancialDocuments => Set<FinancialDocument>();
     public DbSet<FinancialDocumentVoid> FinancialDocumentVoids => Set<FinancialDocumentVoid>();
     public DbSet<FinancialDocumentRendition> FinancialDocumentRenditions => Set<FinancialDocumentRendition>();
@@ -80,12 +81,17 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
         //   find the same payables due; the second's save is refused whole, so no payable is closed by
         //   two settlements and no money is recorded as moving twice.
         // - OfficePayableHold: an administrator releasing a hold while the payables pass checks it.
+        // - Refund (Wave 4, B4; the advisor's review): a refund is its own row, so the payment's token is never
+        //   touched when only a refund changes. The sweep marking a refund Sent or Failed and the webhook settling it
+        //   are the same row moments apart, and without this the sweep's save could overwrite a Settled refund with
+        //   the Sent it had loaded before — last writer wins, with money on the row.
+        // - PaymentIncident (Wave 4, B1): two administrators marking the same capture incident handled.
         if (Database.IsNpgsql())
         {
             foreach (var type in new[]
                      {
                          typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer), typeof(Payment),
-                         typeof(OfficePayable), typeof(OfficePayableHold),
+                         typeof(OfficePayable), typeof(OfficePayableHold), typeof(Refund), typeof(PaymentIncident),
                      })
             {
                 modelBuilder.Entity(type)

@@ -47,4 +47,13 @@ public static class PaymentErrors
     public static readonly Error RefundExceedsCapture = Error.Conflict(
         "payments.refund_exceeds_capture",
         "A refund cannot be larger than what was captured.");
+
+    /// <summary>The capture incident an administrator named does not exist on that payment (Wave 4, B1).</summary>
+    public static readonly Error IncidentNotFound =
+        Error.NotFound("payments.incident_not_found", "That payment incident was not found.");
+
+    /// <summary>An administrator, or two at once, marked a capture incident handled that already is.</summary>
+    public static readonly Error IncidentAlreadyHandled = Error.Conflict(
+        "payments.incident_already_handled",
+        "That payment incident has already been marked as handled.");
 }

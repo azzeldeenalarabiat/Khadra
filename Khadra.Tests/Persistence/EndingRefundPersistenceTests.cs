@@ -108,11 +108,11 @@ public sealed class EndingRefundPersistenceTests : IDisposable
             [withdrawnTicket, openTicket, resolvedTicket]);
 
         await using var read = NewContext();
-        var found = await new BookingRepository(read).ListDueForDepositReleaseAsync(Now.AddDays(30));
+        var found = await new BookingRepository(read).ListIdsDueForDepositReleaseAsync(Now.AddDays(30));
 
         Assert.Equal(
             new[] { gallery.Id, withdrawn.Id, lenient.Id }.OrderBy(id => id.Value),
-            found.Select(booking => booking.Id).OrderBy(id => id.Value));
+            found.OrderBy(id => id.Value));
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public sealed class EndingRefundPersistenceTests : IDisposable
         await SaveAsync([booking], [payment]);
 
         await using var read = NewContext();
-        var found = await new BookingRepository(read).ListDueForDepositReleaseAsync(booking.FinishedAt!.Value.AddTicks(-1));
+        var found = await new BookingRepository(read).ListIdsDueForDepositReleaseAsync(booking.FinishedAt!.Value.AddTicks(-1));
 
         Assert.Empty(found);
     }

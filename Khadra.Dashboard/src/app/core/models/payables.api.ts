@@ -92,9 +92,16 @@ export interface OfficeBalance {
   readonly dueCount: number;
   /** Due now, netted: above zero Khadra owes the office. */
   readonly due: Money;
+  /** Held back or blocked, netted together. Kept as it was; the two parts follow. */
   readonly notYetDueCount: number;
   readonly notYetDue: Money;
   readonly lastSettlement: SettlementSummary | null;
+  /** Of those, the ones held back, netted on their own (Wave 4, F56 a). Optional, as the API made it. */
+  readonly heldCount?: number;
+  readonly held?: Money;
+  /** Of those, the ones blocked: a refund outstanding or a dispute live. */
+  readonly blockedCount?: number;
+  readonly blocked?: Money;
 }
 
 export interface OfficeSettlementVoid {

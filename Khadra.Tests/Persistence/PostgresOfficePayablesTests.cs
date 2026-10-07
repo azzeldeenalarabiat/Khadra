@@ -155,6 +155,39 @@ VALUES (gen_random_uuid(), 'TEST-SET-2026-999999', '{booking.DealerId.Value}', '
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() => IssuanceHarness.UnitOfWork(stale).SaveChangesAsync());
     }
 
+    /// <summary>
+    /// The Open and Nothing due lists (Wave 4, F56 c) on the engine that runs them: "nothing due" is net zero with no
+    /// open hold, no refund outstanding and no live dispute, asked in SQL across four tables, and Open is its negation
+    /// over the unsettled payables. SQLite proves the meaning (<c>OfficePayablesTests</c>); this proves the SQL.
+    /// </summary>
+    [PostgresFact]
+    public async Task The_open_and_nothing_due_lists_translate_on_postgres()
+    {
+        var database = await FreshDatabaseAsync("scopes");
+        var harness = new PayablesHarness(database.Options);
+        var booking = await CompletedAsync(harness, "75757");
+        await harness.PassAsync();
+        var due = Assert.Single(await harness.PayablesAsync());
+        var zero = OfficePayable.Record(
+            new PayableDraft(Id.New(), booking.DealerId, "KH-NETZERO1", "JOD", PaymentProviders.Sandbox, PayableOutcome.PaymentReturned, harness.Now, 2, []),
+            harness.Now);
+        await harness.Bookings.ChangeAsync(async context =>
+        {
+            context.OfficePayables.Add(zero);
+            await Task.CompletedTask;
+        });
+
+        async Task<IReadOnlyList<Id>> Listed(string scope) =>
+            [.. (await harness.ReadAsync(ledger => ledger.ListPayablesAsync(
+                    new Khadra.Application.Payables.ReadModels.PayableListFilter(booking.DealerId, scope, null, null, 1, 50))))
+                .Items.Select(payable => payable.PayableId)];
+
+        Assert.Equal([due.Id], await Listed(Khadra.Application.Payables.ReadModels.PayableListScopes.Open));
+        Assert.Equal([zero.Id], await Listed(Khadra.Application.Payables.ReadModels.PayableListScopes.NothingDue));
+        var balance = Assert.Single(await harness.ReadAsync(ledger => ledger.BalancesAsync(booking.DealerId)));
+        Assert.Equal((1, 12m, 0, 0), (balance.DueCount, balance.DueNet, balance.HeldCount, balance.BlockedCount));
+    }
+
     [PostgresFact]
     public async Task A_payable_held_while_a_settlement_is_being_recorded_stops_it_and_its_number_goes_back()
     {

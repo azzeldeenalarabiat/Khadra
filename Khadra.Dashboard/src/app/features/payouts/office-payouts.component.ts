@@ -85,7 +85,7 @@ export class OfficePayoutsComponent {
   private readonly holds = loaded(this.service.officeHolds);
 
   protected readonly scope = this.service.scope;
-  protected readonly scopes: readonly PayableScope[] = ['open', 'settled', 'all'];
+  protected readonly scopes: readonly PayableScope[] = ['open', 'nothingDue', 'settled', 'all'];
   protected readonly payablesPage = this.service.payablesPage;
   protected readonly settlementsPage = this.service.settlementsPage;
 

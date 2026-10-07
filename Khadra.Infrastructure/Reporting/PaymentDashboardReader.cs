@@ -39,20 +39,54 @@ internal sealed class PaymentDashboardReader(KhadraDbContext context) : IPayment
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
+        var openIncidents = await context.PaymentIncidents.CountAsync(incident => incident.HandledAt == null, cancellationToken);
+
         return new FinanceFacts(
             [.. payments.Select(payment => new AppliedPaymentFact(
                 payment.AppliedToBooking.Amount,
                 payment.ProcessingFee.Amount,
                 payment.Amount.CurrencyCode))],
             [.. settledThisMonth.Select(Fact)],
-            [.. outstanding.Select(Fact)]);
+            [.. outstanding.Select(Fact)],
+            openIncidents);
     }
 
-    public async Task<IReadOnlyList<FailedRefundItem>> FailedRefundsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<OpenCaptureIncidentItem>> OpenCaptureIncidentsAsync(CancellationToken cancellationToken = default)
+    {
+        var open = await context.PaymentIncidents
+            .Where(incident => incident.HandledAt == null)
+            .OrderBy(incident => incident.DetectedAt)
+            .ThenBy(incident => incident.Id)
+            .Select(incident => new { incident.Id, incident.PaymentId, incident.Kind, incident.DetectedAt })
+            .ToListAsync(cancellationToken);
+        if (open.Count == 0)
+            return [];
+
+        var paymentIds = open.Select(incident => incident.PaymentId).Distinct().ToList();
+        var bookingOf = await context.Payments
+            .Where(payment => paymentIds.Contains(payment.Id))
+            .Select(payment => new { payment.Id, payment.BookingId })
+            .ToDictionaryAsync(payment => payment.Id, payment => payment.BookingId, cancellationToken);
+        var references = await ReferencesAsync([.. bookingOf.Values.Distinct()], cancellationToken);
+
+        return
+        [
+            .. open.Select(incident => new OpenCaptureIncidentItem(
+                incident.Id.Value,
+                incident.PaymentId.Value,
+                bookingOf.TryGetValue(incident.PaymentId, out var bookingId) ? references.GetValueOrDefault(bookingId) : null,
+                incident.Kind.Name,
+                incident.DetectedAt)),
+        ];
+    }
+
+    public async Task<IReadOnlyList<FailedRefundItem>> FailedRefundsAsync(
+        int refusedAtLeast,
+        CancellationToken cancellationToken = default)
     {
         var failed = RefundStatus.Failed;
         var refunds = await context.Set<Refund>()
-            .Where(refund => refund.Status == failed)
+            .Where(refund => refund.Status == failed && refund.RefusalCount >= refusedAtLeast)
             .OrderBy(refund => refund.RequestedAt)
             .ThenBy(refund => refund.Id)
             .Select(refund => new { refund.Id, refund.PaymentId, refund.RequestedAt })

@@ -52,6 +52,12 @@
               }
             </div>
           </div>
+          @if (row.heldBack) {
+            <div class="kv-split">
+              <div class="kv-key">{{ t('payouts.colHeldBack') }}</div>
+              <div class="kv-val td-sub">{{ row.heldBack }}</div>
+            </div>
+          }
           @if (row.notYetDue) {
             <div class="kv-split">
               <div class="kv-key">{{ t('payouts.colNotYetDue') }}</div>
@@ -121,7 +127,7 @@
         @for (option of scopes; track option) {
           <button type="button" class="tab" role="tab" [class.is-active]="scope() === option"
                   [attr.aria-selected]="scope() === option" (click)="setScope(option)">
-            {{ t(option === 'open' ? 'payouts.scopeOpen' : option === 'settled' ? 'payouts.scopeSettled' : 'payouts.scopeAll') }}
+            {{ t(option === 'open' ? 'payouts.scopeOpen' : option === 'nothingDue' ? 'payouts.scopeNothingDue' : option === 'settled' ? 'payouts.scopeSettled' : 'payouts.scopeAll') }}
           </button>
         }
       </div>

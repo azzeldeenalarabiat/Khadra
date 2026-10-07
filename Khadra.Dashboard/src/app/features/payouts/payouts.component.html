@@ -44,7 +44,7 @@
             <tr>
               <th>{{ t('payouts.colOffice') }}</th>
               <th>{{ t('payouts.colDue') }}</th>
-              <th>{{ t('payouts.colNotYetDue') }}</th>
+              <th>{{ t('payouts.colWaiting') }}</th>
               <th>{{ t('payouts.colLastSettlement') }}</th>
             </tr>
           </thead>
@@ -67,8 +67,11 @@
                   }
                 </td>
                 <td class="td">
+                  @if (row.heldBack) {
+                    <div class="td-sub">{{ row.heldBack }}</div>
+                  }
                   @if (row.notYetDue) {
-                    <span class="td-sub">{{ row.notYetDue }}</span>
+                    <div class="td-sub">{{ row.notYetDue }}</div>
                   }
                 </td>
                 <td class="td">

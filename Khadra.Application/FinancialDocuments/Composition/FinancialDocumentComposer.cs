@@ -157,12 +157,14 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
                 yours.Money("balanceAfter", DocumentWording.Labels.BalanceDueAtPickup, position.BalanceAfter);
         }
 
-        BookingSection(content, booking, facts.Parties);
+        var statusAfterPayment = StatusAfterPayment(booking, payment);
+        BookingSection(content, booking, facts.Parties, statusAfterPayment);
 
         var snapshot = Root(
             FinancialDocumentType.PaymentReceipt, stamp, cause, capturedAt, charged.CurrencyCode,
             facts.Issuer, facts.Parties, booking, factsNode,
-            content.Build(DocumentWording.Title(FinancialDocumentType.PaymentReceipt), DocumentWording.Labels.AmountPaid, charged));
+            content.Build(DocumentWording.Title(FinancialDocumentType.PaymentReceipt), DocumentWording.Labels.AmountPaid, charged),
+            statusAfterPayment);
 
         return new FinancialDocumentDraft(
             FinancialDocumentType.PaymentReceipt,
@@ -419,11 +421,34 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
         DocumentParties parties,
         Booking booking,
         JsonObject facts,
-        JsonObject content)
+        JsonObject content,
+        BookingStatus? statusAfterPayment = null)
     {
         var (customer, office, vehicle) = (parties.Customer, parties.Office, parties.Vehicle);
         if (customer.CustomerId != booking.CustomerId || office.DealerId != booking.DealerId || vehicle.VehicleId != booking.VehicleId)
             throw new InvalidOperationException($"The parties read are not booking {booking.Id.Value}'s.");
+
+        var bookingNode = new JsonObject
+        {
+            ["bookingId"] = SnapshotJson.IdText(booking.Id),
+            ["reference"] = booking.Reference.Value,
+            ["statusAtIssue"] = booking.Status.Name,
+        };
+        // A payment receipt's own (Wave 4, B6). Absent from every other document, whose snapshots read as before.
+        if (statusAfterPayment is not null)
+            bookingNode["statusAfterPayment"] = statusAfterPayment.Name;
+        bookingNode["rentalStart"] = Instant(booking.Period.Start);
+        bookingNode["rentalEnd"] = Instant(booking.Period.End);
+        bookingNode["days"] = booking.Pricing.Days;
+        bookingNode["pickupMethod"] = booking.PickupMethod.Name;
+        bookingNode["vehicle"] = new JsonObject
+        {
+            ["make"] = vehicle.Make,
+            ["model"] = vehicle.Model,
+            ["year"] = vehicle.Year,
+            ["plate"] = vehicle.Plate,
+            ["carType"] = SnapshotJson.OptionalText(vehicle.CarType),
+        };
 
         return new JsonObject
         {
@@ -471,24 +496,7 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
                 ["area"] = office.Area,
                 ["street"] = office.Street,
             },
-            ["booking"] = new JsonObject
-            {
-                ["bookingId"] = SnapshotJson.IdText(booking.Id),
-                ["reference"] = booking.Reference.Value,
-                ["statusAtIssue"] = booking.Status.Name,
-                ["rentalStart"] = Instant(booking.Period.Start),
-                ["rentalEnd"] = Instant(booking.Period.End),
-                ["days"] = booking.Pricing.Days,
-                ["pickupMethod"] = booking.PickupMethod.Name,
-                ["vehicle"] = new JsonObject
-                {
-                    ["make"] = vehicle.Make,
-                    ["model"] = vehicle.Model,
-                    ["year"] = vehicle.Year,
-                    ["plate"] = vehicle.Plate,
-                    ["carType"] = SnapshotJson.OptionalText(vehicle.CarType),
-                },
-            },
+            ["booking"] = bookingNode,
             ["facts"] = facts,
             ["content"] = content,
         };
@@ -527,12 +535,19 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
             section.Text("officeLocation", DocumentWording.Labels.OfficeLocation, location);
     }
 
-    private void BookingSection(DocumentContent content, Booking booking, DocumentParties parties)
+    /// <param name="statusAfterPayment">
+    /// A payment receipt's status after its payment (Wave 4, B6), printed under its own label; every other document
+    /// prints the status at issue.
+    /// </param>
+    private void BookingSection(DocumentContent content, Booking booking, DocumentParties parties, BookingStatus? statusAfterPayment = null)
     {
         var section = content.Section("booking", DocumentWording.Headings.Booking)
-            .Plain("reference", DocumentWording.Labels.Reference, booking.Reference.Value)
-            .Text("status", DocumentWording.Labels.BookingStatus, DocumentWording.BookingStatus(booking.Status))
-            .Plain("car", DocumentWording.Labels.Car, DocumentWording.Car(parties.Vehicle));
+            .Plain("reference", DocumentWording.Labels.Reference, booking.Reference.Value);
+        if (statusAfterPayment is { } after)
+            section.Text("statusAfterPayment", DocumentWording.Labels.BookingStatusAfterPayment, DocumentWording.BookingStatus(after));
+        else
+            section.Text("status", DocumentWording.Labels.BookingStatus, DocumentWording.BookingStatus(booking.Status));
+        section.Plain("car", DocumentWording.Labels.Car, DocumentWording.Car(parties.Vehicle));
         if (parties.Vehicle.CarType is { } carType)
             section.Text("carType", DocumentWording.Labels.CarType, carType);
         section.Plain("plate", DocumentWording.Labels.Plate, parties.Vehicle.Plate)
@@ -540,6 +555,46 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
             .Instant("rentalEnd", DocumentWording.Labels.RentalEnd, booking.Period.End, calendar)
             .Text("days", DocumentWording.Labels.RentalDays, DocumentWording.Days(booking.Pricing.Days))
             .Text("pickupMethod", DocumentWording.Labels.PickupMethod, DocumentWording.PickupMethod(booking.PickupMethod));
+    }
+
+    /// <summary>
+    /// The status a payment left its booking in (Wave 4, B6; E2E F57) — never the status at composition, which for a
+    /// correction or a late original is a later moment: "Cancelled" beside "Paid in full online. Nothing is due".
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Read from the PLATFORM's instants, never the provider's clock (<c>CapturedAt</c> is the provider's own time).
+    /// The payment that confirmed the booking left it Confirmed — the one change into Confirmed, which happens once.
+    /// Any other, an orphan, left it as the last change at or before the moment the platform applied or orphaned it:
+    /// so a capture orphaned on a booking that expired as it was loaded reads Expired, not Approved.
+    /// </para>
+    /// <para>
+    /// One instant can carry several changes — a booking requested and approved in one moment — and neither the
+    /// stored order nor the ids can say which came last: a v7 id is random within its millisecond, which made this
+    /// answer differ from one composition to the next. The changes themselves can: within one instant they form a
+    /// chain, each starting where the one before it ended, so the last is the one no other change moved on from.
+    /// </para>
+    /// </remarks>
+    internal static BookingStatus StatusAfterPayment(Booking booking, Payment payment)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        ArgumentNullException.ThrowIfNull(payment);
+
+        if (booking.DepositPaymentId == payment.Id
+            && booking.StatusHistory.Any(change => change.To == BookingStatus.Confirmed))
+            return BookingStatus.Confirmed;
+
+        if ((payment.AppliedAt ?? payment.OrphanedAt) is not { } settledAt)
+            throw new InvalidOperationException($"Payment {payment.Id.Value} has no instant at which the platform took it.");
+
+        var before = booking.StatusHistory.Where(change => change.OccurredAt <= settledAt).ToList();
+        if (before.Count == 0)
+            return booking.Status;
+
+        var latest = before.Max(change => change.OccurredAt);
+        var tied = before.Where(change => change.OccurredAt == latest).ToList();
+        var last = tied.Find(change => !tied.Exists(other => !ReferenceEquals(other, change) && other.From == change.To));
+        return (last ?? tied[^1]).To;
     }
 
     // ── The statement ──────────────────────────────────────────────────────────────────────────────

@@ -90,9 +90,7 @@ public sealed class PostgresEndingRefundQueryTests : IAsyncLifetime
         }
 
         await using var read = NewContext();
-        var found = (await new BookingRepository(read).ListDueForDepositReleaseAsync(Now.AddDays(30)))
-            .Select(booking => booking.Id)
-            .ToHashSet();
+        var found = (await new BookingRepository(read).ListIdsDueForDepositReleaseAsync(Now.AddDays(30))).ToHashSet();
 
         Assert.Contains(gallery.Id, found);
         Assert.Contains(lenient.Id, found);

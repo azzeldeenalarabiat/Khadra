@@ -523,6 +523,91 @@ public sealed class FinancialDocumentComposerTests
         Assert.Equal(ar, text.Ar);
     }
 
+    // ── The status after a payment (Wave 4, B6; E2E F57) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// A payment receipt composed after its booking moved on — a correction, or a late original — states the status
+    /// its payment left the booking in, under that label, never the "Cancelled" beside "Paid in full online. Nothing is
+    /// due". The snapshot keeps the status at issue beside it.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_payment_receipt_states_the_status_its_payment_left_the_booking_in(bool inFull)
+    {
+        var (booking, payment) = Build.PaidBooking(inFull: inFull);
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, null, booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+
+        var snapshot = Parse(PaymentReceipt(booking, payment, issuedAt: Now.AddDays(2)).Snapshot);
+
+        var line = Line(snapshot, "booking", "statusAfterPayment");
+        Assert.Equal("Booking status after this payment", line.GetProperty("label").GetProperty("en").GetString());
+        Assert.Equal("حالة الحجز بعد هذه الدفعة", line.GetProperty("label").GetProperty("ar").GetString());
+        Assert.Equal("Confirmed", line.GetProperty("text").GetProperty("en").GetString());
+        Assert.Equal("Cancelled", snapshot.GetProperty("booking").GetProperty("statusAtIssue").GetString());
+        Assert.Equal("Confirmed", snapshot.GetProperty("booking").GetProperty("statusAfterPayment").GetString());
+        Assert.DoesNotContain(
+            snapshot.GetProperty("content").GetProperty("sections").EnumerateArray()
+                .Single(section => section.GetProperty("key").GetString() == "booking")
+                .GetProperty("lines").EnumerateArray(),
+            entry => entry.GetProperty("key").GetString() == "status");
+    }
+
+    /// <summary>
+    /// A capture orphaned on a booking that expired as it was loaded — the expiry and the orphan one instant, one
+    /// save — reads Expired, not the Approved it was a moment before: the platform's instants decide, never the
+    /// provider's clock.
+    /// </summary>
+    [Fact]
+    public void An_orphan_on_a_booking_that_expired_as_it_was_loaded_reads_expired()
+    {
+        var booking = Build.ApprovedBooking(Now);
+        var late = booking.PaymentDeadline!.Value.AddSeconds(30);
+        Assert.True(booking.ExpireUnpaid(late).IsSuccess);
+        var payment = Payment.Open(booking.Id, booking.CustomerId, Money.Create(booking.Pricing.DepositAmount.Amount, "JOD"), "TestProvider", late.AddMinutes(30), Now);
+        Assert.True(payment.AttachProviderSession("sess_expired_on_load", "https://provider.test/checkout").IsSuccess);
+        // The provider says it captured a minute EARLIER than the platform took it; that clock is not the one read.
+        Assert.True(payment.Orphan(Money.Create(booking.Pricing.DepositAmount.Amount, "JOD"), late.AddMinutes(-1), "BookingExpired", late).IsSuccess);
+
+        Assert.Same(BookingStatus.Expired, FinancialDocumentComposer.StatusAfterPayment(booking, payment));
+        Assert.Equal(
+            "Booking status after this payment",
+            Line(Parse(PaymentReceipt(booking, payment, issuedAt: late.AddMinutes(1)).Snapshot), "booking", "statusAfterPayment")
+                .GetProperty("label").GetProperty("en").GetString());
+    }
+
+    /// <summary>
+    /// Several changes at one instant — a booking requested and approved in one moment — are read in the order they
+    /// happened, every time. Their ids cannot say it: a v7 id is random within its millisecond, which once made this
+    /// answer change from one composition to the next.
+    /// </summary>
+    [Fact]
+    public void Changes_at_one_instant_are_read_in_the_order_they_happened()
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var booking = Build.ApprovedBooking(Now);
+            Assert.Equal(2, booking.StatusHistory.Count(change => change.OccurredAt == Now));
+            var payment = Orphaned(booking, Money.Jod(1m));
+
+            Assert.Same(BookingStatus.Approved, FinancialDocumentComposer.StatusAfterPayment(booking, payment));
+        }
+    }
+
+    /// <summary>A statement and a refund receipt keep stating the status at issue, and carry no status after a payment.</summary>
+    [Fact]
+    public void A_statement_still_states_the_status_at_issue()
+    {
+        var (booking, payment, ticket) = DisputedBooking();
+        var financials = BookingFinancialsCalculator.Calculate(booking, [payment], [ticket], false, Now.AddHours(7));
+
+        var snapshot = Parse(Statement(booking, payment, ticket, financials).Snapshot);
+
+        Assert.Equal("Cancelled", Line(snapshot, "booking", "status").GetProperty("text").GetProperty("en").GetString());
+        Assert.Equal("Booking status", Line(snapshot, "booking", "status").GetProperty("label").GetProperty("en").GetString());
+        Assert.False(snapshot.GetProperty("booking").TryGetProperty("statusAfterPayment", out _));
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
 
     private static FinancialDocumentDraft PaymentReceipt(Booking booking, Payment payment, DateTimeOffset? issuedAt = null) =>

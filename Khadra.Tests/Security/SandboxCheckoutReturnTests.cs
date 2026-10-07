@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
@@ -7,6 +8,7 @@ using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Payments;
 using Khadra.Tests.Support;
 using Khadra.WebAPI;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -40,6 +42,9 @@ public sealed class SandboxCheckoutReturnTests
 
     private static readonly IClock Clock = new TestClock(Build.Now);
 
+    private static readonly IOptions<PaymentOptions> Secret =
+        Options.Create(new PaymentOptions { WebhookSecret = "sandbox-page-test-secret" });
+
     private static Payment OpenPayment() =>
         Payment.Open(Id.New(), Id.New(), Money.Jod(18m), PaymentProviders.Sandbox, Build.Now.AddMinutes(30), Build.Now);
 
@@ -54,7 +59,7 @@ public sealed class SandboxCheckoutReturnTests
         payments.GetByProviderReferenceAsync(PaymentProviders.Sandbox, Reference, Arg.Any<CancellationToken>())
             .Returns(payment);
 
-        var result = await SandboxCheckoutEndpoints.ShowAsync(Reference, lang, payments, settings, Clock, CancellationToken.None);
+        var result = await SandboxCheckoutEndpoints.ShowAsync(Reference, lang, payments, settings, Secret, Clock, CancellationToken.None);
 
         return Assert.IsType<ContentHttpResult>(result).ResponseContent!;
     }
@@ -186,8 +191,57 @@ public sealed class SandboxCheckoutReturnTests
     {
         var payments = Substitute.For<IPaymentRepository>();
 
-        var result = await SandboxCheckoutEndpoints.ShowAsync("sbx_unknown", "ar", payments, Settings(Website), Clock, CancellationToken.None);
+        var result = await SandboxCheckoutEndpoints.ShowAsync("sbx_unknown", "ar", payments, Settings(Website), Secret, Clock, CancellationToken.None);
 
         Assert.IsType<NotFound>(result);
+    }
+
+    /// <summary>
+    /// The page offers the session's capture reference (Wave 4, B1), written into the field's value and read back from
+    /// it by the script, never spliced into the script: left alone, pressing Pay again is the same capture said again.
+    /// </summary>
+    [Fact]
+    public async Task The_page_offers_the_sessions_capture_reference_in_its_own_field()
+    {
+        var page = await PageFor(OpenPayment(), Settings(Website), "en");
+
+        var expected = SandboxEvents.CaptureReferenceFor(Reference, Secret.Value.WebhookSecret);
+        Assert.Contains($"""<input id="capture" type="text" value="{expected}">""", page, StringComparison.Ordinal);
+        Assert.Contains("document.getElementById('capture').value.trim()", page, StringComparison.Ordinal);
+        var script = page[page.IndexOf("<script>", StringComparison.Ordinal)..];
+        Assert.DoesNotContain(expected, script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// What the page's Pay button sends: the capture reference the tester left, edited or cleared, trimmed, on a
+    /// capture and on nothing else.
+    /// </summary>
+    [Theory]
+    [InlineData("captured", " sbxcap_edited ", "sbxcap_edited")]
+    [InlineData("captured", "   ", null)]
+    [InlineData("captured", null, null)]
+    [InlineData("failed", "sbxcap_edited", null)]
+    [InlineData("refund_settled", "sbxcap_edited", null)]
+    public async Task Only_a_capture_sent_from_the_page_carries_a_capture_reference(string kind, string? typed, string? expected)
+    {
+        var payments = Substitute.For<IPaymentRepository>();
+        payments.GetByProviderReferenceAsync(PaymentProviders.Sandbox, Reference, Arg.Any<CancellationToken>())
+            .Returns(OpenPayment());
+
+        var result = await SandboxCheckoutEndpoints.BuildEventAsync(
+            Reference,
+            new SandboxCheckoutEndpoints.SandboxOutcome("evt_page", kind, null, null, CaptureReference: typed),
+            payments,
+            Secret,
+            Clock,
+            CancellationToken.None);
+
+        var envelope = Assert.IsAssignableFrom<IValueHttpResult>(result).Value;
+        using var signed = JsonDocument.Parse(JsonSerializer.Serialize(envelope));
+        using var body = JsonDocument.Parse(signed.RootElement.GetProperty("body").GetString()!);
+        var sent = body.RootElement.TryGetProperty("captureReference", out var field) && field.ValueKind == JsonValueKind.String
+            ? field.GetString()
+            : null;
+        Assert.Equal(expected, sent);
     }
 }

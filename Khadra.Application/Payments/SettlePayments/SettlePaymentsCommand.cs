@@ -42,6 +42,18 @@ public sealed record SettlePaymentsCommand : ICommand<Result<PaymentSweepReport,
 /// <see cref="RefundStatus.Requested"/> and this says so in the log — visible and owed, rather than
 /// quietly dropped.
 /// </para>
+/// <para>
+/// <b>A refused refund waits</b> (Wave 4, B4; checklist 157). It used to be sent again on every tick, with an Error
+/// each time. Now each refusal is counted and sets when it may be sent again, by
+/// <see cref="IPaymentSettings.RefundRetry"/>; it is never abandoned, and from the policy's alert on it is logged
+/// at Error and put on the administrator's work queue.
+/// </para>
+/// <para>
+/// <b>One payment at a time.</b> Each payment with a refund due is loaded, sent and saved on its own. A refund the
+/// webhook settled while the sweep held it is refused by its concurrency token at the save, and that costs this
+/// payment's sends only: the tracker is discarded and the next payment is read fresh. It used to be one save for the
+/// whole tick, and one conflict threw every other payment's sends away with it.
+/// </para>
 /// </remarks>
 public sealed partial class SettlePaymentsHandler(
     IPaymentRepository payments,
@@ -154,21 +166,35 @@ public sealed partial class SettlePaymentsHandler(
 
     private async Task<(int Sent, int Failed)> SendRefundsAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var owing = await payments.ListWithOutstandingRefundsAsync(cancellationToken);
+        var due = await payments.ListIdsWithRefundsDueAsync(now, cancellationToken);
+        var policy = settings.RefundRetry;
         var sent = 0;
         var failed = 0;
+        var reached = 0;
+        var unreachable = false;
 
-        foreach (var payment in owing)
+        foreach (var paymentId in due)
         {
+            // The provider stopped answering: every refund left is still due, untouched, and goes on the next tick.
+            if (unreachable)
+                break;
+            reached++;
+
+            // A clean tracker for every payment: nothing one payment did, or failed to save, reaches the next.
+            unitOfWork.DiscardChanges();
+            var payment = await payments.GetByIdAsync(paymentId, cancellationToken);
+
             // Only a captured payment has a provider reference to refund against; a Requested refund
             // on anything else is a bug elsewhere, and sending it would be acting on that bug.
-            if (payment.ProviderReference is not { } reference)
+            if (payment?.ProviderReference is not { } reference)
                 continue;
 
-            var pending = payment.Refunds
-                .Where(refund => refund.Status == RefundStatus.Requested || refund.Status == RefundStatus.Failed)
-                .ToList();
+            // Due by the refund's OWN schedule: one payment can carry a refund that is due and one still waiting.
+            var pending = payment.Refunds.Where(refund => refund.IsDueToSend(now)).ToList();
+            if (pending.Count == 0)
+                continue;
 
+            var (paymentSent, paymentFailed) = (0, 0);
             foreach (var refund in pending)
             {
                 // The refund's OWN id is the idempotency key, so a crash between the provider
@@ -181,20 +207,55 @@ public sealed partial class SettlePaymentsHandler(
                 if (result.IsSuccess)
                 {
                     refund.MarkSent(result.Value.ProviderReference, now);
-                    sent++;
+                    paymentSent++;
+                }
+                else if (result.Error.Code == PaymentErrors.ProviderUnavailable.Code)
+                {
+                    // Nobody refused anything: the provider could not be asked. Counting it would put every refund
+                    // on the work queue as "refused three times" after a ten-minute outage, and stretch its waits
+                    // long after the provider is back (the advisor's review). The refund stays exactly as it was.
+                    unreachable = true;
+                    break;
                 }
                 else
                 {
-                    refund.MarkFailed(result.Error.Code, now);
-                    failed++;
-                    LogRefundRefused(logger, refund.Id.Value, result.Error.Code);
+                    refund.RecordRefusedSend(result.Error.Code, now, policy);
+                    paymentFailed++;
+                    LogRefusal(refund, result.Error.Code, policy);
                 }
+            }
+
+            try
+            {
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                sent += paymentSent;
+                failed += paymentFailed;
+            }
+            catch (ConcurrencyConflictException)
+            {
+                // Somebody wrote this payment's refunds while they were being sent — the webhook settling one, most
+                // likely. Theirs stands. Whatever the provider accepted here is sent again next time under the same
+                // idempotency key, and is the same refund.
+                LogRefundConflict(logger, payment.Id.Value);
+                unitOfWork.DiscardChanges();
             }
         }
 
-        if (sent + failed > 0)
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+        if (unreachable)
+            LogProviderUnreachable(logger, due.Count - reached + 1);
         return (sent, failed);
+    }
+
+    /// <summary>
+    /// A refused send: a warning while the back-off is handling it, an error once the refusals need a person.
+    /// </summary>
+    private void LogRefusal(Refund refund, string code, RefundRetryPolicy policy)
+    {
+        var next = refund.NextAttemptAt ?? DateTimeOffset.MinValue;
+        if (policy.NeedsAPerson(refund.RefusalCount))
+            LogRefundRefusedRepeatedly(logger, refund.Id.Value, code, refund.RefusalCount, next);
+        else
+            LogRefundRefused(logger, refund.Id.Value, code, refund.RefusalCount, next);
     }
 
     [LoggerMessage(
@@ -225,8 +286,39 @@ public sealed partial class SettlePaymentsHandler(
     [LoggerMessage(2314, LogLevel.Warning, "Payment {PaymentId} could not be closed ({Code}).")]
     private static partial void LogCloseRefused(ILogger logger, Guid paymentId, string code);
 
-    [LoggerMessage(2315, LogLevel.Error, "Refund {RefundId} was refused by the provider ({Code}). It stays owed.")]
-    private static partial void LogRefundRefused(ILogger logger, Guid refundId, string code);
+    /// <summary>
+    /// A Warning now, not an Error (Wave 4, B4): the back-off is handling it. It was an Error on every tick, which
+    /// for a card closed for good was a flood of identical lines.
+    /// </summary>
+    [LoggerMessage(
+        2315,
+        LogLevel.Warning,
+        "Refund {RefundId} was refused by the provider ({Code}), {Refusals} time(s) so far. It stays owed and is sent "
+        + "again at {NextAttemptAt:O}.")]
+    private static partial void LogRefundRefused(
+        ILogger logger, Guid refundId, string code, int refusals, DateTimeOffset nextAttemptAt);
+
+    [LoggerMessage(
+        2323,
+        LogLevel.Error,
+        "Refund {RefundId} has been refused by the provider {Refusals} times ({Code}). It stays owed, is sent again at "
+        + "{NextAttemptAt:O}, and is on the administrator's work queue: a person must look.")]
+    private static partial void LogRefundRefusedRepeatedly(
+        ILogger logger, Guid refundId, string code, int refusals, DateTimeOffset nextAttemptAt);
+
+    [LoggerMessage(
+        2325,
+        LogLevel.Warning,
+        "The payment provider could not be reached; {Payments} payment(s) with a refund due were left exactly as they "
+        + "were and are sent on the next tick. Nothing was refused, so nothing was counted.")]
+    private static partial void LogProviderUnreachable(ILogger logger, int payments);
+
+    [LoggerMessage(
+        2324,
+        LogLevel.Warning,
+        "Payment {PaymentId}'s refunds changed while the sweep was sending them; its sends this tick were not recorded "
+        + "and are sent again next time under the same idempotency key. The other payments are unaffected.")]
+    private static partial void LogRefundConflict(ILogger logger, Guid paymentId);
 
     [LoggerMessage(
         2316,

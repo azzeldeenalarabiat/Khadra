@@ -89,6 +89,9 @@ public sealed class OfficePayoutQueryTests
 
         var balance = Assert.Single(balances.Balances);
         Assert.Equal(3m, balance.NotYetDue.Amount);
+        // Held back and blocked, each netted on its own (Wave 4, F56 a): the office reads both too.
+        Assert.Equal((0, 0m, 1, 3m), (balance.HeldCount, balance.Held.Amount, balance.BlockedCount, balance.Blocked.Amount));
+        Assert.Equal("JOD", balance.Blocked.Currency);
         Assert.Equal("TEST-SET-2026-000002", balance.LastSettlement!.Number);
         Assert.Null(balance.Provider);
         Assert.Null(balance.IsTest);
@@ -180,7 +183,11 @@ public sealed class OfficePayoutQueryTests
             DueNet: 0m,
             NotYetDueCount: 1,
             NotYetDueNet: 3m,
-            new LedgerSettlementSummary(Id.New(), "TEST-SET-2026-000002", SettlementDirection.Payout, 12m, new DateOnly(2026, 9, 30)));
+            new LedgerSettlementSummary(Id.New(), "TEST-SET-2026-000002", SettlementDirection.Payout, 12m, new DateOnly(2026, 9, 30)),
+            HeldCount: 0,
+            HeldNet: 0m,
+            BlockedCount: 1,
+            BlockedNet: 3m);
 
     private static LedgerSettlement Settlement(Id dealerId, bool voided = false) =>
         new(

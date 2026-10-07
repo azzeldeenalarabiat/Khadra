@@ -77,10 +77,12 @@ public sealed partial class ReceiveProviderEventHandler(
     IPaymentProvider provider,
     IPaymentRepository payments,
     IProviderEventReceiptRepository receipts,
+    IPaymentIncidentRepository incidents,
     IBookingRepository bookings,
     IDealerRepository dealers,
     DealerTeamNotifier team,
     IClock clock,
+    IPaymentSettings settings,
     IUnitOfWork unitOfWork,
     ILogger<ReceiveProviderEventHandler> logger) : IRequestHandler<ReceiveProviderEventCommand, UnitResult<Error>>
 {
@@ -164,11 +166,70 @@ public sealed partial class ReceiveProviderEventHandler(
             LogAlreadyApplied(logger, parsed.Value.ProviderEventId, parsed.Value.ProviderReference);
             return UnitResult.Success<Error>();
         }
+        catch (UniqueConstraintConflictException conflict) when (conflict.IsProviderCaptureReference)
+        {
+            // Two attempts claimed the same capture at the same moment, and this one lost to the index that keeps one
+            // capture on one attempt (Wave 4, B1). The winner holds the capture; this notice is a capture on another
+            // attempt. Answered 2xx with its receipt and its incident, never a 5xx the provider would redeliver for
+            // days — which is what the index alone, uncaught, would have produced.
+            if (await RecordCaptureLostToAnotherAttemptAsync(parsed.Value, cancellationToken) is { } recorded)
+                return recorded;
+            throw;
+        }
         catch (ConcurrencyConflictException)
         {
             LogRaceLost(logger, parsed.Value.ProviderEventId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Records the loser of a race for one capture: a receipt and an incident, read afresh. Null when what the
+    /// database now holds is not that race, so the caller lets the original conflict surface as before.
+    /// </summary>
+    /// <remarks>
+    /// The refused save left this attempt reading Applied and its booking Confirmed in EF's tracker, so the tracker is
+    /// discarded first and both payments are read again as the winner committed them.
+    /// </remarks>
+    private async Task<UnitResult<Error>?> RecordCaptureLostToAnotherAttemptAsync(
+        ProviderEvent notification,
+        CancellationToken cancellationToken)
+    {
+        unitOfWork.DiscardChanges();
+        if (notification.Amount is not { } captured || string.IsNullOrWhiteSpace(notification.CaptureReference))
+            return null;
+
+        var payment = await payments.GetByProviderReferenceAsync(provider.Name, notification.ProviderReference, cancellationToken);
+        var owner = await payments.GetByCaptureReferenceAsync(provider.Name, notification.CaptureReference.Trim(), cancellationToken);
+        if (payment is null || owner is null || owner.Id == payment.Id)
+            return null;
+
+        var now = clock.UtcNow;
+        LogCaptureOnAnotherAttempt(logger, payment.Id.Value, owner.Id.Value, captured.Amount, captured.CurrencyCode);
+        var receipt = Receipt(notification, payment, ProviderEventOutcome.OtherAttempt, now);
+        receipts.Add(receipt);
+        incidents.Add(PaymentIncident.Raise(
+            PaymentIncidentKind.CaptureOnAnotherAttempt,
+            payment.Id,
+            receipt.Id,
+            provider.Name,
+            notification.CaptureReference,
+            captured,
+            payment.Amount,
+            owner.Id,
+            now));
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (UniqueConstraintConflictException conflict) when (conflict.IsProviderEventReceipt)
+        {
+            // A redelivery of this very notice recorded it first. Recorded once either way.
+            LogAlreadyApplied(logger, notification.ProviderEventId, notification.ProviderReference);
+        }
+
+        return UnitResult.Success<Error>();
     }
 
     private async Task<UnitResult<Error>> ApplyAsync(ProviderEvent notification, CancellationToken cancellationToken)
@@ -191,16 +252,33 @@ public sealed partial class ReceiveProviderEventHandler(
             return UnitResult.Success<Error>();
         }
 
-        var outcome = notification.Kind switch
+        var (outcome, incident) = notification.Kind switch
         {
             ProviderEventKind.Captured => await CaptureAsync(payment, notification, now, cancellationToken),
-            ProviderEventKind.Failed => Fail(payment, notification, now),
-            ProviderEventKind.RefundSettled => await SettleRefundAsync(payment, notification, now, cancellationToken),
-            ProviderEventKind.RefundFailed => FailRefund(payment, notification, now),
-            _ => ProviderEventOutcome.Ignored
+            ProviderEventKind.Failed => (Fail(payment, notification, now), null),
+            ProviderEventKind.RefundSettled => (await SettleRefundAsync(payment, notification, now, cancellationToken), null),
+            ProviderEventKind.RefundFailed => (FailRefund(payment, notification, now), null),
+            _ => (ProviderEventOutcome.Ignored, (PendingIncident?)null)
         };
 
-        receipts.Add(Receipt(notification, payment, outcome, now));
+        var receipt = Receipt(notification, payment, outcome, now);
+        receipts.Add(receipt);
+
+        // An incident is tied to the receipt that recorded its notice, which is unique: a redelivered notice is
+        // refused at the receipt's own index and cannot raise a second one (Wave 4, B1).
+        if (incident is not null)
+        {
+            incidents.Add(PaymentIncident.Raise(
+                incident.Kind,
+                payment.Id,
+                receipt.Id,
+                provider.Name,
+                notification.CaptureReference,
+                incident.Reported,
+                incident.Expected,
+                incident.OtherPaymentId,
+                now));
+        }
 
         // ONE save. The capture, the booking's confirmation, the notifications and the receipt that
         // makes this delivery un-replayable all commit together or none of them do.
@@ -208,7 +286,10 @@ public sealed partial class ReceiveProviderEventHandler(
         return UnitResult.Success<Error>();
     }
 
-    private async Task<ProviderEventOutcome> CaptureAsync(
+    /// <summary>An incident a capture notice raises, waiting for the receipt it will be tied to.</summary>
+    private sealed record PendingIncident(PaymentIncidentKind Kind, Money Reported, Money Expected, Id? OtherPaymentId);
+
+    private async Task<(ProviderEventOutcome Outcome, PendingIncident? Incident)> CaptureAsync(
         Payment payment,
         ProviderEvent notification,
         DateTimeOffset now,
@@ -219,39 +300,58 @@ public sealed partial class ReceiveProviderEventHandler(
         if (notification.Amount is not { } captured)
         {
             LogCaptureWithoutAmount(logger, payment.Id.Value);
-            return ProviderEventOutcome.Ignored;
+            return (ProviderEventOutcome.Ignored, null);
         }
 
-        // The payment's OWN guards run first -- wrong amount, wrong currency, already captured --
-        // before the booking is touched at all. Confirming and then discovering the capture is
-        // unusable would leave a mutated Booking on the change tracker with nothing to undo it: the
-        // aggregate has no `Unconfirm`, and it should not have one.
+        // Before anything else, a capture ANOTHER attempt already took (Wave 4, B1; the advisor's review). Applying it
+        // here would collide with the unique index on (provider, capture reference) at the save, and that 5xx would
+        // bring the same notice back for days. It is an incident, recorded and answered.
+        if (!string.IsNullOrWhiteSpace(notification.CaptureReference))
+        {
+            var owner = await payments.GetByCaptureReferenceAsync(
+                provider.Name, notification.CaptureReference.Trim(), cancellationToken);
+            if (owner is not null && owner.Id != payment.Id)
+            {
+                LogCaptureOnAnotherAttempt(logger, payment.Id.Value, owner.Id.Value, captured.Amount, captured.CurrencyCode);
+                return (ProviderEventOutcome.OtherAttempt,
+                    new PendingIncident(PaymentIncidentKind.CaptureOnAnotherAttempt, captured, payment.Amount, owner.Id));
+            }
+        }
+
+        // A notice for money this attempt has ALREADY taken (E2E F30). It used to be refused as already captured,
+        // fail to orphan, and be logged as money UNACCOUNTED FOR on a row whose money was right.
+        if (payment.Status.IsCaptured)
+            return RepeatCapture(payment, captured, notification.CaptureReference);
+
+        // The payment's OWN guards run first -- wrong amount, wrong currency -- before the booking is touched at
+        // all. Confirming and then discovering the capture is unusable would leave a mutated Booking on the change
+        // tracker with nothing to undo it: the aggregate has no `Unconfirm`, and it should not have one.
         var acceptable = payment.CanAcceptCapture(captured);
         if (acceptable.IsFailure)
         {
             LogCaptureRefused(logger, payment.Id.Value, acceptable.Error.Code);
-            Orphan(payment, captured, notification.OccurredAt, acceptable.Error.Code, now);
-            return ProviderEventOutcome.Orphaned;
+            return Orphan(payment, captured, notification, acceptable.Error.Code, now);
         }
 
         var booking = await bookings.GetByIdAsync(payment.BookingId, cancellationToken);
+
+        // The instant is read again AFTER the load (Wave 4, the advisor's review of the payments half). Loading may
+        // settle a lapse with its own, later reading of the clock -- a capture seconds after the payment deadline
+        // expires the booking on this very load -- and an orphan stamped with the instant read before it would precede
+        // the expiry it was orphaned by: its receipt would state the booking as Approved, not Expired. The receipt
+        // keeps the instant the notice arrived.
+        var decidedAt = clock.UtcNow;
         if (booking is null)
-        {
-            Orphan(payment, captured, notification.OccurredAt, "BookingMissing", now);
-            return ProviderEventOutcome.Orphaned;
-        }
+            return Orphan(payment, captured, notification, "BookingMissing", decidedAt);
 
         // Deliberately NOT gated on the payment deadline. The money has moved; refusing it now would
         // mean keeping it. The deadline is enforced where a checkout opens -- see
         // BookingDepositSettlement.DepositDue and pre-launch item 62.
-        var confirmed = BookingDepositSettlement.Confirm(booking, payment, now);
+        var confirmed = BookingDepositSettlement.Confirm(booking, payment, decidedAt);
         if (confirmed.IsFailure)
-        {
-            Orphan(payment, captured, notification.OccurredAt, BookingDepositSettlement.OrphanReasonFor(booking, payment.Id), now);
-            return ProviderEventOutcome.Orphaned;
-        }
+            return Orphan(payment, captured, notification, BookingDepositSettlement.OrphanReasonFor(booking, payment.Id), decidedAt);
 
-        var applied = payment.Apply(captured, notification.OccurredAt, now);
+        var applied = payment.Apply(captured, notification.OccurredAt, decidedAt, notification.CaptureReference);
         if (applied.IsFailure)
         {
             // Unreachable: CanAcceptCapture asked these exact questions a few lines ago and nothing
@@ -261,30 +361,64 @@ public sealed partial class ReceiveProviderEventHandler(
                 $"Payment {payment.Id} passed its capture guard and then refused the capture: {applied.Error.Code}.");
         }
 
-        await AnnounceAsync(booking.DealerId, booking.CustomerId, booking.Id, booking.Reference.Value, now, cancellationToken);
-        return ProviderEventOutcome.Acted;
+        await AnnounceAsync(booking.DealerId, booking.CustomerId, booking.Id, booking.Reference.Value, decidedAt, cancellationToken);
+        return (ProviderEventOutcome.Acted, null);
+    }
+
+    /// <summary>
+    /// A capture notice for money this attempt has already taken: the same capture said again, or one it cannot
+    /// account for (Wave 4, B1). Changes nothing, and never refunds: an incident is a person's to decide.
+    /// </summary>
+    private (ProviderEventOutcome Outcome, PendingIncident? Incident) RepeatCapture(
+        Payment payment,
+        Money captured,
+        string? captureReference)
+    {
+        var verdict = payment.ClassifyRepeatCapture(captured, captureReference);
+        var taken = payment.AmountCaptured!;
+
+        if (PaymentIncidentKind.For(verdict) is { } kind)
+        {
+            LogRepeatCaptureIncident(
+                logger, payment.Id.Value, verdict.Name, captured.Amount, captured.CurrencyCode, taken.Amount, taken.CurrencyCode);
+            return (verdict, new PendingIncident(kind, captured, taken, null));
+        }
+
+        if (verdict == ProviderEventOutcome.AssumedDuplicate)
+            LogAssumedDuplicate(logger, payment.Id.Value, captured.Amount, captured.CurrencyCode);
+        else
+            LogDuplicateCapture(logger, payment.Id.Value, verdict.Name);
+        return (verdict, null);
     }
 
     /// <summary>
     /// Records a capture the platform cannot use, and the refund that is owed the instant it lands.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The refund is created by the aggregate rather than here, so a capture can never be orphaned
     /// without one. Money taken with no record saying it is owed back is the failure this whole
     /// handler exists to make impossible.
+    /// </para>
+    /// <para>
+    /// The aggregate refuses only a payment that has already taken money, and the caller judged those before
+    /// getting here (<see cref="RepeatCapture"/>). Should that ever change, the notice is judged the same way rather
+    /// than recorded as <c>Orphaned</c> when nothing was orphaned (Wave 4, the advisor's review).
+    /// </para>
     /// </remarks>
-    private void Orphan(Payment payment, Money captured, DateTimeOffset capturedAt, string reason, DateTimeOffset now)
+    private (ProviderEventOutcome Outcome, PendingIncident? Incident) Orphan(
+        Payment payment,
+        Money captured,
+        ProviderEvent notification,
+        string reason,
+        DateTimeOffset now)
     {
-        var orphaned = payment.Orphan(captured, capturedAt, reason, now);
+        var orphaned = payment.Orphan(captured, notification.OccurredAt, reason, now, notification.CaptureReference);
         if (orphaned.IsFailure)
-        {
-            // Reachable only if the amount does not match AND the booking could not take it. Both
-            // facts matter, so the log carries the amount rather than only the code.
-            LogOrphanFailed(logger, payment.Id.Value, orphaned.Error.Code, captured.Amount, captured.CurrencyCode);
-            return;
-        }
+            return RepeatCapture(payment, captured, notification.CaptureReference);
 
         LogOrphaned(logger, payment.Id.Value, captured.Amount, captured.CurrencyCode, reason);
+        return (ProviderEventOutcome.Orphaned, null);
     }
 
     private static ProviderEventOutcome Fail(Payment payment, ProviderEvent notification, DateTimeOffset now)
@@ -354,7 +488,10 @@ public sealed partial class ReceiveProviderEventHandler(
         return ProviderEventOutcome.Acted;
     }
 
-    /// <summary>The provider refused a refund. It stays owed, and the payment sweep sends it again.</summary>
+    /// <summary>
+    /// The provider refused a refund. It stays owed, and the payment sweep sends it again once its wait is over
+    /// (Wave 4, B4).
+    /// </summary>
     private ProviderEventOutcome FailRefund(Payment payment, ProviderEvent notification, DateTimeOffset now)
     {
         var refund = RefundNamedBy(payment, notification);
@@ -364,8 +501,11 @@ public sealed partial class ReceiveProviderEventHandler(
         // stands, because the customer has the money.
         if (refund.Status == RefundStatus.Settled)
             return ProviderEventOutcome.Ignored;
+        // The same refusal said again under a new event id: counted once, so it changes nothing (Wave 4, B4).
+        if (refund.Status == RefundStatus.Failed)
+            return ProviderEventOutcome.Ignored;
 
-        refund.MarkFailed(notification.FailureCode ?? "provider_refused", now);
+        refund.MarkFailed(notification.FailureCode ?? "provider_refused", now, settings.RefundRetry);
         return ProviderEventOutcome.Acted;
     }
 
@@ -450,7 +590,8 @@ public sealed partial class ReceiveProviderEventHandler(
             payment?.Id,
             outcome,
             notification.Amount,
-            now);
+            now,
+            notification.Kind == ProviderEventKind.Captured ? notification.CaptureReference : null);
 
     [LoggerMessage(
         2300,
@@ -489,12 +630,46 @@ public sealed partial class ReceiveProviderEventHandler(
         "Payment {PaymentId} could not accept its own capture: {Code}. It is being orphaned.")]
     private static partial void LogCaptureRefused(ILogger logger, Guid paymentId, string code);
 
+    // 2304 ("… could not be orphaned; captured … is UNACCOUNTED FOR") is retired (Wave 4, B1; E2E F30). It was
+    // reached only by a second notice for money a payment had already taken, whose money was right; such a notice is
+    // now judged by 2309, 2317, 2318 or 2319. The id is not reused.
+
+    /// <summary>
+    /// Information: the provider said the same capture again, which providers do. Logged so the first notice can be
+    /// found from any later one.
+    /// </summary>
     [LoggerMessage(
-        2304,
+        2309,
+        LogLevel.Information,
+        "Payment {PaymentId} received another notice of the capture it already took ({Outcome}). Recorded; nothing changed.")]
+    private static partial void LogDuplicateCapture(ILogger logger, Guid paymentId, string outcome);
+
+    /// <summary>
+    /// A warning, not information: with no capture reference to compare, a genuine second charge of the same amount
+    /// would read exactly like this. A real adapter must send a reference (pre-launch item 76).
+    /// </summary>
+    [LoggerMessage(
+        2317,
+        LogLevel.Warning,
+        "Payment {PaymentId} received a capture notice with no capture reference to compare, for the {Amount} {Currency} "
+        + "it already took. Taken as the same capture said again; a second charge of the same amount would look identical.")]
+    private static partial void LogAssumedDuplicate(ILogger logger, Guid paymentId, decimal amount, string currency);
+
+    [LoggerMessage(
+        2318,
         LogLevel.Error,
-        "Payment {PaymentId} could not be orphaned ({Code}); captured {Amount} {Currency} is UNACCOUNTED FOR.")]
-    private static partial void LogOrphanFailed(
-        ILogger logger, Guid paymentId, string code, decimal amount, string currency);
+        "Payment {PaymentId} received a capture it cannot account for ({Outcome}): the notice says {Reported} {ReportedCurrency}, "
+        + "and the payment took {Taken} {TakenCurrency}. Recorded as an incident for an administrator; nothing was refunded.")]
+    private static partial void LogRepeatCaptureIncident(
+        ILogger logger, Guid paymentId, string outcome, decimal reported, string reportedCurrency, decimal taken, string takenCurrency);
+
+    [LoggerMessage(
+        2319,
+        LogLevel.Error,
+        "Payment {PaymentId} received a capture of {Amount} {Currency} whose capture reference payment {OtherPaymentId} "
+        + "already holds. Recorded as an incident for an administrator; nothing was applied or refunded.")]
+    private static partial void LogCaptureOnAnotherAttempt(
+        ILogger logger, Guid paymentId, Guid otherPaymentId, decimal amount, string currency);
 
     [LoggerMessage(
         2305,

@@ -73,11 +73,13 @@ public sealed record PaymentVocabularyDto(
 /// The documents issued about this payment (payments Phase 5): every version of its receipt and of its
 /// refunds' receipts, newest first. Added last; nothing else in this response changed.
 /// </param>
+/// <param name="Incidents">The payment's capture incidents, open ones first (Wave 4, B1). Added last.</param>
 public sealed record AdminPaymentDto(
     FinancialPaymentDto Payment,
     PaymentBookingLink? Booking,
     IReadOnlyList<ProviderEventItem> ProviderEvents,
-    IReadOnlyList<AdminFinancialDocumentListItem>? Documents = null);
+    IReadOnlyList<AdminFinancialDocumentListItem>? Documents = null,
+    IReadOnlyList<PaymentIncidentItem>? Incidents = null);
 
 public sealed class ListAdminPaymentsQueryValidator : AbstractValidator<ListAdminPaymentsQuery>
 {
@@ -125,7 +127,8 @@ public sealed class AdminPaymentQueryHandlers(
     IPaymentAdminReader reader,
     IPaymentRepository payments,
     IFinancialDocumentReader documents,
-    IReportingCalendar calendar)
+    IReportingCalendar calendar,
+    IPaymentSettings settings)
     : IRequestHandler<ListAdminPaymentsQuery, Result<PagedResult<AdminPaymentListItem>, Error>>,
       IRequestHandler<ListAdminRefundsQuery, Result<PagedResult<AdminRefundListItem>, Error>>,
       IRequestHandler<GetAdminPaymentQuery, Result<AdminPaymentDto, Error>>,
@@ -169,7 +172,12 @@ public sealed class AdminPaymentQueryHandlers(
             request.Reference,
             from,
             before);
-        return await reader.ListRefundsAsync(filter, PageRequest.From(request.Page, request.PageSize), cancellationToken);
+        var page = await reader.ListRefundsAsync(filter, PageRequest.From(request.Page, request.PageSize), cancellationToken);
+
+        // Whether a person must look is the server's judgement, by the setting in force (Wave 4, B4); the console
+        // holds no threshold of its own.
+        var policy = settings.RefundRetry;
+        return page with { Items = [.. page.Items.Select(row => row with { NeedsAPerson = policy.NeedsAPerson(row.RefusalCount) })] };
     }
 
     public async Task<Result<AdminPaymentDto, Error>> Handle(GetAdminPaymentQuery request, CancellationToken cancellationToken)
@@ -184,12 +192,14 @@ public sealed class AdminPaymentQueryHandlers(
         var booking = await reader.BookingLinkAsync(payment.BookingId, cancellationToken);
         var events = await reader.ProviderEventsAsync(payment.Id, payment.Provider, payment.ProviderReference, cancellationToken);
         var issued = await documents.ListForPaymentAsync(payment.Id, cancellationToken);
+        var incidents = await reader.IncidentsAsync(payment.Id, cancellationToken);
 
         return new AdminPaymentDto(
             FinancialPaymentDto.For(BookingFinancialsCalculator.Describe(payment), Reader.Of(BookingParty.Admin)),
             booking,
             events,
-            [.. issued.Select(AdminFinancialDocumentListItem.From)]);
+            [.. issued.Select(AdminFinancialDocumentListItem.From)],
+            incidents);
     }
 
     /// <summary>Amman calendar days, inclusive at both ends, as a half-open range of instants.</summary>

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Khadra.Application.Common;
 using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.Financials;
@@ -106,6 +107,8 @@ internal sealed class OfficeLedgerReader(KhadraDbContext context) : IOfficeLedge
                 .ToList();
             var due = states.Where(entry => entry.State == PayableStates.Due).ToList();
             var notYet = states.Where(entry => entry.State is PayableStates.OnHold or PayableStates.Blocked).ToList();
+            var heldOnes = notYet.Where(entry => entry.State == PayableStates.OnHold).ToList();
+            var blockedOnes = notYet.Where(entry => entry.State == PayableStates.Blocked).ToList();
             var last = settlements
                 .Where(settlement => settlement.DealerId == office && settlement.Currency == currency && settlement.Provider == provider)
                 .OrderByDescending(settlement => settlement.RecordedAt)
@@ -122,7 +125,11 @@ internal sealed class OfficeLedgerReader(KhadraDbContext context) : IOfficeLedge
                 due.Sum(entry => entry.Net),
                 notYet.Count,
                 notYet.Sum(entry => entry.Net),
-                last is null ? null : new LedgerSettlementSummary(last.Id, last.Number, last.Direction, last.Amount, last.PaidOn)));
+                last is null ? null : new LedgerSettlementSummary(last.Id, last.Number, last.Direction, last.Amount, last.PaidOn),
+                heldOnes.Count,
+                heldOnes.Sum(entry => entry.Net),
+                blockedOnes.Count,
+                blockedOnes.Sum(entry => entry.Net)));
         }
 
         // Real money before test money, then the office, then the currency: the order an administrator reads.
@@ -140,7 +147,9 @@ internal sealed class OfficeLedgerReader(KhadraDbContext context) : IOfficeLedge
         if (filter.DealerId is { } dealerId)
             query = query.Where(payable => payable.DealerId == dealerId);
         if (filter.Scope == PayableListScopes.Open)
-            query = query.Where(payable => payable.SettlementId == null);
+            query = query.Where(payable => payable.SettlementId == null).Where(Not(NothingDue()));
+        else if (filter.Scope == PayableListScopes.NothingDue)
+            query = query.Where(payable => payable.SettlementId == null).Where(NothingDue());
         else if (filter.Scope == PayableListScopes.Settled)
             query = query.Where(payable => payable.SettlementId != null);
         if (filter.FinalFrom is { } from)
@@ -159,6 +168,28 @@ internal sealed class OfficeLedgerReader(KhadraDbContext context) : IOfficeLedge
 
         return new PagedResult<LedgerPayable>(await ComposeAsync(page, cancellationToken), filter.Page, filter.PageSize, total);
     }
+
+    /// <summary>
+    /// <see cref="PayableStates.NothingDue"/> as SQL, for an OPEN payable (Wave 4, F56 c): net zero, no open hold, and
+    /// nothing blocking it — no refund on the booking outstanding and no dispute on it live, as <see cref="BlocksAsync"/>
+    /// reads them. A net-zero payable a refund still blocks stays Open until the refund settles, then moves here.
+    /// </summary>
+    private Expression<Func<OfficePayable, bool>> NothingDue()
+    {
+        var settledRefund = RefundStatus.Settled;
+        var openDispute = DisputeStatus.Open;
+        var underReview = DisputeStatus.UnderReview;
+        return payable =>
+            payable.Net == 0m
+            && !context.OfficePayableHolds.Any(hold => hold.ReleasedAt == null && hold.PayableId == payable.Id)
+            && !context.Payments.Any(payment =>
+                payment.BookingId == payable.BookingId && payment.Refunds.Any(refund => refund.Status != settledRefund))
+            && !context.DisputeTickets.Any(ticket =>
+                ticket.BookingId == payable.BookingId && (ticket.Status == openDispute || ticket.Status == underReview));
+    }
+
+    private static Expression<Func<OfficePayable, bool>> Not(Expression<Func<OfficePayable, bool>> predicate) =>
+        Expression.Lambda<Func<OfficePayable, bool>>(Expression.Not(predicate.Body), predicate.Parameters);
 
     public async Task<IReadOnlyList<LedgerHold>> ListBookingHoldsAsync(Id? dealerId, CancellationToken cancellationToken = default) =>
         await HoldsAsync(

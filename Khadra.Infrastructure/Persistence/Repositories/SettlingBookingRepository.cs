@@ -1,3 +1,4 @@
+using Khadra.Application.Bookings;
 using Khadra.Application.Common;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
@@ -24,10 +25,14 @@ namespace Khadra.Infrastructure.Persistence.Repositories;
 /// matters because the API sleeps on Render's free tier and may not run for hours.
 /// </para>
 /// <para>
-/// <b>Only the single-booking loads.</b> The <c>ListDueFor*</c> queries are the SWEEP's, and it
-/// calls <c>ExpireUnpaid</c> / <c>ExpireUnanswered</c> itself; settling them here would leave the
-/// sweep's own call refusing a booking this had already transitioned, and it would log that as a
-/// failure. They pass straight through.
+/// <b>It settles and announces, in one breath</b> (Wave 4, checklist 234). A lapse settled here is announced through
+/// <see cref="BookingExpiryAnnouncer"/> onto the same tracker, so its notifications persist exactly when the caller
+/// saves the expiry and never when it does not. Before, a lapse settled on load and saved by some other command — a
+/// capture landing seconds after the payment deadline, above all — expired the booking and told nobody.
+/// </para>
+/// <para>
+/// <b>Only the single-booking loads.</b> The id lists are the SWEEP's, and pass straight through: the sweep then
+/// loads each booking by id, through here, so its expiries are settled and announced by this one seam too.
 /// </para>
 /// <para>
 /// <b>Concurrency.</b> Two requests may both load the same lapsed booking and both make the same
@@ -36,19 +41,25 @@ namespace Khadra.Infrastructure.Persistence.Repositories;
 /// and nothing is lost.
 /// </para>
 /// </remarks>
-internal sealed class SettlingBookingRepository(BookingRepository inner, IClock clock) : IBookingRepository
+internal sealed class SettlingBookingRepository(BookingRepository inner, IClock clock, BookingExpiryAnnouncer announcer)
+    : IBookingRepository
 {
     public async Task<Booking?> GetByIdAsync(Id id, CancellationToken cancellationToken = default) =>
-        Settled(await inner.GetByIdAsync(id, cancellationToken));
+        await SettledAsync(await inner.GetByIdAsync(id, cancellationToken), cancellationToken);
 
     public async Task<Booking?> GetByReferenceAsync(
         BookingReference reference,
         CancellationToken cancellationToken = default) =>
-        Settled(await inner.GetByReferenceAsync(reference, cancellationToken));
+        await SettledAsync(await inner.GetByReferenceAsync(reference, cancellationToken), cancellationToken);
 
-    private Booking? Settled(Booking? booking)
+    private async Task<Booking?> SettledAsync(Booking? booking, CancellationToken cancellationToken)
     {
-        if (booking is not null) BookingLapse.Settle(booking, clock.UtcNow);
+        if (booking is null)
+            return null;
+
+        var now = clock.UtcNow;
+        if (BookingLapse.Settle(booking, now) is { } lapse)
+            await announcer.AnnounceAsync(booking, lapse, now, cancellationToken);
         return booking;
     }
 
@@ -67,30 +78,30 @@ internal sealed class SettlingBookingRepository(BookingRepository inner, IClock 
         inner.HasOverlappingBookingAsync(
             vehicleId, period, turnaroundBuffer, now, excludingBookingId, cancellationToken);
 
-    public Task<IReadOnlyList<Booking>> ListDueForPaymentExpiryAsync(
+    public Task<IReadOnlyList<Id>> ListIdsDueForPaymentExpiryAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
-        inner.ListDueForPaymentExpiryAsync(now, cancellationToken);
+        inner.ListIdsDueForPaymentExpiryAsync(now, cancellationToken);
 
-    public Task<IReadOnlyList<Booking>> ListDueForDecisionExpiryAsync(
+    public Task<IReadOnlyList<Id>> ListIdsDueForDecisionExpiryAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
-        inner.ListDueForDecisionExpiryAsync(now, cancellationToken);
+        inner.ListIdsDueForDecisionExpiryAsync(now, cancellationToken);
 
-    public Task<IReadOnlyList<Booking>> ListDueForNoShowAsync(
+    public Task<IReadOnlyList<Id>> ListIdsDueForNoShowAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
-        inner.ListDueForNoShowAsync(now, cancellationToken);
+        inner.ListIdsDueForNoShowAsync(now, cancellationToken);
 
-    public Task<IReadOnlyList<Booking>> ListDueForSettlementAsync(
+    public Task<IReadOnlyList<Id>> ListIdsDueForSettlementAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
-        inner.ListDueForSettlementAsync(now, cancellationToken);
+        inner.ListIdsDueForSettlementAsync(now, cancellationToken);
 
-    public Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(
+    public Task<IReadOnlyList<Id>> ListIdsDueForDepositReleaseAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
-        inner.ListDueForDepositReleaseAsync(now, cancellationToken);
+        inner.ListIdsDueForDepositReleaseAsync(now, cancellationToken);
 
     public Task<IReadOnlyList<Booking>> ListStaleHoldsForVehicleAsync(
         Id vehicleId,

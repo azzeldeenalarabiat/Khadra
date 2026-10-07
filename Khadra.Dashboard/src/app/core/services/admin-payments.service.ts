@@ -1,5 +1,6 @@
-import { httpResource } from '@angular/common/http';
-import { Injectable, computed, signal } from '@angular/core';
+import { HttpClient, httpResource } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
 import { AdminPayment, AdminPaymentListItem, AdminRefundListItem, PaymentVocabulary } from '../models/payments.api';
 
@@ -34,11 +35,13 @@ export const NO_PAYMENT_FILTERS: PaymentFilters = {
 
 /**
  * The administrator's view of money across the platform (payments Phase 4b): every checkout attempt,
- * the refunds queue, and one payment's page. Read-only: nothing here retries a card or sends a refund —
- * the payment sweep does that, and a refused refund is sent again by it without a button.
+ * the refunds queue, and one payment's page. Nothing here retries a card or sends a refund — the payment
+ * sweep does that, and a refused refund is sent again by it without a button. The one write is an
+ * administrator's account of a capture incident they dealt with at the provider (Wave 4, B1), which moves no money.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminPaymentsService {
+  private readonly http = inject(HttpClient);
   private readonly base = '/api/v1/admin';
 
   readonly filters = signal<PaymentFilters>(NO_PAYMENT_FILTERS);
@@ -105,5 +108,20 @@ export class AdminPaymentsService {
   setRefundView(view: RefundView): void {
     this.refundView.set(view);
     this.refundPage.set(1);
+  }
+
+  /**
+   * Closes a capture incident with the administrator's account of how its money was dealt with at the provider
+   * (Wave 4, B1). Moves no money; answers 204, or refuses with `payments.incident_already_handled`.
+   */
+  async markIncidentHandled(paymentId: string, incidentId: string, note: string): Promise<void> {
+    const token = await firstValueFrom(this.http.get<{ requestToken: string }>('/bff/antiforgery'));
+    await firstValueFrom(
+      this.http.post<void>(
+        `${this.base}/payments/${paymentId}/incidents/${incidentId}/handled`,
+        { note },
+        { headers: { 'X-XSRF-TOKEN': token.requestToken } },
+      ),
+    );
   }
 }

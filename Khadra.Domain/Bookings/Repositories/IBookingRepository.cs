@@ -32,21 +32,23 @@ public interface IBookingRepository
         Id? excludingBookingId,
         CancellationToken cancellationToken = default);
 
-    // Drives the expiry and no-show background jobs.
-    Task<IReadOnlyList<Booking>> ListDueForPaymentExpiryAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+    // Drive the settlement sweep. IDS, not aggregates (Wave 4, checklist 233): the sweep loads, acts on and saves ONE
+    // booking at a time on a clean tracker, so a booking that fails costs only its own work — a list of aggregates
+    // loaded together left every later save in the pass re-issuing a stale row after one conflict.
+    Task<IReadOnlyList<Id>> ListIdsDueForPaymentExpiryAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Booking>> ListDueForDecisionExpiryAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Id>> ListIdsDueForDecisionExpiryAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Booking>> ListDueForNoShowAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Id>> ListIdsDueForNoShowAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<Booking>> ListDueForSettlementAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Id>> ListIdsDueForSettlementAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Paid bookings that ended before pickup whose deposit nothing has decided yet: candidates for
     /// the clean-close release (owner, 2026-09-26). The aggregate judges each against its own frozen
     /// window (<c>Booking.DepositReleasedOnCleanClose</c>).
     /// </summary>
-    Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Id>> ListIdsDueForDepositReleaseAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Bookings on one vehicle, overlapping one candidate window, whose hold has run out but whose

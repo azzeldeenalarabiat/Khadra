@@ -42,6 +42,10 @@ public static class PayableErrors
     public static readonly Error AlreadyHeld =
         Error.Conflict("payables.already_held", "That payable is already held.");
 
+    /// <summary>A net-zero payable moves no money, so there is nothing to hold back (Wave 4, F56 c).</summary>
+    public static readonly Error NothingToHold =
+        Error.Conflict("payables.nothing_to_hold", "That payable moves no money either way, so there is nothing to hold back.");
+
     public static readonly Error NotHeld =
         Error.Conflict("payables.not_held", "That payable is not held by an administrator.");
 

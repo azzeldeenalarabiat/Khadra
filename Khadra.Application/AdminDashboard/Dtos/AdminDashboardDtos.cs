@@ -184,13 +184,18 @@ public sealed record FinanceThisMonthDto(
 /// <param name="OrphanedCapturesOwed">
 /// Of the two above, what goes back from captures that could not be applied: a PART of them, never added to them.
 /// </param>
+/// <param name="OpenCaptureIncidentsCount">
+/// Capture incidents nobody has marked handled (Wave 4, B1): a second charge, or a capture the provider reported in a
+/// way no booking accounts for. A count, not money: what the money is, a person decides at the provider.
+/// </param>
 public sealed record FinanceRightNowDto(
     MoneyDto RefundsInProgress,
     int RefundsInProgressCount,
     MoneyDto RefundsFailed,
     int RefundsFailedCount,
     MoneyDto OrphanedCapturesOwed,
-    int OrphanedCapturesOwedCount);
+    int OrphanedCapturesOwedCount,
+    int OpenCaptureIncidentsCount = 0);
 
 /// <summary>Money in a currency that is not the platform's, listed apart rather than summed.</summary>
 public sealed record FinanceOtherCurrencyDto(

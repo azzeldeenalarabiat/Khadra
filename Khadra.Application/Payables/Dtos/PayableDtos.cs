@@ -126,7 +126,9 @@ public sealed record SettlementSummaryDto(Guid SettlementId, string Number, stri
 /// <summary>An office's balance in one currency and one kind of money.</summary>
 /// <param name="Provider">The kind of money, as payments name it. Administrators send it back when they settle.</param>
 /// <param name="Due">Due now, netted: above zero Khadra owes the office, below zero the office owes Khadra.</param>
-/// <param name="NotYetDue">Recorded but held back or blocked.</param>
+/// <param name="NotYetDue">Recorded but held back or blocked, netted together. Kept as it was; the two parts follow.</param>
+/// <param name="Held">Of those, the ones held back, netted on their own (Wave 4, F56 a). Added last.</param>
+/// <param name="Blocked">Of those, the ones blocked, netted on their own.</param>
 public sealed record OfficeBalanceDto(
     Guid DealerId,
     string DealerName,
@@ -137,7 +139,11 @@ public sealed record OfficeBalanceDto(
     MoneyDto Due,
     int NotYetDueCount,
     MoneyDto NotYetDue,
-    SettlementSummaryDto? LastSettlement)
+    SettlementSummaryDto? LastSettlement,
+    int HeldCount,
+    MoneyDto Held,
+    int BlockedCount,
+    MoneyDto Blocked)
 {
     public static OfficeBalanceDto ForAdmin(OfficeBalance balance) => Of(balance, admin: true);
 
@@ -159,7 +165,11 @@ public sealed record OfficeBalanceDto(
             new MoneyDto(balance.NotYetDueNet, currency),
             balance.LastSettlement is { } last
                 ? new SettlementSummaryDto(last.SettlementId.Value, last.Number, last.Direction.Name, new MoneyDto(last.Amount, currency), last.PaidOn)
-                : null);
+                : null,
+            balance.HeldCount,
+            new MoneyDto(balance.HeldNet, currency),
+            balance.BlockedCount,
+            new MoneyDto(balance.BlockedNet, currency));
     }
 }
 

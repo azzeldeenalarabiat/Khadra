@@ -32,8 +32,9 @@ namespace Khadra.Application.Bookings.SettleBookings;
 /// server's word.
 ///
 /// Idempotent by construction: every transition it calls re-checks its own status and deadline, so a
-/// second pass over the same booking does nothing. Each booking is committed on its own, so one that
-/// fails — a concurrency conflict with a dealer acting at the same instant — cannot hold up the rest.
+/// second pass over the same booking does nothing. Each booking is loaded, changed and committed on its own, on a
+/// clean tracker (Wave 4, checklist 233), so one that fails — a concurrency conflict with a dealer acting at the
+/// same instant, or anything else — costs only its own work and cannot hold up the rest.
 ///
 /// Two passes touch money (Phase 3, 2026-09-26), and only by RECORDING what is owed; the payment
 /// sweep sends it. A paid no-show owes the customer everything above the deposit, recorded in the
@@ -72,36 +73,22 @@ public sealed partial class SettleDueBookingsHandler(
         SettleDueBookingsCommand request,
         CancellationToken cancellationToken)
     {
+        // ONE instant for the whole pass, so every pass judges every booking against the same clock.
         var now = clock.UtcNow;
         var failed = 0;
+        void OnFailure(int count) => failed += count;
 
-        // Order matters only in that each pass reads the database fresh, so a booking settled by an
-        // earlier pass is simply not returned by a later one.
-        // Fed per status, so the office is never told an approval lapsed about a request it never
-        // approved: a request it let lapse tells it nothing (Wave 3, C7).
-        var unanswered = await SettleAsync(
-            await bookings.ListDueForDecisionExpiryAsync(now, cancellationToken),
-            booking => booking.ExpireUnanswered(now),
-            NotificationKind.YourBookingExpired,
-            officeKind: null,
-            now,
-            count => failed += count,
-            cancellationToken);
+        // Each pass reads its ids fresh, so a booking settled by an earlier pass is simply not listed by a later one.
+        // An expiry is "load, save": loading through the settling seam expires the booking AND stages its
+        // announcements (Wave 4, checklist 234), fed per lapse — the office is never told a request it let lapse did.
+        var unanswered = await ExpireAsync(await bookings.ListIdsDueForDecisionExpiryAsync(now, cancellationToken), OnFailure, cancellationToken);
+        var unpaid = await ExpireAsync(await bookings.ListIdsDueForPaymentExpiryAsync(now, cancellationToken), OnFailure, cancellationToken);
 
-        var unpaid = await SettleAsync(
-            await bookings.ListDueForPaymentExpiryAsync(now, cancellationToken),
-            booking => booking.ExpireUnpaid(now),
-            NotificationKind.YourBookingExpired,
-            NotificationKind.BookingExpiredUnpaid,
-            now,
-            count => failed += count,
-            cancellationToken);
+        var noShows = await SettleNoShowsAsync(now, OnFailure, cancellationToken);
 
-        var noShows = await SettleNoShowsAsync(now, count => failed += count, cancellationToken);
+        var completed = await SettleCompletionsAsync(now, OnFailure, cancellationToken);
 
-        var completed = await SettleCompletionsAsync(now, error => failed += error, cancellationToken);
-
-        var released = await ReleaseCleanDepositsAsync(now, count => failed += count, cancellationToken);
+        var released = await ReleaseCleanDepositsAsync(now, OnFailure, cancellationToken);
 
         var report = new SettlementReport(unanswered, unpaid, noShows, completed, failed, released);
 
@@ -112,6 +99,22 @@ public sealed partial class SettleDueBookingsHandler(
 
         return report;
     }
+
+    /// <summary>
+    /// Expires every booking the query says has lapsed: loading it through the settling seam expires it and stages
+    /// its announcements in one breath, and this saves them together.
+    /// </summary>
+    /// <remarks>
+    /// A booking is counted only when THIS load expired it — its expiry still pending on the aggregate. One a dealer
+    /// answered between the query and the load, or one another request expired and saved first, loads as it now is
+    /// and is skipped, which is the correct outcome and not a failure.
+    /// </remarks>
+    private Task<int> ExpireAsync(IReadOnlyList<Id> due, Action<int> onFailure, CancellationToken cancellationToken) =>
+        EachAsync(
+            due,
+            booking => Task.FromResult(booking.DomainEvents.Any(change => change is Domain.Bookings.Events.BookingExpired)),
+            onFailure,
+            cancellationToken);
 
     /// <summary>
     /// A rental nobody collected is marked a no-show, and a PAID one records, in the same save, the
@@ -128,43 +131,35 @@ public sealed partial class SettleDueBookingsHandler(
     private async Task<int> SettleNoShowsAsync(
         DateTimeOffset now,
         Action<int> onFailure,
-        CancellationToken cancellationToken)
-    {
-        var due = await bookings.ListDueForNoShowAsync(now, cancellationToken);
-        var settled = 0;
-
-        foreach (var booking in due)
-        {
-            // Only a booking paid above its deposit will owe a refund once marked; only that one
-            // needs its payment, and needs it BEFORE the booking changes.
-            Payment? payment = null;
-            if (!booking.PaidAboveDeposit.IsZero)
+        CancellationToken cancellationToken) =>
+        await EachAsync(
+            await bookings.ListIdsDueForNoShowAsync(now, cancellationToken),
+            async booking =>
             {
-                payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
-                if (!BookingEndingRefunds.CanRecord(booking, payment))
+                // Only a booking paid above its deposit will owe a refund once marked; only that one
+                // needs its payment, and needs it BEFORE the booking changes.
+                Payment? payment = null;
+                if (!booking.PaidAboveDeposit.IsZero)
                 {
-                    LogPaymentUnusable(logger, booking.Reference.Value);
-                    onFailure(1);
-                    continue;
+                    payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
+                    if (!BookingEndingRefunds.CanRecord(booking, payment))
+                    {
+                        LogPaymentUnusable(logger, booking.Reference.Value);
+                        onFailure(1);
+                        return false;
+                    }
                 }
-            }
 
-            var result = booking.MarkNoShow(now);
-            if (result.IsFailure)
-                continue;
+                if (booking.MarkNoShow(now).IsFailure)
+                    return false;
 
-            BookingEndingRefunds.Record(booking, payment, now);
-            await NotifyBothPartiesAsync(
-                booking, NotificationKind.YourBookingMarkedNoShow, NotificationKind.BookingMarkedNoShow, now, cancellationToken);
-
-            if (await CommitAsync(booking, cancellationToken))
-                settled++;
-            else
-                onFailure(1);
-        }
-
-        return settled;
-    }
+                BookingEndingRefunds.Record(booking, payment, now);
+                await NotifyBothPartiesAsync(
+                    booking, NotificationKind.YourBookingMarkedNoShow, NotificationKind.BookingMarkedNoShow, now, cancellationToken);
+                return true;
+            },
+            onFailure,
+            cancellationToken);
 
     /// <summary>
     /// Returns a held deposit to the customer once its booking's dispute window has closed CLEANLY
@@ -187,52 +182,41 @@ public sealed partial class SettleDueBookingsHandler(
     private async Task<int> ReleaseCleanDepositsAsync(
         DateTimeOffset now,
         Action<int> onFailure,
-        CancellationToken cancellationToken)
-    {
-        var due = await bookings.ListDueForDepositReleaseAsync(now, cancellationToken);
-        var released = 0;
-
-        foreach (var booking in due)
-        {
-            // Asked per booking rather than in bulk, for the same reason as the completions: the
-            // queries share one scoped DbContext and must not run concurrently.
-            var claimed = await disputes.HasClaimOnDepositAsync(booking.Id, cancellationToken);
-            var deposit = booking.DepositReleasedOnCleanClose(now, claimed);
-            if (deposit.IsZero)
-                continue;
-
-            var payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
-            if (!BookingEndingRefunds.CanRecord(booking, payment))
+        CancellationToken cancellationToken) =>
+        await EachAsync(
+            await bookings.ListIdsDueForDepositReleaseAsync(now, cancellationToken),
+            async booking =>
             {
-                LogPaymentUnusable(logger, booking.Reference.Value);
-                onFailure(1);
-                continue;
-            }
+                var claimed = await disputes.HasClaimOnDepositAsync(booking.Id, cancellationToken);
+                var deposit = booking.DepositReleasedOnCleanClose(now, claimed);
+                if (deposit.IsZero)
+                    return false;
 
-            // Released already — the query leaves these out; asked again so a pass never counts, or
-            // commits, a release it did not make.
-            if (payment!.RefundFor(RefundReason.DisputeWindowClosed) is not null)
-                continue;
+                var payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
+                if (!BookingEndingRefunds.CanRecord(booking, payment))
+                {
+                    LogPaymentUnusable(logger, booking.Reference.Value);
+                    onFailure(1);
+                    return false;
+                }
 
-            var refund = payment.RefundHeldDeposit(deposit, now);
-            if (refund.IsFailure)
-            {
-                LogReleaseRefused(logger, booking.Reference.Value, refund.Error.Code);
-                onFailure(1);
-                continue;
-            }
+                // Released already — the query leaves these out; asked again so a pass never counts, or
+                // commits, a release it did not make.
+                if (payment!.RefundFor(RefundReason.DisputeWindowClosed) is not null)
+                    return false;
 
-            if (refund.Value is null)
-                continue;
+                var refund = payment.RefundHeldDeposit(deposit, now);
+                if (refund.IsFailure)
+                {
+                    LogReleaseRefused(logger, booking.Reference.Value, refund.Error.Code);
+                    onFailure(1);
+                    return false;
+                }
 
-            if (await CommitAsync(booking, cancellationToken))
-                released++;
-            else
-                onFailure(1);
-        }
-
-        return released;
-    }
+                return refund.Value is not null;
+            },
+            onFailure,
+            cancellationToken);
 
     /// <summary>
     /// A booking that has just returned and whose settlement window has passed completes ON ITS OWN —
@@ -241,62 +225,81 @@ public sealed partial class SettleDueBookingsHandler(
     private async Task<int> SettleCompletionsAsync(
         DateTimeOffset now,
         Action<int> onFailure,
-        CancellationToken cancellationToken)
-    {
-        var due = await bookings.ListDueForSettlementAsync(now, cancellationToken);
-        var settled = 0;
+        CancellationToken cancellationToken) =>
+        await EachAsync(
+            await bookings.ListIdsDueForSettlementAsync(now, cancellationToken),
+            async booking =>
+            {
+                var hasOpenDispute = await disputes.HasLiveTicketAsync(booking.Id, cancellationToken);
+                if (booking.Settle(now, hasOpenDispute).IsFailure)
+                    return false;
 
-        foreach (var booking in due)
-        {
-            // Asked per booking rather than in bulk: the queries share one scoped DbContext, so they
-            // must not run concurrently, and this list is the tail of a day's returns, not a table.
-            var hasOpenDispute = await disputes.HasLiveTicketAsync(booking.Id, cancellationToken);
+                await NotifyBothPartiesAsync(
+                    booking, NotificationKind.YourBookingCompleted, NotificationKind.BookingCompleted, now, cancellationToken);
+                return true;
+            },
+            onFailure,
+            cancellationToken);
 
-            var result = booking.Settle(now, hasOpenDispute);
-            if (result.IsFailure)
-                continue;
-
-            await NotifyBothPartiesAsync(
-                booking, NotificationKind.YourBookingCompleted, NotificationKind.BookingCompleted, now, cancellationToken);
-
-            if (await CommitAsync(booking, cancellationToken))
-                settled++;
-            else
-                onFailure(1);
-        }
-
-        return settled;
-    }
-
-    private async Task<int> SettleAsync(
-        IReadOnlyList<Booking> due,
-        Func<Booking, UnitResult<Error>> transition,
-        NotificationKind customerKind,
-        NotificationKind? officeKind,
-        DateTimeOffset now,
+    /// <summary>
+    /// One booking at a time, each on a CLEAN tracker and committed alone (Wave 4, checklist 233; the advisor's
+    /// review): whatever one booking's work fails with costs that booking only.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The pass used to load every candidate together and save each in turn on one tracker. A concurrency conflict
+    /// on one booking left it tracked with a stale token, so every later save in the pass re-issued it and failed
+    /// too, its staged notifications still waiting; and anything thrown other than a conflict ended the whole pass.
+    /// </para>
+    /// <para>
+    /// Now the tracker is discarded before every load and after any failure, so each booking — and its dealer, its
+    /// payment, its notifications — is read and written on its own. Any failure is logged with the booking's
+    /// reference and counted as deferred; the next pass finds whatever is genuinely still due. A conflict is
+    /// expected traffic (a dealer acting at the same instant), not a fault.
+    /// </para>
+    /// </remarks>
+    /// <param name="work">The booking's own step: true when it changed the booking and the change is to be saved.</param>
+    private async Task<int> EachAsync(
+        IReadOnlyList<Id> ids,
+        Func<Booking, Task<bool>> work,
         Action<int> onFailure,
         CancellationToken cancellationToken)
     {
-        var settled = 0;
-
-        foreach (var booking in due)
+        var done = 0;
+        foreach (var id in ids)
         {
-            // The repository already filtered on status and deadline, but the aggregate is the rule
-            // and it checks again. A booking a dealer answered between the query and this line is
-            // refused here, which is the correct outcome and not an error.
-            var result = transition(booking);
-            if (result.IsFailure)
-                continue;
+            unitOfWork.DiscardChanges();
+            var label = id.Value.ToString();
+            try
+            {
+                var booking = await bookings.GetByIdAsync(id, cancellationToken);
+                if (booking is null)
+                    continue;
+                label = booking.Reference.Value;
 
-            await NotifyBothPartiesAsync(booking, customerKind, officeKind, now, cancellationToken);
+                if (!await work(booking))
+                    continue;
 
-            if (await CommitAsync(booking, cancellationToken))
-                settled++;
-            else
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                done++;
+            }
+            catch (ConcurrencyConflictException)
+            {
+                LogConflict(logger, label);
+                unitOfWork.DiscardChanges();
                 onFailure(1);
+            }
+#pragma warning disable CA1031 // One booking's failure must not take the rest of the pass with it.
+            catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
+            {
+                LogBookingFailed(logger, label, exception);
+                unitOfWork.DiscardChanges();
+                onFailure(1);
+            }
         }
 
-        return settled;
+        return done;
     }
 
     /// <summary>
@@ -307,7 +310,8 @@ public sealed partial class SettleDueBookingsHandler(
     /// in the console and by email (Fix & Polish Wave 3, C5). It used to mirror only a completion, as
     /// <c>BookingReturned</c> by "A customer": untrue in both languages, and English inside Arabic. An
     /// unpaid expiry and a no-show were not mirrored at all, on the mistaken ground that the office
-    /// already had kinds for them. A request that lapsed unanswered still tells the office nothing.
+    /// already had kinds for them. An expiry is announced by <see cref="BookingExpiryAnnouncer"/> now, wherever it
+    /// happens (Wave 4, checklist 234).
     /// </remarks>
     private async Task NotifyBothPartiesAsync(
         Booking booking,
@@ -328,28 +332,6 @@ public sealed partial class SettleDueBookingsHandler(
 
         if (dealer is not null && officeKind is not null)
             await team.NotifyTeamFromPlatformAsync(dealer, officeKind, now, booking.Id, booking.Reference.Value);
-    }
-
-    /// <summary>
-    /// Commits one booking. A conflict is expected traffic, not a fault.
-    /// </summary>
-    /// <remarks>
-    /// The alternative — one transaction for the whole pass — means a single dealer approving a
-    /// request at the wrong instant rolls back everything the job did. A conflict here simply means
-    /// somebody got there first, and the next pass will find whatever is genuinely still due.
-    /// </remarks>
-    private async Task<bool> CommitAsync(Booking booking, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-        catch (ConcurrencyConflictException)
-        {
-            LogConflict(logger, booking.Reference.Value);
-            return false;
-        }
     }
 
     [LoggerMessage(
@@ -379,4 +361,10 @@ public sealed partial class SettleDueBookingsHandler(
         LogLevel.Information,
         "Booking {Reference} changed while settlement was working on it; leaving it for the next pass.")]
     private static partial void LogConflict(ILogger logger, string reference);
+
+    [LoggerMessage(
+        2104,
+        LogLevel.Error,
+        "Settling booking {Reference} failed; it is left for the next pass and the rest of this pass carries on.")]
+    private static partial void LogBookingFailed(ILogger logger, string reference, Exception exception);
 }

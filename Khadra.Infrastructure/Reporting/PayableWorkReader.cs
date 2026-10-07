@@ -1,6 +1,7 @@
 using Khadra.Application.Payables.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Infrastructure.Persistence;
+using Khadra.Infrastructure.Persistence.Configurations.Bookings;
 using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Reporting;
@@ -25,15 +26,21 @@ internal sealed class PayableWorkReader(KhadraDbContext context) : IPayableWorkR
         var cancelled = BookingStatus.Cancelled;
         var noShow = BookingStatus.NoShow;
 
-        // Paid, ended in a status that can owe an office, past the margin — and a cancellation or a no-show past
-        // today's window too — with no payable, and not held back until later. Completed rentals first.
+        // Paid, ended in a status that can owe an office, past the margin — and a cancellation or a no-show past its
+        // OWN window (Wave 4, B5; checklist 210): the end stored when the window opened, plus the margin. A booking that
+        // ended before the column existed has none, and is bounded by today's window as before; its own frozen window
+        // still decides, in the step. With no payable, and not held back until later. Completed rentals first.
         var bookings = await context.Bookings
             .AsNoTracking()
             .Where(booking =>
                 booking.DepositPaymentId != null &&
                 booking.FinishedAt != null &&
                 ((booking.Status == completed && booking.FinishedAt <= completedBefore) ||
-                 ((booking.Status == cancelled || booking.Status == noShow) && booking.FinishedAt <= cancelledBefore)) &&
+                 ((booking.Status == cancelled || booking.Status == noShow) &&
+                  ((EF.Property<DateTimeOffset?>(booking, BookingConfiguration.DisputeWindowEndsAtField) != null &&
+                    EF.Property<DateTimeOffset?>(booking, BookingConfiguration.DisputeWindowEndsAtField) <= completedBefore) ||
+                   (EF.Property<DateTimeOffset?>(booking, BookingConfiguration.DisputeWindowEndsAtField) == null &&
+                    booking.FinishedAt <= cancelledBefore)))) &&
                 !context.OfficePayables.Any(payable => payable.BookingId == booking.Id) &&
                 !context.OfficePayableHolds.Any(hold =>
                     hold.BookingId == booking.Id &&

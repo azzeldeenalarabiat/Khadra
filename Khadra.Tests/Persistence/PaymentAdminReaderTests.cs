@@ -259,12 +259,146 @@ public sealed class PaymentAdminReaderTests : IDisposable
 
         await using var read = NewContext();
         var reader = new PaymentDashboardReader(read);
-        var failed = await reader.FailedRefundsAsync();
+        var failed = await reader.FailedRefundsAsync(refusedAtLeast: 1);
         var orphans = await reader.OwedOrphansAsync();
 
         Assert.Equal(2, failed.Count);
         Assert.Contains(failed, item => item.RefundId == refused.Id.Value && item.BookingReference == booking.Reference.Value);
         // The refused orphan is a failed refund, and only that.
         Assert.Equal([owed.Id.Value], orphans.Select(item => item.PaymentId));
+    }
+
+    /// <summary>
+    /// The work queue asks only for refunds refused often enough to need a person (Wave 4, B4); below that the
+    /// back-off is handling them. The refunds queue shows each one's count and when it is sent again.
+    /// </summary>
+    [Fact]
+    public async Task Refused_refunds_are_read_for_the_queue_from_the_alert_on_and_listed_with_their_count()
+    {
+        var (onceBooking, once) = Build.PaidBooking(inFull: true);
+        var refusedOnce = once.RefundAboveDeposit(Money.Jod(72m), Now).Value!;
+        refusedOnce.RecordRefusedSend("card_closed", Now, TestPayments.RetryPolicy);
+        var (thriceBooking, thrice) = Build.PaidBooking(inFull: true);
+        var refusedThrice = thrice.RefundAboveDeposit(Money.Jod(72m), Now).Value!;
+        refusedThrice.RecordRefusedSend("card_closed", Now, TestPayments.RetryPolicy);
+        refusedThrice.RecordRefusedSend("card_closed", Now.AddMinutes(1), TestPayments.RetryPolicy);
+        refusedThrice.RecordRefusedSend("card_closed", Now.AddMinutes(3), TestPayments.RetryPolicy);
+        await SaveAsync([onceBooking, thriceBooking], [once, thrice]);
+
+        await using var read = NewContext();
+        var queued = await new PaymentDashboardReader(read).FailedRefundsAsync(refusedAtLeast: TestPayments.RetryPolicy.RefusalsBeforeAlert);
+        var listed = await new PaymentAdminReader(read).ListRefundsAsync(new AdminRefundFilter(null, null, null, null, null), PageRequest.From(1, 20));
+
+        Assert.Equal([refusedThrice.Id.Value], queued.Select(item => item.RefundId));
+        var row = Assert.Single(listed.Items, item => item.RefundId == refusedThrice.Id.Value);
+        Assert.Equal(3, row.RefusalCount);
+        Assert.Equal(Now.AddMinutes(7), row.NextAttemptAt);
+        Assert.Equal(1, Assert.Single(listed.Items, item => item.RefundId == refusedOnce.Id.Value).RefusalCount);
+    }
+
+    // ── Capture incidents (Wave 4, B1) ────────────────────────────────────────────────────────────────
+
+    private static ProviderEventReceipt Notice(Payment payment, string eventId, ProviderEventOutcome outcome, string? captureReference, DateTimeOffset at) =>
+        ProviderEventReceipt.Record(
+            "TestProvider", eventId, payment.ProviderReference!, "Captured", payment.Id, outcome, Money.Jod(18m), at, captureReference);
+
+    private static PaymentIncident Raised(
+        Payment payment, ProviderEventReceipt receipt, PaymentIncidentKind kind, DateTimeOffset at, Id? otherPaymentId = null) =>
+        PaymentIncident.Raise(
+            kind, payment.Id, receipt.Id, "TestProvider", receipt.CaptureReference, Money.Jod(18m), Money.Jod(18m), otherPaymentId, at);
+
+    private async Task SaveIncidentsAsync(params PaymentIncident[] incidents)
+    {
+        await using var context = NewContext();
+        context.PaymentIncidents.AddRange(incidents);
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// A payment's page reads its own incidents, open ones first, each with the notice that raised it and — once
+    /// handled — the administrator's name and note. Another payment's incident is not on it.
+    /// </summary>
+    [Fact]
+    public async Task A_payments_incidents_are_read_open_first_with_who_handled_them()
+    {
+        var admin = User.CreateAdmin(
+            EmailAddress.Create("omar@khadra.jo").Value,
+            PhoneNumber.Create("0790000002").Value,
+            PersonName.Create("Omar Deeb").Value,
+            PasswordHash.FromHash("hash"),
+            Now.AddYears(-1));
+        var (booking, payment) = Build.PaidBooking();
+        var (otherBooking, otherPayment) = Build.PaidBooking();
+        var first = Notice(payment, "evt_a", ProviderEventOutcome.SecondCapture, "cap_2", Now.AddHours(1));
+        var second = Notice(payment, "evt_b", ProviderEventOutcome.AmountMismatch, "cap_1", Now.AddHours(2));
+        var third = Notice(payment, "evt_c", ProviderEventOutcome.OtherAttempt, "cap_9", Now.AddHours(3));
+        var elsewhere = Notice(otherPayment, "evt_d", ProviderEventOutcome.SecondCapture, "cap_3", Now);
+        await SaveAsync([booking, otherBooking], [payment, otherPayment], users: [admin], receipts: [first, second, third, elsewhere]);
+
+        var handled = Raised(payment, first, PaymentIncidentKind.SecondCapture, Now.AddHours(1));
+        Assert.True(handled.MarkHandled(admin.Id, "Refunded at the provider.", Now.AddHours(5)).IsSuccess);
+        var mismatch = Raised(payment, second, PaymentIncidentKind.AmountMismatch, Now.AddHours(2));
+        var onOther = Raised(payment, third, PaymentIncidentKind.CaptureOnAnotherAttempt, Now.AddHours(3), otherPayment.Id);
+        await SaveIncidentsAsync(handled, mismatch, onOther, Raised(otherPayment, elsewhere, PaymentIncidentKind.SecondCapture, Now));
+
+        await using var read = NewContext();
+        var reader = new PaymentAdminReader(read);
+        var incidents = await reader.IncidentsAsync(payment.Id);
+
+        Assert.Equal([mismatch.Id.Value, onOther.Id.Value, handled.Id.Value], incidents.Select(item => item.IncidentId));
+        var open = incidents[0];
+        Assert.Equal("AmountMismatch", open.Kind);
+        Assert.Equal(second.Id.Value, open.ReceiptId);
+        Assert.Equal("cap_1", open.CaptureReference);
+        Assert.Equal(18m, open.Reported.Amount);
+        Assert.Equal("JOD", open.Expected.Currency);
+        Assert.Null(open.HandledAt);
+        Assert.Null(open.HandledBy);
+        Assert.Equal(otherPayment.Id.Value, incidents[1].OtherPaymentId);
+        var closed = incidents[2];
+        Assert.Equal(Now.AddHours(5), closed.HandledAt);
+        Assert.Equal("Omar Deeb", closed.HandledBy);
+        Assert.Equal("Refunded at the provider.", closed.HandledNote);
+
+        // The notices themselves carry the capture reference they were sent with.
+        var events = await reader.ProviderEventsAsync(payment.Id, payment.Provider, payment.ProviderReference);
+        Assert.Equal(["cap_2", "cap_1", "cap_9"], events.Select(item => item.CaptureReference));
+        Assert.Equal(["SecondCapture", "AmountMismatch", "OtherAttempt"], events.Select(item => item.Outcome));
+
+        Assert.Empty(await reader.IncidentsAsync(Id.New()));
+    }
+
+    /// <summary>
+    /// The work queue reads every incident nobody has handled, oldest first, labelled by its booking's reference where
+    /// one resolves; the finance panel counts the same set.
+    /// </summary>
+    [Fact]
+    public async Task Open_incidents_are_read_for_the_queue_oldest_first_and_counted_for_the_finance_panel()
+    {
+        var (booking, payment) = Build.PaidBooking();
+        var (_, orphanedFromItsBooking) = Build.PaidBooking();
+        var older = Notice(payment, "evt_old", ProviderEventOutcome.SecondCapture, "cap_2", Now.AddHours(1));
+        var newer = Notice(orphanedFromItsBooking, "evt_new", ProviderEventOutcome.AmountMismatch, "cap_1", Now.AddHours(2));
+        var done = Notice(payment, "evt_done", ProviderEventOutcome.SecondCapture, "cap_3", Now);
+        // The second payment's booking is never saved: its incident still reaches the queue, with no reference.
+        await SaveAsync([booking], [payment, orphanedFromItsBooking], receipts: [older, newer, done]);
+        var handled = Raised(payment, done, PaymentIncidentKind.SecondCapture, Now);
+        Assert.True(handled.MarkHandled(Id.New(), "Dealt with.", Now.AddHours(3)).IsSuccess);
+        var newest = Raised(orphanedFromItsBooking, newer, PaymentIncidentKind.AmountMismatch, Now.AddHours(2));
+        var oldest = Raised(payment, older, PaymentIncidentKind.SecondCapture, Now.AddHours(1));
+        await SaveIncidentsAsync(newest, handled, oldest);
+
+        await using var read = NewContext();
+        var reader = new PaymentDashboardReader(read);
+        var open = await reader.OpenCaptureIncidentsAsync();
+        var facts = await reader.FinanceAsync(Now.AddDays(-1), Now.AddDays(1));
+
+        Assert.Equal([oldest.Id.Value, newest.Id.Value], open.Select(item => item.IncidentId));
+        Assert.Equal(payment.Id.Value, open[0].PaymentId);
+        Assert.Equal(booking.Reference.Value, open[0].BookingReference);
+        Assert.Equal("SecondCapture", open[0].Kind);
+        Assert.Equal(Now.AddHours(1), open[0].DetectedAt);
+        Assert.Null(open[1].BookingReference);
+        Assert.Equal(2, facts.OpenCaptureIncidents);
     }
 }

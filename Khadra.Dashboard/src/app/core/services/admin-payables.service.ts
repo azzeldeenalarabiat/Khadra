@@ -12,7 +12,8 @@ import {
 } from '../models/payables.api';
 
 /** Which of an office's payables a list shows. */
-export type PayableScope = 'open' | 'settled' | 'all';
+/** `nothingDue` (Wave 4, F56 c): net zero, and nothing holds it back — no longer counted among the open ones. */
+export type PayableScope = 'open' | 'nothingDue' | 'settled' | 'all';
 
 /** What the administrator confirms when recording a settlement: the balance they were shown, and how it moved. */
 export interface SettlementRequest {

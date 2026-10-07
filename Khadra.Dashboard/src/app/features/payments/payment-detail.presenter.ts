@@ -5,7 +5,8 @@ import { refundReasonKey } from '../../core/i18n/refund-words';
 import { EnumFamily } from '../../core/i18n/status-key';
 import { Tone } from '../../core/models/console.models';
 import { Money } from '../../core/models/fleet.api';
-import { AdminPayment } from '../../core/models/payments.api';
+import { AdminPayment, PaymentIncident } from '../../core/models/payments.api';
+import { attemptLabel } from './payments.presenter';
 
 type Translate = (key: TranslationKey, params?: MessageParams) => string;
 type EnumLabel = (family: EnumFamily, name: string | null | undefined) => string;
@@ -42,9 +43,35 @@ export interface ProviderEventView {
   readonly when: string;
   readonly kind: string;
   readonly outcome: string;
+  /** Quiet for the same capture said again, a warning when that is only assumed, alarm for an incident. */
+  readonly tone: Tone;
   readonly amount: string | null;
   /** Tied by the provider reference alone: it arrived before the payment was saved. */
   readonly byReference: boolean;
+  /** The provider's id for the capture the notice reported (Wave 4, B1), shown as it is. */
+  readonly captureReference: string | null;
+}
+
+/**
+ * A capture incident (Wave 4, B1): what the notice said, what the payment had, and whether somebody has dealt
+ * with the money at the provider.
+ */
+export interface PaymentIncidentView {
+  readonly id: string;
+  readonly kind: string;
+  readonly open: boolean;
+  readonly status: string;
+  readonly tone: Tone;
+  readonly detected: string;
+  /** What the notice said was captured, and what it is measured against, in words. */
+  readonly figures: readonly string[];
+  readonly captureReference: string | null;
+  /** For a capture on another attempt: that attempt's page. */
+  readonly otherPaymentId: string | null;
+  /** Who marked it handled, and when; null while it is open. */
+  readonly handled: string | null;
+  /** The administrator's account, as they typed it. */
+  readonly note: string | null;
 }
 
 export interface PaymentPage {
@@ -58,11 +85,64 @@ export interface PaymentPage {
   readonly facts: readonly PaymentFact[];
   readonly refunds: readonly PaymentRefundView[];
   readonly events: readonly ProviderEventView[];
+  /** Null when the API sent none at all; the section is then not drawn. */
+  readonly incidents: readonly PaymentIncidentView[] | null;
+  /** Open incidents, said once above everything: each is money that may have moved twice. */
+  readonly incidentNotice: string | null;
   readonly bookingId: string | null;
 }
 
 const PAYMENT_TONES: Readonly<Record<string, Tone>> = { Applied: 'ok', Orphaned: 'warn', Failed: 'bad' };
 const REFUND_TONES: Readonly<Record<string, Tone>> = { Settled: 'ok', Failed: 'bad', Requested: 'warn', Sent: 'warn' };
+
+/**
+ * What became of a provider event, as a colour (Wave 4, B1). The same capture said again is quiet; one only ASSUMED
+ * to be the same, because no capture reference could be compared, is a warning; an incident — a second charge, a
+ * contradiction, a capture another attempt holds — and a refund event nobody could match are alarms.
+ */
+const EVENT_TONES: Readonly<Record<string, Tone>> = {
+  Acted: 'ok',
+  Duplicate: 'dim',
+  Ignored: 'dim',
+  AssumedDuplicate: 'warn',
+  Orphaned: 'warn',
+  Unknown: 'warn',
+  Unmatched: 'bad',
+  AmountMismatch: 'bad',
+  SecondCapture: 'bad',
+  OtherAttempt: 'bad',
+};
+
+/** One incident in words. Every figure is the server's; nothing here compares the two amounts. */
+function incidentView(incident: PaymentIncident, t: Translate, label: EnumLabel, format: PaymentPageFormat): PaymentIncidentView {
+  const handledAt = incident.handledAt;
+  const open = handledAt === null;
+  return {
+    id: incident.incidentId,
+    kind: label('paymentIncidentKind', incident.kind),
+    open,
+    status: t(open ? 'paymentDetail.incidentOpen' : 'paymentDetail.incidentHandled'),
+    tone: open ? 'bad' : 'ok',
+    detected: t('paymentDetail.incidentDetected', { when: format.when(incident.detectedAt) }),
+    figures: [
+      t('paymentDetail.incidentReported', { amount: format.money(incident.reported) }),
+      // A capture on another attempt is measured against what THIS attempt asked for; any other incident against
+      // what this payment had already taken.
+      t(incident.kind === 'CaptureOnAnotherAttempt' ? 'paymentDetail.incidentAskedFor' : 'paymentDetail.incidentAlreadyTaken', {
+        amount: format.money(incident.expected),
+      }),
+    ],
+    captureReference: incident.captureReference,
+    otherPaymentId: incident.otherPaymentId,
+    handled:
+      handledAt === null
+        ? null
+        : incident.handledBy
+          ? t('paymentDetail.incidentHandledBy', { name: incident.handledBy, when: format.when(handledAt) })
+          : t('paymentDetail.incidentHandledAt', { when: format.when(handledAt) }),
+    note: incident.handledNote,
+  };
+}
 
 /**
  * One payment's page in words (payments Phase 4b): the attempt as the booking's financial state
@@ -103,6 +183,8 @@ export function paymentPage(page: AdminPayment, t: Translate, label: EnumLabel, 
   if (payment.createdAt) facts.push({ k: t('paymentDetail.opened'), v: format.when(payment.createdAt) });
   facts.push({ k: t('paymentDetail.lastChange'), v: format.when(payment.occurredAt) });
 
+  const openIncidents = (page.incidents ?? []).filter((incident) => incident.handledAt === null).length;
+
   const notice =
     payment.status === 'Failed'
       ? {
@@ -116,7 +198,7 @@ export function paymentPage(page: AdminPayment, t: Translate, label: EnumLabel, 
         : null;
 
   return {
-    title: t('paymentDetail.title', { id: payment.paymentId.slice(0, 8) }),
+    title: t('paymentDetail.title', { id: attemptLabel(payment.paymentId, payment.providerReference) }),
     subtitle: t('paymentDetail.subtitle', {
       purpose,
       reference: page.booking?.reference ?? t('payments.noBooking'),
@@ -152,9 +234,13 @@ export function paymentPage(page: AdminPayment, t: Translate, label: EnumLabel, 
       when: format.when(event.receivedAt),
       kind: event.kind,
       outcome: label('providerEventOutcome', event.outcome),
+      tone: EVENT_TONES[event.outcome] ?? 'dim',
       amount: event.amount ? format.money(event.amount) : null,
       byReference: event.tiedBy === 'Reference',
+      captureReference: event.captureReference ?? null,
     })),
+    incidents: page.incidents ? page.incidents.map((incident) => incidentView(incident, t, label, format)) : null,
+    incidentNotice: openIncidents > 0 ? t('paymentDetail.openIncidentsNotice', { count: openIncidents }) : null,
     bookingId: page.booking?.bookingId ?? null,
   };
 }

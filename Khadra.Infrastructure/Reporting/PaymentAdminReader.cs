@@ -110,7 +110,9 @@ internal sealed class PaymentAdminReader(KhadraDbContext context) : IPaymentAdmi
                 refund.FailedAt,
                 refund.FailureCode,
                 refund.ProviderReference,
-                PaymentProviders.IsSandbox(payment.Provider)));
+                PaymentProviders.IsSandbox(payment.Provider),
+                refund.RefusalCount,
+                refund.NextAttemptAt));
         }
 
         return new PagedResult<AdminRefundListItem>(rows, page.Page, page.PageSize, total);
@@ -182,7 +184,49 @@ internal sealed class PaymentAdminReader(KhadraDbContext context) : IPaymentAdmi
                 receipt.Outcome.Name,
                 receipt.Amount is { } amount && receipt.CurrencyCode is { } currency ? new MoneyDto(amount, currency) : null,
                 receipt.ReceivedAt,
-                receipt.PaymentId == tied ? "Payment" : "Reference")),
+                receipt.PaymentId == tied ? "Payment" : "Reference",
+                receipt.CaptureReference)),
+        ];
+    }
+
+    public async Task<IReadOnlyList<PaymentIncidentItem>> IncidentsAsync(Id paymentId, CancellationToken cancellationToken = default)
+    {
+        var incidents = await context.PaymentIncidents
+            .Where(incident => incident.PaymentId == paymentId)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+        if (incidents.Count == 0)
+            return [];
+
+        var adminIds = incidents.Where(incident => incident.HandledByAdminId is not null)
+            .Select(incident => incident.HandledByAdminId!.Value)
+            .Distinct()
+            .ToList();
+        var names = adminIds.Count == 0
+            ? []
+            : await context.Users
+                .Where(user => adminIds.Contains(user.Id))
+                .Select(user => new { user.Id, Name = user.Name.Value })
+                .ToDictionaryAsync(user => user.Id, user => user.Name, cancellationToken);
+
+        return
+        [
+            .. incidents
+                .OrderBy(incident => incident.HandledAt is null ? 0 : 1)
+                .ThenBy(incident => incident.DetectedAt)
+                .ThenBy(incident => incident.Id.Value)
+                .Select(incident => new PaymentIncidentItem(
+                    incident.Id.Value,
+                    incident.Kind.Name,
+                    incident.ReceiptId.Value,
+                    incident.CaptureReference,
+                    MoneyDto.From(incident.Reported),
+                    MoneyDto.From(incident.Expected),
+                    incident.OtherPaymentId?.Value,
+                    incident.DetectedAt,
+                    incident.HandledAt,
+                    incident.HandledByAdminId is { } admin ? names.GetValueOrDefault(admin) : null,
+                    incident.HandledNote)),
         ];
     }
 

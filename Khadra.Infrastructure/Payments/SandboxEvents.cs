@@ -67,6 +67,24 @@ public static class SandboxEvents
         public string? FailureCode { get; init; }
         public DateTimeOffset? OccurredAt { get; init; }
         public string? RefundReference { get; init; }
+        public string? CaptureReference { get; init; }
+    }
+
+    /// <summary>
+    /// The sandbox's id for the capture of a session: derived from the session reference under the shared secret
+    /// (Wave 4, B1).
+    /// </summary>
+    /// <remarks>
+    /// Deterministic, as a real provider's capture id is stable across every notice about that one charge: pressing
+    /// Pay twice on the same page sends the same capture said again, a Duplicate, unless the tester edits it. Keyed,
+    /// like <see cref="RefundReferenceFor"/>, so it cannot be worked out from the session reference alone.
+    /// </remarks>
+    public static string CaptureReferenceFor(string sessionReference, string secret)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionReference);
+        using var mac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var digest = mac.ComputeHash(Encoding.UTF8.GetBytes($"capture:{sessionReference}"));
+        return $"sbxcap_{Convert.ToHexString(digest, 0, 12).ToLowerInvariant()}";
     }
 
     /// <summary>
@@ -110,7 +128,8 @@ public static class SandboxEvents
         string secret,
         string? failureCode = null,
         DateTimeOffset? occurredAt = null,
-        string? refundReference = null)
+        string? refundReference = null,
+        string? captureReference = null)
     {
         var payload = new Dictionary<string, object?>
         {
@@ -127,6 +146,9 @@ public static class SandboxEvents
             ["occurredAt"] = occurredAt?.ToString("O", CultureInfo.InvariantCulture),
             // Which refund a refund event is about (Phase 3). Absent on a capture or a failure.
             ["refundReference"] = refundReference,
+            // Which capture a capture event reports (Wave 4, B1). Absent on every other kind, and when the tester
+            // cleared it to exercise a notice with no reference.
+            ["captureReference"] = captureReference,
         };
 
         var body = JsonSerializer.Serialize(payload, Json);

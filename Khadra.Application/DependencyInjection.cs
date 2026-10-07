@@ -36,6 +36,8 @@ public static class DependencyInjection
         services.AddScoped<Disputes.DisputeAuditor>();
         services.AddScoped<Disputes.DisputeViewComposer>();
         services.AddScoped<Notifications.DealerTeamNotifier>();
+        // The one place an expiry is announced (Wave 4, checklist 234): the settling seam, the sweep and a new request all use it.
+        services.AddScoped<Bookings.BookingExpiryAnnouncer>();
         services.AddScoped<Bookings.Handover.HandoverVerifier>();
         services.AddScoped<AuthEmailDispatcher>();
         services.AddScoped<Bookings.BookingEmailDispatcher>();

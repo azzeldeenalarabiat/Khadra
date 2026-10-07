@@ -50,18 +50,17 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
                 cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> ListDueForPaymentExpiryAsync(
+    public async Task<IReadOnlyList<Id>> ListIdsDueForPaymentExpiryAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         // Approved, and the customer let the payment window close.
         var approved = BookingStatus.Approved;
-        return await WithChildren()
-            .Where(booking => booking.Status == approved && booking.PaymentDeadline <= now)
-            .ToListAsync(cancellationToken);
+        return await Ids(context.Bookings
+            .Where(booking => booking.Status == approved && booking.PaymentDeadline <= now), cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> ListDueForDecisionExpiryAsync(
+    public async Task<IReadOnlyList<Id>> ListIdsDueForDecisionExpiryAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
@@ -69,12 +68,11 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
         // arrive, which was harmless while a deposit gated the hold and is not now: a request costs
         // nothing, so without a real window one account could hold a car for the booking horizon.
         var requested = BookingStatus.Requested;
-        return await WithChildren()
-            .Where(booking => booking.Status == requested && booking.DecisionDeadline <= now)
-            .ToListAsync(cancellationToken);
+        return await Ids(context.Bookings
+            .Where(booking => booking.Status == requested && booking.DecisionDeadline <= now), cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> ListDueForNoShowAsync(
+    public async Task<IReadOnlyList<Id>> ListIdsDueForNoShowAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
@@ -82,21 +80,40 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
         // failed to collect a car they had not paid for, and the aggregate refuses it anyway. The
         // no-show timeout itself is per booking, in its Terms.
         var confirmed = BookingStatus.Confirmed;
-        return await WithChildren()
-            .Where(booking => booking.Status == confirmed && booking.Period.Start <= now)
-            .ToListAsync(cancellationToken);
+        return await Ids(context.Bookings
+            .Where(booking => booking.Status == confirmed && booking.Period.Start <= now), cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> ListDueForSettlementAsync(
+    public async Task<IReadOnlyList<Id>> ListIdsDueForSettlementAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        // Candidates: returned. The settlement window is per booking, in its Terms.
+        // Candidates: returned, and past the window stored when it opened (Wave 4, B5; checklist 210) — or, for a
+        // booking returned before the column existed, any returned one, as before. The window is per booking, in its
+        // Terms, and Booking.Settle judges it again; this only stops re-reading the ones still inside it.
         var returned = BookingStatus.Returned;
-        return await WithChildren()
+        return await Ids(context.Bookings
             .Where(booking => booking.Status == returned && booking.ReturnedAt <= now)
-            .ToListAsync(cancellationToken);
+            .Where(WindowClosedOrUnknown(now)), cancellationToken);
     }
+
+    /// <summary>
+    /// The window stored when an ending opened it has closed by <paramref name="now"/> — or no window is stored, for a
+    /// booking that ended before the column existed (Wave 4, B5; checklist 210). Never later than before, and the
+    /// aggregate still judges each booking against its own frozen window.
+    /// </summary>
+    private static System.Linq.Expressions.Expression<Func<Booking, bool>> WindowClosedOrUnknown(DateTimeOffset now) =>
+        booking =>
+            EF.Property<DateTimeOffset?>(booking, Configurations.Bookings.BookingConfiguration.DisputeWindowEndsAtField) == null ||
+            EF.Property<DateTimeOffset?>(booking, Configurations.Bookings.BookingConfiguration.DisputeWindowEndsAtField) <= now;
+
+    /// <summary>The sweep's candidates as ids, oldest booking first, so a pass works through them in a stable order.</summary>
+    private static async Task<IReadOnlyList<Id>> Ids(IQueryable<Booking> due, CancellationToken cancellationToken) =>
+        await due
+            .OrderBy(booking => booking.CreatedAt)
+            .ThenBy(booking => booking.Id)
+            .Select(booking => booking.Id)
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<Booking>> ListStaleHoldsForVehicleAsync(
         Id vehicleId,
@@ -107,7 +124,7 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
     {
         ArgumentNullException.ThrowIfNull(candidatePeriod);
 
-        // The two ListDueFor* predicates above, taken together because the caller does not care
+        // The two expiry predicates above, taken together because the caller does not care
         // WHICH clock ran out -- only that the row still sits in the exclusion constraint's index
         // while the application has stopped counting it.
         //
@@ -132,7 +149,7 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(
+    public async Task<IReadOnlyList<Id>> ListIdsDueForDepositReleaseAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
@@ -150,7 +167,7 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
         var released = RefundReason.DisputeWindowClosed;
         var withdrawn = DisputeStatus.Withdrawn;
 
-        return await WithChildren()
+        return await Ids(context.Bookings
             .Where(booking =>
                 (booking.Status == cancelled || booking.Status == noShow) &&
                 booking.PickedUpAt == null &&
@@ -164,7 +181,8 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
                     refund.PaymentId == booking.DepositPaymentId &&
                     (refund.Reason == freeCancellation || refund.Reason == platformCancellation || refund.Reason == released)) &&
                 !context.DisputeTickets.Any(ticket => ticket.BookingId == booking.Id && ticket.Status != withdrawn))
-            .ToListAsync(cancellationToken);
+            .Where(WindowClosedOrUnknown(now)),
+            cancellationToken);
     }
 
     public async Task AddAsync(Booking booking, CancellationToken cancellationToken = default) =>

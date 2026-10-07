@@ -1,3 +1,4 @@
+using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.SettleBookings;
 using Khadra.Application.Common;
 using Khadra.Application.Notifications;
@@ -40,18 +41,85 @@ public sealed class BookingSettlementTests
         public Dealer Office { get; } = Build.ApprovedDealer();
         public List<Notification> Told { get; } = [];
 
+        /// <summary>The bookings loaded since the tracker was last discarded, as the real unit of work tracks them.</summary>
+        public List<Booking> Tracked { get; } = [];
+
+        public BookingExpiryAnnouncer Announcer => new(new DealerTeamNotifier(Notifier, Users), Dealers);
+
         public Context()
         {
-            UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
+            // As the real unit of work does: a save hands over the tracked aggregates' events, which clears them.
+            UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            {
+                Tracked.ForEach(booking => booking.ClearDomainEvents());
+                return 1;
+            });
+            UnitOfWork.When(unit => unit.DiscardChanges()).Do(_ => Tracked.Clear());
             Dealers.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(Office);
             Notifier.When(n => n.Raise(Arg.Any<Notification>())).Do(call => Told.Add(call.Arg<Notification>()));
             Notifier.When(n => n.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
                 .Do(call => Told.AddRange(call.Arg<IEnumerable<Notification>>()));
-            Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-            Bookings.ListDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-            Bookings.ListDueForNoShowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-            Bookings.ListDueForSettlementAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
-            Bookings.ListDueForDepositReleaseAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+            Bookings.ListIdsDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+            Bookings.ListIdsDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+            Bookings.ListIdsDueForNoShowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+            Bookings.ListIdsDueForSettlementAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+            Bookings.ListIdsDueForDepositReleaseAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+        }
+
+        public void DueForDecisionExpiry(params Booking[] due)
+        {
+            // Set up before the list: NSubstitute cannot configure one call inside another's Returns.
+            var ids = Loadable(due);
+            Bookings.ListIdsDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(ids);
+        }
+
+        public void DueForPaymentExpiry(params Booking[] due)
+        {
+            // Set up before the list: NSubstitute cannot configure one call inside another's Returns.
+            var ids = Loadable(due);
+            Bookings.ListIdsDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(ids);
+        }
+
+        public void DueForNoShow(params Booking[] due)
+        {
+            // Set up before the list: NSubstitute cannot configure one call inside another's Returns.
+            var ids = Loadable(due);
+            Bookings.ListIdsDueForNoShowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(ids);
+        }
+
+        public void DueForSettlement(params Booking[] due)
+        {
+            // Set up before the list: NSubstitute cannot configure one call inside another's Returns.
+            var ids = Loadable(due);
+            Bookings.ListIdsDueForSettlementAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(ids);
+        }
+
+        public void DueForDepositRelease(params Booking[] due)
+        {
+            // Set up before the list: NSubstitute cannot configure one call inside another's Returns.
+            var ids = Loadable(due);
+            Bookings.ListIdsDueForDepositReleaseAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(ids);
+        }
+
+        /// <summary>The ids the sweep is handed, each loadable by id the way the settling seam loads it.</summary>
+        private IReadOnlyList<Id> Loadable(Booking[] due)
+        {
+            foreach (var booking in due)
+                Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(_ => LoadAsync(booking));
+            return [.. due.Select(booking => booking.Id)];
+        }
+
+        /// <summary>
+        /// What <c>SettlingBookingRepository</c> does on every single-booking load (Wave 4, checklist 234): settle a
+        /// lapse, and announce it on the same tracker. Its own proof against a real database is in
+        /// <c>SettlingBookingRepositoryTests</c>.
+        /// </summary>
+        private async Task<Booking?> LoadAsync(Booking booking)
+        {
+            Tracked.Add(booking);
+            if (BookingLapse.Settle(booking, Clock.UtcNow) is { } lapse)
+                await Announcer.AnnounceAsync(booking, lapse, Clock.UtcNow, CancellationToken.None);
+            return booking;
         }
 
         public SettleDueBookingsHandler Handler() =>
@@ -68,8 +136,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Build.Booking();
         context.Clock.UtcNow = booking.DecisionDeadline;
-        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDecisionExpiry(booking);
 
         var report = await context.Run();
 
@@ -85,8 +152,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Build.ApprovedBooking();
         context.Clock.UtcNow = booking.PaymentDeadline!.Value;
-        context.Bookings.ListDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForPaymentExpiry(booking);
 
         var report = await context.Run();
 
@@ -103,8 +169,7 @@ public sealed class BookingSettlementTests
     {
         var context = new Context();
         var answered = Build.ApprovedBooking();
-        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([answered]);
+        context.DueForDecisionExpiry(answered);
 
         var report = await context.Run();
 
@@ -153,8 +218,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Build.Booking();
         context.Clock.UtcNow = booking.DecisionDeadline;
-        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDecisionExpiry(booking);
 
         var first = await context.Run();
         var second = await context.Run();
@@ -173,8 +237,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Build.Booking();
         context.Clock.UtcNow = booking.DecisionDeadline;
-        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDecisionExpiry(booking);
 
         await context.Run();
 
@@ -198,8 +261,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Build.Booking();
         context.Clock.UtcNow = booking.DecisionDeadline;
-        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDecisionExpiry(booking);
 
         await context.Run();
 
@@ -214,8 +276,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Build.ApprovedBooking();
         context.Clock.UtcNow = booking.PaymentDeadline!.Value;
-        context.Bookings.ListDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForPaymentExpiry(booking);
 
         await context.Run();
 
@@ -268,8 +329,7 @@ public sealed class BookingSettlementTests
         context.Clock.UtcNow = first.DecisionDeadline > second.DecisionDeadline
             ? first.DecisionDeadline
             : second.DecisionDeadline;
-        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([first, second]);
+        context.DueForDecisionExpiry(first, second);
 
         var calls = 0;
         context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(_ =>
@@ -279,6 +339,30 @@ public sealed class BookingSettlementTests
 
         Assert.Equal(1, report.Value.ExpiredUnanswered);
         Assert.Equal(1, report.Value.Failed);
+    }
+
+    /// <summary>
+    /// ANY failure on one booking — not only a conflict — costs that booking alone, and the tracker is clean again for
+    /// the next (Wave 4, checklist 233; the advisor's review). The pass used to end at the first unexpected exception.
+    /// </summary>
+    [Fact]
+    public async Task Any_failure_on_one_booking_leaves_the_others_settled_on_a_clean_tracker()
+    {
+        var context = new Context();
+        var first = Build.Booking();
+        var second = Build.Booking();
+        context.Clock.UtcNow = first.DecisionDeadline > second.DecisionDeadline ? first.DecisionDeadline : second.DecisionDeadline;
+        context.DueForDecisionExpiry(first, second);
+        var calls = 0;
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            ++calls == 1 ? throw new InvalidOperationException("The database went away.") : 1);
+
+        var report = await context.Run();
+
+        Assert.Equal(1, report.Value.ExpiredUnanswered);
+        Assert.Equal(1, report.Value.Failed);
+        // A clean tracker before each booking, and again after the failure.
+        context.UnitOfWork.Received(3).DiscardChanges();
     }
 
     // ---------------------------------------------------------------- money the timer owes (Phase 3, 2026-09-26)
@@ -295,8 +379,7 @@ public sealed class BookingSettlementTests
     private static void DueForNoShow(Context context, Booking booking)
     {
         context.Clock.UtcNow = booking.Period.Start.Add(booking.Terms.NoShowTimeout).AddMinutes(1);
-        context.Bookings.ListDueForNoShowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForNoShow(booking);
     }
 
     /// <summary>A paid no-show returns everything above the deposit, recorded in the save that marks it.</summary>
@@ -342,8 +425,7 @@ public sealed class BookingSettlementTests
         var (orphaned, _) = Build.PaidBooking(inFull: true);
         var fine = Paid(context, out var payment, inFull: true);
         context.Clock.UtcNow = fine.Period.Start.Add(fine.Terms.NoShowTimeout).AddMinutes(1);
-        context.Bookings.ListDueForNoShowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([orphaned, fine]);
+        context.DueForNoShow(orphaned, fine);
 
         var report = await context.Run();
 
@@ -360,8 +442,7 @@ public sealed class BookingSettlementTests
         var booking = Paid(context, out payment, inFull);
         Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "The car failed its inspection.", Build.Now.AddHours(3)).IsSuccess);
         booking.ClearDomainEvents();
-        context.Bookings.ListDueForDepositReleaseAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDepositRelease(booking);
         return booking;
     }
 
@@ -426,8 +507,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var booking = Paid(context, out var payment);
         Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, "Changed plans.", Build.Now.AddHours(3)).IsSuccess);
-        context.Bookings.ListDueForDepositReleaseAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDepositRelease(booking);
         context.Clock.UtcNow = booking.FinishedAt!.Value.AddDays(30);
 
         var report = await context.Run();
@@ -459,8 +539,7 @@ public sealed class BookingSettlementTests
         var context = new Context();
         var (booking, _) = Build.PaidBooking();
         Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", Build.Now.AddHours(3)).IsSuccess);
-        context.Bookings.ListDueForDepositReleaseAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForDepositRelease(booking);
         context.Clock.UtcNow = booking.FinishedAt!.Value.AddDays(3);
 
         var report = await context.Run();
@@ -476,8 +555,7 @@ public sealed class BookingSettlementTests
         booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.Period.Start);
         booking.RecordReturn(BookingParty.Dealer, Id.New(), returnedAt);
         booking.ClearDomainEvents();
-        context.Bookings.ListDueForSettlementAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns([booking]);
+        context.DueForSettlement(booking);
         return booking;
     }
 }

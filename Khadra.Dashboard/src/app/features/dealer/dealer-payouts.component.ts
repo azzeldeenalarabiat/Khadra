@@ -72,7 +72,7 @@ export class DealerPayoutsComponent {
   private readonly settlement = loaded(this.service.settlement);
 
   protected readonly scope = this.service.scope;
-  protected readonly scopes: readonly PayableScope[] = ['open', 'settled', 'all'];
+  protected readonly scopes: readonly PayableScope[] = ['open', 'nothingDue', 'settled', 'all'];
   protected readonly payablesPage = this.service.payablesPage;
   protected readonly settlementsPage = this.service.settlementsPage;
   protected readonly viewing = this.service.viewingSettlement;

@@ -294,7 +294,14 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
     }
 
     /// <summary>A booking paid the way production pays, with real parties saved beside it.</summary>
-    public async Task<(Booking Booking, Payment Payment)> PaidAsync(string provider, bool inFull = false, decimal fee = 0m, string unique = "", DateTimeOffset? start = null)
+    /// <param name="terms">The rules the booking freezes; the shipped ones when left out.</param>
+    public async Task<(Booking Booking, Payment Payment)> PaidAsync(
+        string provider,
+        bool inFull = false,
+        decimal fee = 0m,
+        string unique = "",
+        DateTimeOffset? start = null,
+        BookingTerms? terms = null)
     {
         var (customer, dealer, vehicle) = await PartiesAsync(unique);
         // `start` puts the rental within reach of the clock, for a test that records a handover: a pickup may be
@@ -302,6 +309,7 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
         var booking = Build.Booking(
             Now,
             period: start is null ? null : Build.Period(start.Value),
+            terms: terms,
             customerId: customer.Id,
             dealerId: dealer.Id,
             vehicleId: vehicle.Id);
