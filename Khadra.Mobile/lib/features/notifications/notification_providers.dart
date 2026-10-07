@@ -66,8 +66,11 @@ class NotificationsNotifier
 
   @override
   Future<PagedList<NotificationItem>> build() async {
-    final session = ref.watch(sessionProvider);
-    if (!session.isSignedIn) {
+    // Whether somebody is signed in, and nothing else about the session. Watching the
+    // whole session reloaded the feed — spinner and all — on every access-token
+    // rotation, which took the rows down under the customer's finger (W4-9).
+    final signedIn = ref.watch(sessionProvider.select((state) => state.isSignedIn));
+    if (!signedIn) {
       _unread = 0;
       return const PagedList<NotificationItem>.empty();
     }

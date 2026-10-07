@@ -12,6 +12,7 @@ import 'core/fonts/font_licences.dart';
 import 'core/live/live_refresh.dart';
 import 'core/providers.dart';
 import 'core/push/push_actions.dart';
+import 'core/push/push_trace.dart';
 import 'core/router.dart';
 import 'core/theme/khadra_theme.dart';
 import 'features/update/update_required_screen.dart';
@@ -50,6 +51,8 @@ Future<void> main() async {
 
   final preferences = await SharedPreferences.getInstance();
   final installedVersion = await _installedVersion();
+  // TEMPORARY, Staging only: what earlier runs recorded of push taps (PushTrace).
+  await PushTrace.attach();
 
   runApp(
     ProviderScope(

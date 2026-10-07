@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +8,7 @@ import '../../features/documents/document_providers.dart';
 import '../live/live_refresh.dart';
 import '../live/live_surfaces.dart';
 import 'notification_route.dart';
+import 'push_trace.dart';
 
 /// Opens where a tapped push leads ([notificationRoute]), from any state the app was in.
 ///
@@ -25,10 +28,23 @@ void openForPush(
   required GoRouter router,
   required bool sessionResolved,
 }) {
+  PushTrace.record('navigate', detail: '${sessionResolved ? 'push' : 'go'} ${PushTrace.redact(location)}');
   if (sessionResolved) {
     router.push(location);
   } else {
     router.go(location);
+  }
+  // TEMPORARY, Staging only (PushTrace): which screen is on top once the navigation has
+  // had time to land, the session included.
+  if (PushTrace.enabled) {
+    Timer(const Duration(milliseconds: 1500), () {
+      try {
+        final top = router.routerDelegate.currentConfiguration.last.matchedLocation;
+        PushTrace.record('screen', detail: 'top=${PushTrace.redact(top)}');
+      } on Object catch (error) {
+        PushTrace.record('screen', detail: 'unreadable ${error.runtimeType}');
+      }
+    });
   }
 }
 

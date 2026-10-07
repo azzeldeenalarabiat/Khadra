@@ -582,6 +582,19 @@ no document type (`OfficeNotificationEmailTests`). **Open until verified on a ph
 build, and the three Android tap states were proven in widget tests, not on a device. Installed builds still open
 nothing on a tap; the email's link works for them.
 
+**Second device finding (2026-10-07), on 1.3.0+5: a tap still did nothing.** Run through the REAL app (`KhadraApp`,
+`FirebasePushMessaging`, the router) with the exact maps Android's plugins send, the push taps opened My Documents
+in all three states and under every cold-start race (`push_platform_channels_test.dart`), so no fault was found
+there. The tap on the notice's ROW in Alerts did fail, the way the phone showed it. The row waited for
+`markNotificationRead` and then opened its screen only if the row was still mounted. That request can rotate a stale
+access token, and the feed watched the whole session, so the rotation reloaded the feed and took the row down
+mid-request. The row was marked read and nothing opened. Fixed: the row opens first and the read is recorded
+without waiting; the feed watches only whether somebody is signed in. **Temporary, Staging builds only:** `PushTrace`
+records each step of a push tap on the phone (keys, kind, route with ids masked; never a reason, token or id),
+readable from Profile → "push trace (staging)". If a push tap still does nothing on a phone, that trace names the
+step it stops at. **To close:** verify on a phone, then delete `PushTrace`, `push_trace_screen.dart` and their call
+sites.
+
 ### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
 
 **Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.

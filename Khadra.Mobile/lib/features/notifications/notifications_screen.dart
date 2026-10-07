@@ -11,6 +11,7 @@ import '../../core/format/booking_presentation.dart';
 import '../../core/paging.dart';
 import '../../core/providers.dart';
 import '../../core/push/notification_route.dart';
+import '../../core/push/push_trace.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
@@ -203,24 +204,38 @@ class _NotificationRow extends ConsumerWidget {
     );
   }
 
-  Future<void> _open(BuildContext context, WidgetRef ref) async {
-    if (!item.isRead) {
-      try {
-        await ref.read(apiProvider).markNotificationRead(item.notificationId);
-        ref.invalidate(notificationsProvider);
-        ref.invalidate(unreadNotificationCountProvider);
-      } on ApiFailure {
-        // Failing to mark it read must not stop the customer opening what it is
-        // about; the row simply stays bold.
-      }
-    }
-
+  void _open(BuildContext context, WidgetRef ref) {
     // The same destination a tap on its push opens (notificationRoute): the booking,
     // the dispute — whose subject is the TICKET — or My Documents for a document Khadra
     // could not accept, which has no subject at all.
     final route =
         notificationRoute(kind: item.kind, subjectId: item.subjectId);
-    if (route != null && context.mounted) context.push(route);
+    PushTrace.record('alerts-tap',
+        data: {'kind': item.kind, 'subjectId': ?item.subjectId},
+        detail: 'route=${PushTrace.redact(route)}');
+
+    // OPENED FIRST, and marked read without being waited for (Staging, W4-9).
+    //
+    // It used to wait for the read to be recorded and then open only if this row was
+    // still on screen. On a phone that request can rotate a stale access token, the
+    // feed reloaded on the new session and took this row down mid-request, and the
+    // tap was dropped without a word: marked read, opened nothing. Whether the row is
+    // bold has nothing to do with where the customer asked to go.
+    if (!item.isRead) {
+      unawaited(_markRead(ProviderScope.containerOf(context, listen: false)));
+    }
+    if (route != null) context.push(route);
+  }
+
+  Future<void> _markRead(ProviderContainer container) async {
+    try {
+      await container.read(apiProvider).markNotificationRead(item.notificationId);
+      container
+        ..invalidate(notificationsProvider)
+        ..invalidate(unreadNotificationCountProvider);
+    } on ApiFailure {
+      // Failing to mark it read must not cost anything else; the row simply stays bold.
+    }
   }
 
   /// The sentence, chosen from the KIND.

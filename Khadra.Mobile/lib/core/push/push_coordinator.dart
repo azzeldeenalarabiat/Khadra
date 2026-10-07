@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../api/khadra_api.dart';
 import '../api/api_failure.dart';
 import 'notification_route.dart';
+import 'push_trace.dart';
 import 'push_messaging.dart';
 
 /// Where tapping a push leads, from its data. Null when it leads nowhere in particular.
@@ -70,9 +71,13 @@ class PushCoordinator {
     if (_started.isCompleted) return;
     try {
       _available = await _messaging.initialize();
+    } on Object catch (error) {
+      PushTrace.record('start', detail: 'initialize threw ${error.runtimeType}');
+      rethrow;
     } finally {
       _started.complete();
     }
+    PushTrace.record('start', detail: 'available=$_available');
     if (!_available) return;
 
     _subscriptions
@@ -141,6 +146,8 @@ class PushCoordinator {
 
   void _open(PushEvent event) {
     final route = pushRoute(event.data);
+    PushTrace.record('open', data: event.data,
+        detail: 'route=${PushTrace.redact(route)} navigate=${navigate != null}');
     if (route != null) navigate?.call(route);
   }
 

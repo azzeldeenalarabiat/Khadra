@@ -99,6 +99,10 @@ dev_dependencies:
   # directly, to drive the refresh heartbeat without spending real minutes on it.
   fake_async: ^1.3.1
 
+  # Already in the tree through firebase_core; named because `push_platform_channels_test` uses its
+  # mocks to run the real Firebase start-up, so push taps are tested against the maps Android sends.
+  firebase_core_platform_interface: ^8.1.1
+
   # Launcher icons. BUILD-TIME ONLY -- neither of these ships in the APK.
   #
   # The icons are generated rather than hand-cut because there are ten of them
