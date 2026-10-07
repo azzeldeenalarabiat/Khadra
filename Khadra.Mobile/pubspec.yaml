@@ -9,7 +9,7 @@ publish_to: 'none'
 # 1.2.0 shows the handover code and registers for push. Additive to the API, so the minimum stays
 # 1.1.0 until Handover:RequireVerification is switched on — which raises it to 1.2.0 in the same
 # step, AFTER this build is published (docs/production.md, "The customer app").
-version: 1.3.0+5
+version: 1.3.0+6
 
 environment:
   sdk: ^3.12.2
