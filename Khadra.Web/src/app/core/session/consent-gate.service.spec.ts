@@ -135,13 +135,20 @@ describe('the consent gate', () => {
     expect(gate.blocked()).toBe(true);
   });
 
-  it('does not hold back what somebody asked for when it cannot ask: the server still refuses', async () => {
+  // The advisor's review: an unanswered question is "not known", never "nothing owed". Nothing is blocked — the server
+  // still refuses — and nothing that waits on `clear` is sent to a refusal and forgotten.
+  it('stays unknown when it cannot ask: it blocks nothing and clears nothing, and asks again on the next refusal', async () => {
     user.set(customer('rana'));
     TestBed.tick();
     http.expectOne(CONSENTS).flush(null, { status: 503, statusText: 'Unavailable' });
     await settle();
 
     expect(gate.blocked()).toBe(false);
+    expect(gate.clear()).toBe(false);
+
+    gate.raise();
+    http.expectOne(CONSENTS).flush({ accepted: [], pending: [] });
+    await settle();
     expect(gate.clear()).toBe(true);
   });
 

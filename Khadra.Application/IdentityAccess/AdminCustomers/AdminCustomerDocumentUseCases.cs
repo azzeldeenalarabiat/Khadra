@@ -32,7 +32,8 @@ public sealed record OpenCustomerDocumentCommand(Id CustomerId, Id DocumentId) :
 /// <param name="ExpectedUploadedAt">
 /// When the file the administrator opened was uploaded, exactly as the server sent it. A different file — the customer
 /// uploaded a new one since — answers 409 <c>documents.changed_since_viewed</c> rather than rejecting a file nobody
-/// looked at.
+/// looked at. And this administrator must have opened that very upload: the disclosure log says so, or the answer is
+/// 409 <c>documents.not_viewed</c> (the advisor's review).
 /// </param>
 public sealed record RejectCustomerDocumentCommand(Id CustomerId, Id DocumentId, string Reason, DateTimeOffset ExpectedUploadedAt)
     : ICommand<Result<CustomerProfile, Error>>;
@@ -110,6 +111,13 @@ public sealed class AdminCustomerDocumentHandlers(
         var document = customer.FindDocument(request.DocumentId);
         if (document is null)
             return IdentityErrors.DocumentNotFound;
+        if (document.UploadedAt != request.ExpectedUploadedAt)
+            return IdentityErrors.DocumentChangedSinceViewed;
+
+        // A rejection names a file its author looked at (the advisor's review): this administrator must have opened THIS
+        // upload, which the disclosure log records before a byte is sent. The profile showing it is not enough.
+        if (!await accessLog.AdminHasViewedAsync(customer.Id, document.Id, document.UploadedAt, cancellationToken))
+            return IdentityErrors.DocumentNotViewed;
 
         var before = $"{document.Type.Name}:{document.Status.Name}";
         var rejected = customer.RejectDocument(request.DocumentId, request.Reason, request.ExpectedUploadedAt);

@@ -99,6 +99,8 @@ describe('problemMessage', () => {
     expect(problemMessage(replaced, 'ar', t)).toBe('«problem.documentChangedSinceViewed»');
     expect(problemMessage(replaced, 'en', t)).toBe('«problem.documentChangedSinceViewed»');
     expect(problemMessage(refusal(404, { code: 'documents.not_found' }), 'ar', t)).toBe('«problem.documentNotFound»');
+    // The advisor's review: a rejection names a file its author opened, and the dialog says to open it first.
+    expect(problemMessage(refusal(409, { code: 'documents.not_viewed' }), 'en', t)).toBe('«problem.documentNotViewed»');
   });
 
   it('words a malformed address from the code the API now sends', () => {

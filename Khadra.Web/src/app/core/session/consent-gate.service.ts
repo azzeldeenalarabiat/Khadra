@@ -119,9 +119,9 @@ export class ConsentGateService {
     this.asking ??= firstValueFrom(this.http.get<MyLegalConsents>('/api/v1/auth/me/legal-consents'))
       .then((record) => this.known.set({ userId: user.id, pending: record.pending ?? [] }))
       .catch(() => {
-        // Not knowing is no reason to stop anybody, or to hold back what they asked for: the server's gate still
-        // stands, and its next refusal asks again.
-        this.known.set({ userId: user.id, pending: [] });
+        // Left unknown (the advisor's review), as the console leaves it: nothing is blocked, because the server's gate
+        // still stands and its next refusal asks again; and nothing is CLEAR, so what waits on `clear` — a car saved
+        // before signing in — keeps waiting rather than being sent to a refusal and forgotten.
       })
       .finally(() => (this.asking = null));
     return this.asking;

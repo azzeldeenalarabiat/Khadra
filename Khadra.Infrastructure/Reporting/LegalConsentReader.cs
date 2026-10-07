@@ -1,5 +1,6 @@
 using Khadra.Application.Legal.ReadModels;
 using Khadra.Domain.Common;
+using Khadra.Domain.Legal;
 using Khadra.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,8 @@ internal sealed class LegalConsentReader(KhadraDbContext context) : ILegalConsen
         CancellationToken cancellationToken = default)
     {
         var versions = context.LegalDocumentVersions.AsNoTracking();
+        // Acceptances only (the advisor's review): a withdrawal, the day one exists, is a row too, and must not count.
+        var accepted = ConsentAction.Accepted;
 
         // ONE statement, because the consent gate asks it on every request it judges: the version of each kind in force
         // at `at` (none of its kind newer and already in force) that this person has no acceptance of. The unique index on
@@ -22,7 +25,7 @@ internal sealed class LegalConsentReader(KhadraDbContext context) : ILegalConsen
                 && !versions.Any(newer =>
                     newer.Kind == version.Kind && newer.EffectiveFrom <= at && newer.EffectiveFrom > version.EffectiveFrom)
                 && !context.LegalConsents.Any(consent =>
-                    consent.UserId == userId && consent.DocumentVersionId == version.Id))
+                    consent.UserId == userId && consent.DocumentVersionId == version.Id && consent.Action == accepted))
             .Select(version => new { version.Kind, version.Id, version.VersionLabel, version.EffectiveFrom })
             .ToListAsync(cancellationToken);
 
@@ -33,9 +36,10 @@ internal sealed class LegalConsentReader(KhadraDbContext context) : ILegalConsen
 
     public async Task<IReadOnlyList<AcceptedLegalVersion>> AcceptedAsync(Id userId, CancellationToken cancellationToken = default)
     {
+        var accepted = ConsentAction.Accepted;
         var rows = await context.LegalConsents
             .AsNoTracking()
-            .Where(consent => consent.UserId == userId)
+            .Where(consent => consent.UserId == userId && consent.Action == accepted)
             .Join(
                 context.LegalDocumentVersions.AsNoTracking(),
                 consent => consent.DocumentVersionId,
@@ -71,9 +75,12 @@ internal sealed class LegalConsentReader(KhadraDbContext context) : ILegalConsen
             return new HashSet<Id>();
 
         var wanted = versionIds.Distinct().ToList();
+        var acceptance = ConsentAction.Accepted;
         var accepted = await context.LegalConsents
             .AsNoTracking()
-            .Where(consent => consent.UserId == userId && wanted.Contains(consent.DocumentVersionId))
+            .Where(consent => consent.UserId == userId
+                && wanted.Contains(consent.DocumentVersionId)
+                && consent.Action == acceptance)
             .Select(consent => consent.DocumentVersionId)
             .Distinct()
             .ToListAsync(cancellationToken);

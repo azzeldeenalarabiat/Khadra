@@ -2296,7 +2296,9 @@ export const EN = {
   'problem.notPermitted': 'Your account is not allowed to do that.',
   'problem.notFound': 'That record no longer exists. Reload the screen.',
   'problem.documentChangedSinceViewed':
-    'The customer uploaded a new file after you opened this one. Close this, then open the file again before deciding.',
+    'This file changed after you opened it: the customer uploaded a new one, or another administrator acted on it. Close this, then open the file again before deciding.',
+  'problem.documentNotViewed':
+    'Open the file first, with the link above: a rejection names a file you have looked at. Then reject it.',
   'problem.documentNotFound': "That file is no longer on the customer's record. Reload the page.",
   'problem.conflict': 'That conflicts with the record as it stands now. Reload and check it.',
   'problem.tooMany': 'Too many attempts. Wait a moment and try again.',

@@ -1,5 +1,8 @@
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
+using Khadra.Domain.Common;
+using Khadra.Domain.IdentityAccess;
+using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Persistence.Repositories;
 
@@ -13,5 +16,27 @@ internal sealed class DocumentAccessLog(KhadraDbContext context) : IDocumentAcce
     {
         ArgumentNullException.ThrowIfNull(entry);
         context.DocumentAccessEntries.Add(entry);
+    }
+
+    // The subject first, so the (subject_user_id, occurred_at, id) index narrows it to one person's handful of rows.
+    public Task<bool> AdministratorHasViewedAsync(
+        Id administratorUserId,
+        Id subjectUserId,
+        Id documentId,
+        DateTimeOffset documentUploadedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var viewed = DocumentAccessAction.Viewed;
+        var admin = UserRole.Admin;
+        return context.DocumentAccessEntries
+            .AsNoTracking()
+            .AnyAsync(
+                entry => entry.SubjectUserId == subjectUserId
+                    && entry.DocumentId == documentId
+                    && entry.ActorUserId == administratorUserId
+                    && entry.ActorRole == admin
+                    && entry.Action == viewed
+                    && entry.DocumentUploadedAt == documentUploadedAt,
+                cancellationToken);
     }
 }

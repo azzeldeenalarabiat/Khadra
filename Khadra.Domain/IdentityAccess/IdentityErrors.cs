@@ -41,13 +41,23 @@ public static class IdentityErrors
         Error.NotFound("documents.not_found", "That document does not exist.");
 
     /// <summary>
-    /// The customer uploaded a new file after the administrator opened the one they were judging (Wave 4, W4-9): the
-    /// decision was about a file that is no longer there. Open the document again before deciding.
+    /// The document changed after the administrator opened the file they were judging (Wave 4, W4-9): the customer
+    /// uploaded a new one, or, in the rarer race, another administrator acted on it at the same moment. Either way the
+    /// decision was about a file as it no longer stands. Open the document again before deciding.
     /// </summary>
     public static readonly Error DocumentChangedSinceViewed =
         Error.Conflict(
             "documents.changed_since_viewed",
-            "The customer has uploaded a new file since you opened this one. Open it again before deciding.");
+            "This file changed after you opened it: the customer uploaded a new one, or another administrator acted on it. Open it again before deciding.");
+
+    /// <summary>
+    /// The administrator has not opened this upload (Wave 4, W4-9; the advisor's review): a rejection names a file its
+    /// author looked at, and the disclosure log is what says they did. Open it from the decision, then decide.
+    /// </summary>
+    public static readonly Error DocumentNotViewed =
+        Error.Conflict(
+            "documents.not_viewed",
+            "Open the file before you reject it: a rejection names a file you have looked at.");
 
     public static readonly Error EmailTaken =
         Error.Conflict("auth.email_taken", "An account with this email already exists.");

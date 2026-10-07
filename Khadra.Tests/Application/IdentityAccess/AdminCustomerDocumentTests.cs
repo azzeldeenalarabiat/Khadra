@@ -45,6 +45,10 @@ public sealed class AdminCustomerDocumentTests
         _users.GetByIdAsync(_customer.Id, Arg.Any<CancellationToken>()).Returns(_customer);
         _storage.OpenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ => new MemoryStream([1, 2, 3]));
         _accessLog.When(log => log.Record(Arg.Any<DocumentAccessEntry>())).Do(call => _views.Add(call.Arg<DocumentAccessEntry>()));
+        // This administrator has opened the file being judged, unless a test says otherwise.
+        _accessLog.AdministratorHasViewedAsync(
+                Arg.Any<Id>(), Arg.Any<Id>(), Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(true);
         _auditTrail.When(trail => trail.Record(Arg.Any<AuditEntry>())).Do(call => _audited.Add(call.Arg<AuditEntry>()));
         _notifier.When(notifier => notifier.Raise(Arg.Any<Notification>())).Do(call => _told.Add(call.Arg<Notification>()));
         _admin.UserId.Returns(Id.New());
@@ -180,6 +184,29 @@ public sealed class AdminCustomerDocumentTests
         Assert.Empty(_audited);
         Assert.Empty(_told);
         await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A rejection names a file its author looked at (the advisor's review): the profile showing it is not enough, and the
+    /// log is asked about THIS administrator and THIS upload.
+    /// </summary>
+    [Fact]
+    public async Task A_file_this_administrator_has_not_opened_is_not_rejected_and_nothing_is_written()
+    {
+        _accessLog.AdministratorHasViewedAsync(
+                Arg.Any<Id>(), Arg.Any<Id>(), Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var rejected = await Handlers().Handle(
+            new RejectCustomerDocumentCommand(_customer.Id, Front.Id, "Blurred.", Front.UploadedAt), CancellationToken.None);
+
+        Assert.Equal(IdentityErrors.DocumentNotViewed, rejected.Error);
+        Assert.Same(CustomerDocumentStatus.PendingReview, Front.Status);
+        Assert.Empty(_audited);
+        Assert.Empty(_told);
+        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await _accessLog.Received(1).AdministratorHasViewedAsync(
+            _admin.UserId!.Value, _customer.Id, Front.Id, Front.UploadedAt, Arg.Any<CancellationToken>());
     }
 
     /// <summary>The race the document's own token catches: the customer's upload committed between this load and this save.</summary>

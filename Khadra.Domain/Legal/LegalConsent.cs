@@ -59,7 +59,9 @@ public sealed class ConsentAction : Enumeration
 /// <b>Bounded by its writers, not by an index.</b> A person accepts a version once: the recorder writes a row only for a
 /// version in force they have not already accepted (the advisor's review), so an endpoint called in a loop cannot fill a
 /// table nothing can empty. The table stays non-unique on purpose: a later withdrawal followed by a new acceptance will
-/// need a second <see cref="ConsentAction.Accepted"/> row for the same version.
+/// need a second <see cref="ConsentAction.Accepted"/> row for the same version. So two acceptances sent at the same
+/// moment (a double click) can both pass the recorder's check and both be written: the same evidence twice, bounded by
+/// the size of the burst, and harmless. Every reader counts acceptances, never rows.
 /// </para>
 /// </remarks>
 public sealed class LegalConsent : AggregateRoot, IAppendOnly

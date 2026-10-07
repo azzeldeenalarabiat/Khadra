@@ -86,4 +86,20 @@ public sealed class DocumentAccessRecorder(IDocumentAccessLog log, ICurrentActor
             clock.UtcNow,
             actor.CorrelationId));
     }
+
+    /// <summary>
+    /// Whether the administrator making this request has opened this upload (Wave 4, W4-9): asked before a rejection,
+    /// which must name a file its author looked at.
+    /// </summary>
+    public Task<bool> AdminHasViewedAsync(
+        Id subjectUserId,
+        Id documentId,
+        DateTimeOffset documentUploadedAt,
+        CancellationToken cancellationToken = default)
+    {
+        if (actor.UserId is not { } actorUserId || actor.Role != UserRole.Admin)
+            throw new InvalidOperationException("Only an authenticated administrator can have viewed a document as one.");
+
+        return log.AdministratorHasViewedAsync(actorUserId, subjectUserId, documentId, documentUploadedAt, cancellationToken);
+    }
 }

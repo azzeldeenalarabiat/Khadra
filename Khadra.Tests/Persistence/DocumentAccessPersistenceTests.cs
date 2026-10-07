@@ -3,6 +3,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Infrastructure.Persistence;
+using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -132,6 +133,37 @@ public sealed class DocumentAccessPersistenceTests : IDisposable
 
         await using var read = new KhadraDbContext(_options);
         Assert.Equal(0, await read.DocumentAccessEntries.CountAsync());
+    }
+
+    /// <summary>
+    /// What a rejection asks first (Wave 4, W4-9; the advisor's review): did THIS administrator open THIS upload? Another
+    /// administrator's view, an earlier file in the same slot, or an office's view of the same file is not an answer.
+    /// </summary>
+    [Fact]
+    public async Task Only_this_administrators_view_of_this_upload_counts_as_having_opened_it()
+    {
+        var administrator = Id.New();
+        var subject = Id.New();
+        var document = Id.New();
+        var uploadedAt = Now.AddDays(-1);
+        await using (var write = new KhadraDbContext(_options))
+        {
+            write.DocumentAccessEntries.Add(DocumentAccessEntry.RecordAdminView(
+                administrator, "Dana Saleh", subject, document, CustomerDocumentType.DrivingLicenceFront, uploadedAt, Now));
+            write.DocumentAccessEntries.Add(DocumentAccessEntry.Record(
+                DocumentAccessAction.Viewed, Id.New(), "Rami Haddad", UserRole.DealerOwner, Id.New(), Id.New(), subject,
+                document, CustomerDocumentType.DrivingLicenceFront, uploadedAt.AddHours(1), Now));
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = new KhadraDbContext(_options);
+        var log = new DocumentAccessLog(read);
+
+        Assert.True(await log.AdministratorHasViewedAsync(administrator, subject, document, uploadedAt));
+        Assert.False(await log.AdministratorHasViewedAsync(Id.New(), subject, document, uploadedAt));
+        Assert.False(await log.AdministratorHasViewedAsync(administrator, subject, document, uploadedAt.AddHours(1)));
+        Assert.False(await log.AdministratorHasViewedAsync(administrator, subject, Id.New(), uploadedAt));
+        Assert.False(await log.AdministratorHasViewedAsync(administrator, Id.New(), document, uploadedAt));
     }
 
     [Fact]

@@ -97,7 +97,7 @@ this batch (decision D6).
 | 4 | `YourDocumentRejected` (W4-9; push and email): no subject and no reference, and its words never carry the reason; the email opens `{site}/profile/documents` | new value | installed builds show their generic line and the server's push text, and a tap opens nothing until 1.4.0 routes it |
 | 4 | A document Khadra rejected counts as not filed: `/customers/me/documents` lists its type in `missing` with `isComplete: false` (the file stays listed, `Rejected`, with its `reviewNote`), and `booking.documents_incomplete` gains `missingDocumentTypes` and `rejectedDocumentTypes` | behavioural, additive | installed builds already show a rejected file with its note, and their incomplete-documents path; they do not name the rejected types until 1.4.0 |
 | 4 | `rejectedByPlatform` on the office's renter documents (`GET /bookings/{id}/renter-documents`) | additive | none: office endpoint |
-| 4 | `GET /api/v1/admin/customers/{id}/documents/{documentId}` (the file, its view recorded first) and `POST …/reject` (`{ reason, uploadedAt }`; 409 `documents.changed_since_viewed`, 404 `documents.not_found`); `CustomerDocumentRejected` in the audit vocabulary | new endpoints | none: administrators only |
+| 4 | `GET /api/v1/admin/customers/{id}/documents/{documentId}` (the file, its view recorded first) and `POST …/reject` (`{ reason, uploadedAt }`; 409 `documents.changed_since_viewed` and `documents.not_viewed`, 404 `documents.not_found`); `CustomerDocumentRejected` in the audit vocabulary | new endpoints | none: administrators only |
 | 4 | The handover's fuel level reads as a whole percentage on the website and in the console (W4-10) | none | none: no API change |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)

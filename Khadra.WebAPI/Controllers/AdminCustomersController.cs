@@ -97,6 +97,8 @@ public sealed class AdminCustomersController : ApiControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> OpenDocument(Guid userId, Guid documentId, CancellationToken cancellationToken)
     {
+        // Before the handler, so a refusal carries it too, as the office's listing does (the advisor's review).
+        KeepOutOfCaches();
         var result = await Mediator.Send(new OpenCustomerDocumentCommand(Id.From(userId), Id.From(documentId)), cancellationToken);
         return FromResult(result, opened => PrivateDocument(opened.Content, opened.ContentType));
     }

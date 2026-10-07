@@ -199,6 +199,7 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   // A renter's document (Wave 4, W4-9): replaced after it was opened, or no longer on the record.
   'documents.changed_since_viewed': 'problem.documentChangedSinceViewed',
   'documents.not_found': 'problem.documentNotFound',
+  'documents.not_viewed': 'problem.documentNotViewed',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */

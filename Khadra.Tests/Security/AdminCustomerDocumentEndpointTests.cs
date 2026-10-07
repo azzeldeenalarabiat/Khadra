@@ -108,6 +108,30 @@ public sealed class AdminCustomerDocumentEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task A_refusal_to_open_a_file_is_not_cached_either()
+    {
+        var controller = ControllerWith(Result.Failure<OpenedDocument, Error>(IdentityErrors.DocumentNotFound));
+
+        var result = await controller.OpenDocument(UserId, DocumentId, default);
+
+        Assert.Equal(StatusCodes.Status404NotFound, Assert.IsType<ObjectResult>(result).StatusCode);
+        Assert.Equal("no-store, private", controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task A_rejection_of_a_file_this_administrator_never_opened_answers_409_with_its_own_code()
+    {
+        var controller = ControllerWith(Result.Failure<CustomerProfile, Error>(IdentityErrors.DocumentNotViewed));
+
+        var result = await controller.RejectDocument(
+            UserId, DocumentId, new AdminCustomersController.RejectDocumentRequest("Blurred.", DateTimeOffset.UtcNow), default);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal("documents.not_viewed", Assert.IsType<ProblemDetails>(problem.Value).Extensions["code"]);
+    }
+
+    [Fact]
     public async Task A_file_replaced_since_it_was_opened_answers_409_with_a_code_the_console_can_read()
     {
         var controller = ControllerWith(Result.Failure<CustomerProfile, Error>(IdentityErrors.DocumentChangedSinceViewed));

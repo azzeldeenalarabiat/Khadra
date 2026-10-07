@@ -1,7 +1,10 @@
+using Khadra.Domain.Common;
+
 namespace Khadra.Domain.Auditing.Repositories;
 
 /// <summary>
-/// Write side of the document disclosure log (pre-launch item 86).
+/// The document disclosure log (pre-launch item 86): written by every disclosure, and asked one question, whether an
+/// administrator has opened an upload before rejecting it (Wave 4, W4-9).
 /// </summary>
 /// <remarks>
 /// The same shape, and the same reasoning, as <see cref="IAuditTrail"/>: <c>Record</c> only STAGES
@@ -14,4 +17,16 @@ namespace Khadra.Domain.Auditing.Repositories;
 public interface IDocumentAccessLog
 {
     void Record(DocumentAccessEntry entry);
+
+    /// <summary>
+    /// Whether this administrator has opened this upload of this person's document (Wave 4, W4-9): a rejection must
+    /// name a file its author looked at. Matched on the upload's instant, because a document row is a slot whose file
+    /// is replaced in place: having opened an earlier file of the same slot is not having opened this one.
+    /// </summary>
+    Task<bool> AdministratorHasViewedAsync(
+        Id administratorUserId,
+        Id subjectUserId,
+        Id documentId,
+        DateTimeOffset documentUploadedAt,
+        CancellationToken cancellationToken = default);
 }

@@ -562,7 +562,9 @@ verified: `MarkVerified` is gone, and `Verified` stays in the enum only because 
   only by `ck_document_access_entries_scope`. The console offers the file only from inside the reject dialog.
 - Rejecting (`POST …/reject`) takes a reason (500) and the `uploadedAt` the profile showed, so a file the customer
   replaced since is refused (409 `documents.changed_since_viewed`), in memory and by the document's own `xmin`
-  token. It is audited in the same save as `CustomerDocumentRejected`. The customer is told by `YourDocumentRejected`
+  token. And it is refused unless this administrator has opened that very upload (409 `documents.not_viewed`, from
+  the disclosure log; the advisor's review of the built wave): a rejection names a file its author looked at. It is
+  audited in the same save as `CustomerDocumentRejected`. The customer is told by `YourDocumentRejected`
   (push and email, never the reason), and a rejected file counts as not filed: a new request is refused until they
   upload another. Bookings already made are not touched; the office still checks at pickup.
 
