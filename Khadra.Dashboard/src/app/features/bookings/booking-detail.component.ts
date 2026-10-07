@@ -258,7 +258,7 @@ export class AdminBookingDetailComponent {
       );
     if (handover.fuelLevel !== null)
       facts.push(
-        this.t('adminBooking.fuelLevel', { level: this.formats.number(handover.fuelLevel) }),
+        this.t('adminBooking.fuelLevel', { level: this.formats.fuelLevel(handover.fuelLevel) }),
       );
     if (handover.photoCount)
       facts.push(this.t('adminBooking.photoCount', { count: handover.photoCount }));

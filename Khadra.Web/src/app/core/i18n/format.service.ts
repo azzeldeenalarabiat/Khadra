@@ -3,7 +3,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { Money } from '../api/common.api';
 import { I18nService } from './i18n.service';
 import { formatCalendarDate, formatFrozenLocal } from './date-format';
-import { formatAmount, formatNumber, formatStoredAmount } from './number-format';
+import { formatAmount, formatNumber, formatStoredAmount, fuelPercent } from './number-format';
 
 const FSI = '⁨';
 const PDI = '⁩';
@@ -64,6 +64,11 @@ export class FormatService {
 
   number(value: number, fractionDigits?: number): string {
     return formatNumber(value, this.locale(), fractionDigits);
+  }
+
+  /** A handover's fuel level, recorded as a fraction of a full tank, as a whole percentage: 1 → "100". */
+  fuelLevel(level: number): string {
+    return this.number(fuelPercent(level));
   }
 
   /** 23 Sept 2026 */

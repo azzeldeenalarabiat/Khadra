@@ -46,3 +46,27 @@ describe('calendarMonthYear', () => {
     expect(formats.calendarMonthYear('September')).toBe('—');
   });
 });
+
+/**
+ * A handover's fuel level is recorded as a fraction of a full tank, and is read as a whole percentage, as the app has
+ * always shown it (E2E F84, Wave 4). Printed raw, a full tank read "fuel 1" on both booking pages.
+ */
+describe('fuelLevel', () => {
+  it('reads a full, a half and an empty tank as whole percentages, in English and in Arabic', () => {
+    for (const locale of ['en-GB', 'ar-JO-u-nu-latn']) {
+      const formats = formatterIn(locale, 'Asia/Amman');
+
+      expect(visible(formats.fuelLevel(1))).toBe('100%');
+      expect(visible(formats.fuelLevel(0.5))).toBe('50%');
+      expect(visible(formats.fuelLevel(0))).toBe('0%');
+    }
+  });
+
+  it('rounds to a whole percentage, and says nothing when no level was recorded', () => {
+    const formats = formatterIn('en-GB', 'Asia/Amman');
+
+    expect(visible(formats.fuelLevel(0.333))).toBe('33%');
+    expect(visible(formats.fuelLevel(0.875))).toBe('88%');
+    expect(formats.fuelLevel(null)).toBe('—');
+  });
+});

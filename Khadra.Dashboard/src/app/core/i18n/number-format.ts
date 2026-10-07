@@ -94,3 +94,12 @@ export function formatPercent(value: number, localeTag: string): string {
   );
   return `${digits}%`;
 }
+
+/**
+ * A handover's fuel level as a whole percentage of a full tank (E2E F84, Wave 4). It is recorded as a
+ * fraction — 1 full, 0.5 half — and the app has always shown it as a rounded percentage; printed raw,
+ * a full tank read "fuel 1".
+ */
+export function fuelPercent(level: number): number {
+  return Math.round(level * 100);
+}

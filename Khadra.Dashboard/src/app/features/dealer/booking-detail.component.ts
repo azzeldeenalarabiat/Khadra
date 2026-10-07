@@ -748,9 +748,14 @@ export class DealerBookingDetailComponent {
     return this.format.dateTime(iso);
   }
 
-  /** A plain figure (an odometer reading, a fuel level), or "—" when none was recorded. */
+  /** A plain figure (an odometer reading), or "—" when none was recorded. */
   protected number(value: number | null): string {
     return this.format.number(value);
+  }
+
+  /** A fuel level as a whole percentage of a full tank (E2E F84), or "—" when none was recorded. */
+  protected fuel(value: number | null): string {
+    return this.format.fuelLevel(value);
   }
 
   /** "20%", in the reader's language. */

@@ -5,6 +5,7 @@ import {
   formatPercent,
   formatPercentRange,
   formatStoredAmount,
+  fuelPercent,
   withoutNegativeZero,
 } from './number-format';
 
@@ -129,5 +130,22 @@ describe('formatStoredAmount', () => {
     expect(formatStoredAmount('', EN)).toBeNull();
     expect(formatStoredAmount('1e3', EN)).toBeNull();
     expect(formatStoredAmount(' 12.000', EN)).toBeNull();
+  });
+});
+
+/**
+ * A handover's fuel level is recorded as a fraction of a full tank and read as a whole percentage, as the app has always
+ * shown it (E2E F84, Wave 4): printed raw, a full tank read «الوقود 1%».
+ */
+describe('fuelPercent', () => {
+  it('reads a full, a half and an empty tank as whole percentages', () => {
+    expect(fuelPercent(1)).toBe(100);
+    expect(fuelPercent(0.5)).toBe(50);
+    expect(fuelPercent(0)).toBe(0);
+  });
+
+  it('rounds to the nearest whole percentage', () => {
+    expect(fuelPercent(0.333)).toBe(33);
+    expect(fuelPercent(0.875)).toBe(88);
   });
 });

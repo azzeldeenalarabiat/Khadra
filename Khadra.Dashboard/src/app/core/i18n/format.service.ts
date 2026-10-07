@@ -1,7 +1,14 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { formatFrozenLocal } from './date-format';
 import { I18nService } from './i18n.service';
-import { formatAmount, formatNumber, formatPercent, formatPercentRange, formatStoredAmount } from './number-format';
+import {
+  formatAmount,
+  formatNumber,
+  formatPercent,
+  formatPercentRange,
+  formatStoredAmount,
+  fuelPercent,
+} from './number-format';
 import {
   ClockReading,
   deadlineReading,
@@ -327,6 +334,12 @@ export class FormatService {
   percent(value: number | null | undefined): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return '—';
     return this.isolate(formatPercent(value, this.locale()));
+  }
+
+  /** A handover's fuel level, recorded as a fraction of a full tank, as a whole percentage: 1 → "100%". */
+  fuelLevel(level: number | null | undefined): string {
+    if (level === null || level === undefined || !Number.isFinite(level)) return '—';
+    return this.percent(fuelPercent(level));
   }
 
   /**

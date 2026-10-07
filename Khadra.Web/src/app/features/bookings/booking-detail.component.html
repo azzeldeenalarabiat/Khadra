@@ -302,7 +302,7 @@
             <span class="faint small">{{ i18n.t('booking.recordedAt', { date: format.dateTime(handover.recordedAt) }) }}</span></p>
           <p class="small muted">
             @if (handover.odometerKm !== null) { {{ i18n.t('booking.odometer', { km: format.number(handover.odometerKm) }) }} · }
-            @if (handover.fuelLevel !== null) { {{ i18n.t('booking.fuelLevel', { percent: format.number(handover.fuelLevel) }) }} }
+            @if (handover.fuelLevel !== null) { {{ i18n.t('booking.fuelLevel', { percent: format.fuelLevel(handover.fuelLevel) }) }} }
             @if (handover.cashCollected) { · {{ i18n.t('booking.cash', { amount: format.money(handover.cashCollected) }) }} }
           </p>
           @if (verificationLabel(handover.verification); as label) {

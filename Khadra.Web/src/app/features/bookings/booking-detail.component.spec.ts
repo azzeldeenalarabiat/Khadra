@@ -964,3 +964,64 @@ describe('BookingDetailComponent, the words behind an ending (Wave 3 E1)', () =>
     expect(text).not.toContain('Payment window elapsed.');
   });
 });
+
+/**
+ * A handover's fuel level is recorded as a fraction of a full tank, and the page reads it as a whole percentage, as the
+ * app does (E2E F84, Wave 4). It printed the fraction itself, so a full tank read «الوقود 1%» — on a record a customer
+ * would cite in a fuel dispute.
+ */
+describe('BookingDetailComponent, the fuel level of a handover (Wave 4, F84)', () => {
+  const handover = (type: 'Pickup' | 'Return', fuelLevel: number, recordedAt: string) => ({
+    type, recordedBy: 'Dealer', odometerKm: 12000, fuelLevel, notes: null, cashCollected: null, photoCount: 0,
+    recordedAt, verification: 'Code', unverifiedReason: null,
+  });
+
+  const completed = (pickupFuel: number, returnFuel: number) => ({
+    ...CONFIRMED,
+    status: 'Completed',
+    isTerminal: true,
+    pickedUpAt: '2026-10-15T07:05:00+00:00',
+    returnedAt: '2026-10-17T06:55:00+00:00',
+    finishedAt: '2026-10-19T07:00:00+00:00',
+    handovers: [
+      handover('Pickup', pickupFuel, '2026-10-15T07:05:00+00:00'),
+      handover('Return', returnFuel, '2026-10-17T06:55:00+00:00'),
+    ],
+  });
+
+  async function render(booking: object, language: 'ar' | 'en') {
+    TestBed.configureTestingModule({
+      imports: [BookingDetailComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    TestBed.inject(I18nService).use(language);
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BookingDetailComponent);
+    fixture.componentRef.setInput('bookingId', ID);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(booking));
+    await settle();
+    const page = fixture.nativeElement as HTMLElement;
+    // What a reader sees: the isolates the Arabic page puts around each figure carry no glyph.
+    return [...page.querySelectorAll('.handover-record')]
+      .map((record) => (record.textContent ?? '').replace(/[⁨⁩]/g, '').replace(/\s+/g, ' '));
+  }
+
+  it('reads a full tank and a half one as whole percentages, in English', async () => {
+    const [pickup, back] = await render(completed(1, 0.5), 'en');
+    expect(pickup).toContain('Fuel 100%');
+    expect(back).toContain('Fuel 50%');
+    expect(pickup).not.toContain('Fuel 1%');
+  });
+
+  it('reads them the same way in Arabic, and an empty tank as 0%', async () => {
+    const [pickup, back] = await render(completed(1, 0), 'ar');
+    expect(pickup).toContain('الوقود 100%');
+    expect(back).toContain('الوقود 0%');
+    expect(pickup).not.toContain('الوقود 1%');
+  });
+});
