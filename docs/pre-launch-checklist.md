@@ -568,6 +568,20 @@ verified: `MarkVerified` is gone, and `Verified` stays in the enum only because 
   (push and email, never the reason), and a rejected file counts as not filed: a new request is refused until they
   upload another. Bookings already made are not touched; the office still checks at pickup.
 
+**Staging finding, fixed on `fix/polish-wave4` (2026-10-07): tapping the notice did nothing in the app.** The rejection,
+its email and its in-app notice all worked; a tap on the notice, in Alerts or on its push, led nowhere. Both taps chose
+their destination from `subjectId` alone, and this notice has none by design (installed builds must never open
+`/bookings/null`). The app now routes both from one rule, `notificationRoute` (`Khadra.Mobile/lib/core/push/`): a
+rejected document opens My Documents, which shows "Not accepted", "Why:" and the reason in its own direction, and
+"Upload a new one". The same work found that a push tapped from a CLOSED app was lost for every kind: it arrived
+before the stored session was restored, was pushed onto the splash, and the splash then went Home. Until the session
+resolves, a tap is now gone to rather than pushed (`openForPush`), so it waits on the splash as `next` like any deep
+link. Pinned by `document_rejected_notice_test.dart` (real router, both languages, each tap state) and
+`push_coordinator_test.dart`. No API changed: the push and the email still carry no subject, no reference, no reason and
+no document type (`OfficeNotificationEmailTests`). **Open until verified on a phone**: the fix ships only in a new app
+build, and the three Android tap states were proven in widget tests, not on a device. Installed builds still open
+nothing on a tap; the email's link works for them.
+
 ### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
 
 **Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.

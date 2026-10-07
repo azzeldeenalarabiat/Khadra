@@ -86,7 +86,7 @@ class FirebasePushMessaging implements PushMessaging {
     await _local.initialize(
       const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_notification')),
       onDidReceiveNotificationResponse: (response) {
-        final data = _decode(response.payload);
+        final data = decodePayload(response.payload);
         if (data != null) _taps.add(PushEvent(data: data));
       },
     );
@@ -141,7 +141,7 @@ class FirebasePushMessaging implements PushMessaging {
     if (message != null) return _event(message);
     final launch = await _local.getNotificationAppLaunchDetails();
     final data = launch?.didNotificationLaunchApp == true
-        ? _decode(launch?.notificationResponse?.payload)
+        ? decodePayload(launch?.notificationResponse?.payload)
         : null;
     return data == null ? null : PushEvent(data: data);
   }
@@ -165,7 +165,7 @@ class FirebasePushMessaging implements PushMessaging {
           icon: '@drawable/ic_notification',
         ),
       ),
-      payload: jsonEncode(event.data),
+      payload: encodePayload(event.data),
     );
   }
 
@@ -175,7 +175,13 @@ class FirebasePushMessaging implements PushMessaging {
         data: {for (final entry in message.data.entries) entry.key: '${entry.value}'},
       );
 
-  static Map<String, String>? _decode(String? payload) {
+  /// What a push shown in front carries to its tap: the push's data, whole. A tap on it
+  /// is routed from `kind` and `subjectId` exactly as a tap Android showed itself, so
+  /// nothing may be dropped on the way — a notice with no subject leads by its kind.
+  static String encodePayload(Map<String, String> data) => jsonEncode(data);
+
+  /// The other half of [encodePayload]. Null for a payload that is not one of ours.
+  static Map<String, String>? decodePayload(String? payload) {
     if (payload == null || payload.isEmpty) return null;
     try {
       final decoded = jsonDecode(payload);

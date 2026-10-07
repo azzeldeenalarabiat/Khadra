@@ -1984,6 +1984,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get documentsStatusRejected => 'غير مقبول';
 
   @override
+  String get documentsRejectedWhy => 'السبب:';
+
+  @override
+  String get documentsUploadNew => 'ارفع نسخة جديدة';
+
+  @override
   String get documentsMissing => 'لا يزال مطلوباً';
 
   @override
@@ -2000,11 +2006,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'ارفع المستندات الناقصة قبل أن تتمكن من الحجز.';
 
   @override
-  String get documentsNotYetCheckedTitle => 'لم يدقّق أحد هذه المستندات بعد';
+  String get documentsNotYetCheckedTitle => 'يتحقق منها مكتب التأجير شخصياً';
 
   @override
   String get documentsNotYetCheckedBody =>
-      'لا تدقّق خضرا المستندات في هذه النسخة. يتحقق منها مكتب التأجير شخصياً عند استلام السيارة.';
+      'لا تعتمد خضرا أي مستند على أنه موثَّق، لكنها قد تطلب منك رفعه من جديد. يتحقق مكتب التأجير من مستنداتك عند استلام السيارة.';
 
   @override
   String documentsTooLarge(String size) {
@@ -2197,6 +2203,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get notificationYourDisputeUpdated => 'هناك تحديث على النزاع الخاص بك';
+
+  @override
+  String get notificationYourDocumentRejected =>
+      'لم تتمكن خضرا من قبول أحد مستنداتك — ارفع نسخة جديدة';
 
   @override
   String get handoverShowPickupCode => 'أظهر رمز الاستلام';

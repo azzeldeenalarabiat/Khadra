@@ -178,6 +178,17 @@ public sealed class OfficeNotificationEmailTests
             Assert.DoesNotContain("null", text, StringComparison.OrdinalIgnoreCase);
         }
 
+        // Which document and why are read signed in, on My Documents: a lock screen and an inbox are not private
+        // (Staging finding on W4-9). Nothing here may name the paper, in either language.
+        var arabicReader = Users.Customer();
+        arabicReader.ChoosePreferredLanguage(Language.Arabic);
+        var emailAr = Composer().ComposeEmail(rejected, arabicReader);
+        foreach (var text in new[] { push.Title, push.Body, pushAr.Title, pushAr.Body, email.Subject, email.TextBody, email.HtmlBody, emailAr.Subject, emailAr.TextBody })
+        {
+            foreach (var paper in new[] { "licence", "license", "passport", "national id", "identity card", "رخصة", "جواز", "هوية", "بطاقة" })
+                Assert.DoesNotContain(paper, text, StringComparison.OrdinalIgnoreCase);
+        }
+
         Assert.Contains($"{Website}/profile/documents", email.TextBody, StringComparison.Ordinal);
         Assert.Contains("Open your documents", email.HtmlBody, StringComparison.Ordinal);
         Assert.DoesNotContain("/bookings/", email.TextBody, StringComparison.Ordinal);

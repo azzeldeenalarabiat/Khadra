@@ -447,10 +447,48 @@ class FakeApi extends KhadraApi {
     return openDepositCheckout(bookingId);
   }
 
+  /// What the Alerts tab reads. Empty unless a test says otherwise.
+  NotificationFeed notificationFeed = const NotificationFeed(
+      items: [], page: 1, pageSize: 25, totalCount: 0, unreadCount: 0);
+
+  /// The notifications marked read, in order.
+  final List<String> markedRead = [];
+
   @override
   Future<NotificationFeed> notifications({int page = 1, int pageSize = 25}) async =>
-      const NotificationFeed(
-          items: [], page: 1, pageSize: 25, totalCount: 0, unreadCount: 0);
+      notificationFeed;
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async =>
+      markedRead.add(notificationId);
+
+  /// Every upload, as (type, file name, content type).
+  final List<(String, String, String)> uploads = [];
+
+  /// What the documents read answers after an upload. Unchanged when null.
+  CustomerDocuments Function(String type)? afterUpload;
+
+  @override
+  Future<CustomerDocument> uploadDocument({
+    required String type,
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    uploads.add((type, fileName, contentType));
+    final next = afterUpload?.call(type);
+    if (next != null) documents = next;
+    return documents.ofType(type) ??
+        CustomerDocument(
+          documentId: 'uploaded-$type',
+          type: type,
+          status: 'PendingReview',
+          contentType: contentType,
+          sizeBytes: bytes.length,
+          uploadedAt: DateTime.utc(2026, 10, 7, 12),
+          reviewNote: null,
+        );
+  }
 
   @override
   Future<int> unreadNotificationCount() async => 0;

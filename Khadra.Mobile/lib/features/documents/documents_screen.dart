@@ -16,11 +16,16 @@ import 'document_providers.dart';
 
 /// A customer's identity paperwork.
 ///
-/// The screen is honest about what happens to it: **nobody at Khadra checks these
-/// in this version.** Nothing can move a document out of `PendingReview`, and the
-/// rental office performs the legal check in person when the car is handed over.
-/// A tile that read "verified" would be claiming a check the platform does not
+/// The screen is honest about what happens to it: **nothing on the platform ever
+/// calls a document verified.** Khadra may refuse one (owner, D3 = A; Wave 4, W4-9),
+/// and the rental office performs the legal check in person when the car is handed
+/// over. A tile that read "verified" would be claiming a check the platform does not
 /// make.
+///
+/// It is also where a refusal is READ. The push and the email that announce one say
+/// nothing about which document or why — a lock screen is not private — and lead
+/// here (notificationRoute), where the refused document shows its reason and the way
+/// to upload a new one.
 class DocumentsScreen extends ConsumerStatefulWidget {
   const DocumentsScreen({super.key});
 
@@ -144,10 +149,8 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   /// expensive: a customer on a Jordanian mobile network should not upload eight
   /// megabytes to be told it was one too many.
   Future<void> _upload(String type) async {
-    final picker =
-        DocumentPicker(ref.read(appConfigProvider).valueOrNull?.documents);
-
-    final choice = await picker.pick(context);
+    final choice = await ref.read(documentChooserProvider)(
+        context, ref.read(appConfigProvider).valueOrNull?.documents);
     if (choice == null || !mounted) return;
 
     switch (choice) {
@@ -370,7 +373,17 @@ class _DocumentTile extends StatelessWidget {
           if (document?.reviewNote != null &&
               document!.reviewNote!.isNotEmpty) ...[
             const SizedBox(height: Space.sm),
+            // Khadra's reason as it was typed, laid out in ITS direction: an
+            // administrator may write it in the other language from the app's.
             Text(
+              l10n.documentsRejectedWhy,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: KhadraColors.bad),
+            ),
+            const SizedBox(height: 2),
+            UserText(
               document!.reviewNote!,
               style: const TextStyle(
                   fontSize: 13, height: 1.45, color: KhadraColors.bad),
@@ -391,9 +404,13 @@ class _DocumentTile extends StatelessWidget {
                     : OutlinedButton.icon(
                         onPressed: onUpload,
                         icon: const Icon(Icons.upload_outlined, size: 18),
-                        label: Text(present
-                            ? l10n.documentsReplace
-                            : l10n.documentsUpload),
+                        // A refused document is not "replaced" at leisure: it has
+                        // to be, before the next booking.
+                        label: Text(document?.status == 'Rejected'
+                            ? l10n.documentsUploadNew
+                            : present
+                                ? l10n.documentsReplace
+                                : l10n.documentsUpload),
                       ),
               ),
               if (present && !uploading) ...[

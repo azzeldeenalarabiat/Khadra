@@ -10,11 +10,10 @@ import 'core/config/app_environment.dart';
 import 'core/config/update_requirement.dart';
 import 'core/fonts/font_licences.dart';
 import 'core/live/live_refresh.dart';
-import 'core/live/live_surfaces.dart';
 import 'core/providers.dart';
+import 'core/push/push_actions.dart';
 import 'core/router.dart';
 import 'core/theme/khadra_theme.dart';
-import 'features/bookings/booking_providers.dart';
 import 'features/update/update_required_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -117,22 +116,22 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
   /// Firebase project behind it.
   void _startPush() {
     final push = ref.read(pushCoordinatorProvider)
-      // A tap opens the booking or dispute it is about, through the router's own guards.
+      // A tap opens what it is about (notificationRoute), through the router's own guards,
+      // and survives a cold start (openForPush).
       ..navigate = (location) {
-        ref.read(routerProvider).push(location);
+        openForPush(
+          location,
+          router: ref.read(routerProvider),
+          sessionResolved: ref.read(sessionProvider).isResolved,
+        );
       }
-      // A push in front refreshes what might be showing its booking, now rather than at the
-      // next poll. `touch` is the policy's own "something changed" trigger.
-      ..refresh = (data) {
-        final subject = data['subjectId'];
-        if (subject != null && data['kind'] != 'YourDisputeUpdated') {
-          ref.invalidate(bookingProvider(subject));
-        }
-        final live = ref.read(liveRefreshProvider);
-        for (final surface in Surfaces.all) {
-          live.touch(surface);
-        }
-      };
+      // A push in front refreshes what it might be showing, now rather than at the next
+      // poll: its booking, My Documents, and every live surface (refreshForPush).
+      ..refresh = (data) => refreshForPush(
+            data,
+            invalidate: ref.invalidate,
+            live: ref.read(liveRefreshProvider),
+          );
     push.start();
   }
 

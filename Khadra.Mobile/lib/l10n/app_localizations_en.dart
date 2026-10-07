@@ -1926,6 +1926,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get documentsStatusRejected => 'Not accepted';
 
   @override
+  String get documentsRejectedWhy => 'Why:';
+
+  @override
+  String get documentsUploadNew => 'Upload a new one';
+
+  @override
   String get documentsMissing => 'Still needed';
 
   @override
@@ -1942,11 +1948,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'Upload the missing documents before you can book.';
 
   @override
-  String get documentsNotYetCheckedTitle => 'Nobody has checked these yet';
+  String get documentsNotYetCheckedTitle =>
+      'The rental office checks these in person';
 
   @override
   String get documentsNotYetCheckedBody =>
-      'Khadra does not verify documents in this version. The rental office checks them in person when you collect the car.';
+      'Khadra never marks a document as verified, though it may ask you to upload one again. The rental office checks your documents when you collect the car.';
 
   @override
   String documentsTooLarge(String size) {
@@ -2137,6 +2144,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationYourDisputeUpdated =>
       'There is an update on your dispute';
+
+  @override
+  String get notificationYourDocumentRejected =>
+      'Khadra could not accept one of your documents — upload a new one';
 
   @override
   String get handoverShowPickupCode => 'Show my pickup code';

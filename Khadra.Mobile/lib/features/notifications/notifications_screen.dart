@@ -10,6 +10,7 @@ import '../../core/api/api_failure_messages.dart';
 import '../../core/format/booking_presentation.dart';
 import '../../core/paging.dart';
 import '../../core/providers.dart';
+import '../../core/push/notification_route.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
@@ -214,13 +215,12 @@ class _NotificationRow extends ConsumerWidget {
       }
     }
 
-    // Every customer-facing kind is about a booking, and `subjectId` is that
-    // booking's id — except a dispute update, whose subject is the TICKET.
-    if (item.subjectId != null && context.mounted) {
-      context.push(item.kind == 'YourDisputeUpdated'
-          ? Routes.dispute(item.subjectId!)
-          : Routes.booking(item.subjectId!));
-    }
+    // The same destination a tap on its push opens (notificationRoute): the booking,
+    // the dispute — whose subject is the TICKET — or My Documents for a document Khadra
+    // could not accept, which has no subject at all.
+    final route =
+        notificationRoute(kind: item.kind, subjectId: item.subjectId);
+    if (route != null && context.mounted) context.push(route);
   }
 
   /// The sentence, chosen from the KIND.
@@ -254,6 +254,7 @@ class _NotificationRow extends ConsumerWidget {
         'YourReturnReminder' =>
           l10n.notificationYourReturnReminder(item.actorName),
         'YourDisputeUpdated' => l10n.notificationYourDisputeUpdated,
+        documentRejectedKind => l10n.notificationYourDocumentRejected,
         'YourDepositRefunded' =>
           l10n.notificationYourDepositRefunded(item.actorName),
         'YourPartialRefundSettled' =>
@@ -274,6 +275,7 @@ class _NotificationRow extends ConsumerWidget {
         'YourPaymentReminder' => Icons.payments_outlined,
         'YourPickupReminder' || 'YourReturnReminder' => Icons.alarm_outlined,
         'YourDisputeUpdated' => Icons.gavel_outlined,
+        documentRejectedKind => Icons.upload_file_outlined,
         'YourDepositRefunded' || 'YourPartialRefundSettled' => Icons.currency_exchange_outlined,
         _ => Icons.notifications_none,
       };

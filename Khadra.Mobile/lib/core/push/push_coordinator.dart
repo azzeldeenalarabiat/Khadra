@@ -4,18 +4,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../api/khadra_api.dart';
 import '../api/api_failure.dart';
+import 'notification_route.dart';
 import 'push_messaging.dart';
 
 /// Where tapping a push leads, from its data. Null when it leads nowhere in particular.
 ///
-/// A dispute update opens the dispute (its subject is the TICKET); everything else about
-/// a booking opens the booking. The routes are the app's own guarded routes, so a push
-/// tapped while signed out goes through sign-in exactly as a typed link would.
-String? pushRoute(Map<String, String> data) {
-  final subject = data['subjectId'];
-  if (subject == null || subject.isEmpty) return null;
-  return data['kind'] == 'YourDisputeUpdated' ? '/disputes/$subject' : '/bookings/$subject';
-}
+/// The same answer as the notice's row in Alerts: see [notificationRoute].
+String? pushRoute(Map<String, String> data) =>
+    notificationRoute(kind: data['kind'], subjectId: data['subjectId']);
 
 /// Owns this phone's push registration for the life of the app.
 ///
@@ -31,7 +27,8 @@ String? pushRoute(Map<String, String> data) {
 ///   leave a signed-out phone being woken.
 /// - **A push that arrives in front** is shown (Android does not show those itself) and
 ///   the screens that might be showing its booking are refreshed.
-/// - **A tap** opens the booking or dispute it is about.
+/// - **A tap** opens what it is about: its booking or dispute, or My Documents for a
+///   document Khadra could not accept.
 class PushCoordinator {
   PushCoordinator({
     required PushMessaging messaging,

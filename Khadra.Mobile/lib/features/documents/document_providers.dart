@@ -1,7 +1,9 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
 import '../../core/providers.dart';
+import '../../core/uploads/document_picker.dart';
 
 /// The document types spec 5.1 asks a renter for.
 ///
@@ -32,3 +34,13 @@ final myDocumentsProvider =
   }
   return ref.watch(apiProvider).myDocuments();
 });
+
+/// How the customer chooses the file to upload: the real [DocumentPicker] (camera, photos
+/// or files, checked against `/app-config`).
+///
+/// A provider only so a test can answer the choice without a camera or a file system, and
+/// so walk the whole path from a rejection notice to the replacement being sent.
+final documentChooserProvider = Provider<
+    Future<DocumentChoice?> Function(BuildContext context, DocumentLimits? limits)>(
+  (ref) => (context, limits) => DocumentPicker(limits).pick(context),
+);

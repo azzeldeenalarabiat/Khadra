@@ -3210,6 +3210,18 @@ abstract class AppLocalizations {
   /// **'Not accepted'**
   String get documentsStatusRejected;
 
+  /// No description provided for @documentsRejectedWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Why:'**
+  String get documentsRejectedWhy;
+
+  /// No description provided for @documentsUploadNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a new one'**
+  String get documentsUploadNew;
+
   /// No description provided for @documentsMissing.
   ///
   /// In en, this message translates to:
@@ -3243,13 +3255,13 @@ abstract class AppLocalizations {
   /// No description provided for @documentsNotYetCheckedTitle.
   ///
   /// In en, this message translates to:
-  /// **'Nobody has checked these yet'**
+  /// **'The rental office checks these in person'**
   String get documentsNotYetCheckedTitle;
 
   /// No description provided for @documentsNotYetCheckedBody.
   ///
   /// In en, this message translates to:
-  /// **'Khadra does not verify documents in this version. The rental office checks them in person when you collect the car.'**
+  /// **'Khadra never marks a document as verified, though it may ask you to upload one again. The rental office checks your documents when you collect the car.'**
   String get documentsNotYetCheckedBody;
 
   /// No description provided for @documentsTooLarge.
@@ -3533,6 +3545,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'There is an update on your dispute'**
   String get notificationYourDisputeUpdated;
+
+  /// No description provided for @notificationYourDocumentRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Khadra could not accept one of your documents — upload a new one'**
+  String get notificationYourDocumentRejected;
 
   /// No description provided for @handoverShowPickupCode.
   ///
