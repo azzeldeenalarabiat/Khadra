@@ -4917,6 +4917,12 @@ invitation was counted as failed (`TaskCanceledException` on attempt 1, during a
 received it, so the platform retired the link that had just been delivered and sent a second one on the next start.
 An "accepted is not delivered" log line already says this; the retry and the retirement do not yet act on it.
 
+**Placed by the owner (2026-10-07, Fix & Polish Wave 4, D12):** it stays a launch blocker, and is closed together with
+items 202 and 204 as one "delivery idempotency" package in the Production plan. The right fix depends on the
+transport Production uses: SMTP needs "no retry after the data phase"; Brevo's single-send `idempotencyKey` must first
+be proven against a real Brevo test account (202's condition); Resend is idempotent already. A duplicate email moves
+no money and corrupts no record, so it is accepted on Staging meanwhile.
+
 ### 188. The customer website never shows why the platform cancelled a booking
 
 **Status:** open · **Raised:** 2026-09-28 · **Owner decision**
@@ -5717,3 +5723,26 @@ at the next read. **To close:** report a booking's repeated failure once per pro
 `BookingSettlementService` does for a PDF it cannot draw), and stop `CloseStaleAsync` at the first
 `ProviderUnavailable`. Not "stop after K failures in a row": a few broken bookings at the head of the list would then
 starve every booking behind them, every tick. The second half is due before a real provider is connected (item 76).
+
+### 237. The session pooler admits 15 clients, and the API's pool would ask for 100
+
+**Status:** open · **Raised:** 2026-10-06 (E2E F85, Staging) · **Before real users** (owner, 2026-10-07, Fix & Polish
+Wave 4, D12)
+
+On 6 Oct at 12:23:37 a catalogue search on Staging failed with `EMAXCONNSESSION … max clients are limited to
+pool_size: 15` and answered 500. Supabase's session pooler admits a fixed number of clients per database user (15 on
+Staging's plan), every open Npgsql connection is one of them, and the API set no pool size, so Npgsql's default of 100
+per pool applied. The readiness check (`/health/ready`) and the startup "Database reachable" check build their own
+pools from the same string. `docs/deployment.md` and `docs/production.md` require the session pooler but do not say
+that it has a client cap.
+
+**Staging, applied by the owner on 2026-10-07** (05:01, "Save and deploy", build `4623b81` unchanged): `Maximum Pool
+Size=5` in the API's connection string. The worst case, during a deploy's overlap, is 2 × (5 + 1 readiness) + 1
+startup check = 13 of 15, which leaves room for a backup or a SQL session. Verified the same morning: `/health/live`
+and `/health/ready` answer 200; the new instance logged Database reachable, Email ready, sandbox payments and legal
+pages; and the logs hold no `EMAXCONNSESSION`, no pool exhaustion and no other database connection error since.
+
+**To close, for Production (with WP-K):** keep the pool below Production's pooler limit, with room for a deploy's
+overlap, a backup and a person's SQL session. Do it either with `Maximum Pool Size` in its connection string, as on
+Staging, or with a tracked `Database:MaxPoolSize` applied to the data source, so that nobody has to edit a secret.
+Otherwise size the pooler for the plan. Either way, write the cap into `docs/deployment.md` and `docs/production.md`.
