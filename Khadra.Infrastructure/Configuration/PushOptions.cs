@@ -88,10 +88,10 @@ public sealed class NotificationDeliveryOptions
     public int BatchSize { get; init; } = 10;
 
     /// <summary>
-    /// How long a claimed row is held. It must outlast the slowest batch — every row timing out on a
-    /// degraded transport — or a second process re-claims rows the first is still sending and
-    /// customers get the email twice. Startup refuses less than <see cref="WorstCaseSecondsPerRow"/>
-    /// per row in the batch.
+    /// How long a claimed row is held. Since pre-launch item 204 a row is renewed as its send begins and is worked
+    /// only while its claim is still this process's, so a lease that runs out costs a row this process skips, not a
+    /// second copy. It must still outlast the slowest batch — every row timing out on a degraded transport — or rows
+    /// would keep changing hands mid-batch; startup refuses less than <see cref="WorstCaseSecondsPerRow"/> per row.
     /// </summary>
     [Range(10, 3600)]
     public int LeaseSeconds { get; init; } = 300;

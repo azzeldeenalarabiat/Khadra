@@ -87,9 +87,9 @@ public sealed class PostgresOutboxAndReminderTests : IAsyncLifetime
         await firstTx.CommitAsync();
         await secondTx.CommitAsync();
 
-        var mine = a.Concat(b).Where(d => owned.Contains(d.Id)).Select(d => d.Id).ToList();
+        var mine = a.Concat(b).Where(d => owned.Contains(d.DeliveryId)).Select(d => d.DeliveryId).ToList();
         Assert.Equal(mine.Count, mine.Distinct().Count());
-        Assert.All(a.Concat(b), d => Assert.Equal(1, d.Attempts));
+        Assert.All(a.Concat(b), d => Assert.Equal(1, d.Claims));
     }
 
     [PostgresFact]
@@ -110,18 +110,62 @@ public sealed class PostgresOutboxAndReminderTests : IAsyncLifetime
         await using (var context = NewContext())
         {
             var claimed = await new NotificationDeliveryRepository(context).ClaimDueAsync(at.AddSeconds(1), TimeSpan.FromMinutes(2), 500);
-            Assert.Contains(claimed, d => d.Id == deliveryId);
+            Assert.Contains(claimed, d => d.DeliveryId == deliveryId);
         }
 
         await using (var context = NewContext())
         {
             var again = await new NotificationDeliveryRepository(context).ClaimDueAsync(at.AddMinutes(1), TimeSpan.FromMinutes(2), 500);
-            Assert.DoesNotContain(again, d => d.Id == deliveryId);
+            Assert.DoesNotContain(again, d => d.DeliveryId == deliveryId);
         }
 
         await using var later = NewContext();
         var retried = await new NotificationDeliveryRepository(later).ClaimDueAsync(at.AddMinutes(3), TimeSpan.FromMinutes(2), 500);
-        Assert.Equal(2, Assert.Single(retried, d => d.Id == deliveryId).Attempts);
+        Assert.Equal(2, Assert.Single(retried, d => d.DeliveryId == deliveryId).Claims);
+    }
+
+    /// <summary>
+    /// Pre-launch item 204 on the real database: a dispatcher that outlived its lease can neither renew a claim another
+    /// process has taken since nor record an outcome on it, so the row is worked by one process only.
+    /// </summary>
+    [PostgresFact]
+    public async Task A_claim_taken_over_after_its_lease_ran_out_can_neither_be_renewed_nor_written()
+    {
+        var at = new DateTimeOffset(2003, 1, 1, 0, 0, 0, TimeSpan.Zero).AddSeconds(Random.Shared.Next(1, 1_000_000));
+        Id deliveryId;
+        await using (var context = NewContext())
+        {
+            var notification = Notification.Raise(Id.New(), NotificationKind.YourBookingConfirmed, "Petra", at, Id.New(), "KH-PG");
+            context.Notifications.Add(notification);
+            var delivery = NotificationDelivery.Owe(notification.Id, NotificationChannel.Push, at);
+            context.NotificationDeliveries.Add(delivery);
+            deliveryId = delivery.Id;
+            await context.SaveChangesAsync();
+        }
+
+        await using var stalled = NewContext();
+        var stalledRepository = new NotificationDeliveryRepository(stalled);
+        var mine = Assert.Single(
+            await stalledRepository.ClaimDueAsync(at.AddSeconds(1), TimeSpan.FromMinutes(2), 500),
+            claim => claim.DeliveryId == deliveryId);
+        Assert.True(await stalledRepository.TryRenewClaimAsync(deliveryId, mine.Claims, at.AddMinutes(1)));
+        var row = await stalledRepository.GetAsync(deliveryId);
+
+        // Frozen mid-send past the lease; another dispatcher claims the row.
+        await using (var other = NewContext())
+        {
+            var theirs = await new NotificationDeliveryRepository(other).ClaimDueAsync(at.AddMinutes(4), TimeSpan.FromMinutes(2), 500);
+            Assert.Equal(mine.Claims + 1, Assert.Single(theirs, claim => claim.DeliveryId == deliveryId).Claims);
+        }
+
+        Assert.False(await stalledRepository.TryRenewClaimAsync(deliveryId, mine.Claims, at.AddMinutes(5)));
+        row!.RecordSent(at.AddMinutes(5));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => stalled.SaveChangesAsync());
+
+        await using var after = NewContext();
+        var stored = await after.NotificationDeliveries.AsNoTracking().SingleAsync(delivery => delivery.Id == deliveryId);
+        Assert.Same(DeliveryState.Pending, stored.State);
+        Assert.Equal(mine.Claims + 1, stored.Attempts);
     }
 
     [PostgresFact]

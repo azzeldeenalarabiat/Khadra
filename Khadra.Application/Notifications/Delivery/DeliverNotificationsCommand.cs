@@ -31,9 +31,19 @@ public interface INotificationDeliverySettings
 /// <param name="Skipped">Nobody to send to: no live phone, no verified address, or no provider.</param>
 /// <param name="Retrying">Failed this time and scheduled again.</param>
 /// <param name="Failed">Given up.</param>
-public sealed record DeliveryReport(int Claimed, int Sent, int Skipped, int Retrying, int Failed);
+/// <param name="TakenOver">
+/// Claimed again by another process after this one outlived its lease, and left to it (pre-launch item 204).
+/// </param>
+public sealed record DeliveryReport(int Claimed, int Sent, int Skipped, int Retrying, int Failed, int TakenOver = 0);
 
 /// <summary>Works one batch of the notification outbox. Run by the dispatcher on a timer.</summary>
+/// <remarks>
+/// <b>One process per delivery</b> (pre-launch item 204). A batch can outlive its lease — a push service that stalls, a
+/// slow database — and another process may then claim a row this one has yet to reach. So each row is worked only
+/// while its claim count is still the one this pass's claim left: the lease is renewed for the send by a statement that
+/// matches that count, and the count is a concurrency token, so an outcome saved after a takeover during the send is
+/// refused by the database. Each row starts from an empty tracker, so one row's refused save never rides into the next.
+/// </remarks>
 public sealed record DeliverNotificationsCommand : ICommand<Result<DeliveryReport, Error>>;
 
 public sealed partial class DeliverNotificationsHandler(
@@ -55,18 +65,37 @@ public sealed partial class DeliverNotificationsHandler(
         CancellationToken cancellationToken)
     {
         var claimed = await deliveries.ClaimDueAsync(clock.UtcNow, settings.Lease, settings.BatchSize, cancellationToken);
-        int sent = 0, skipped = 0, retrying = 0, failed = 0;
+        int sent = 0, skipped = 0, retrying = 0, failed = 0, takenOver = 0;
 
-        foreach (var delivery in claimed)
+        foreach (var claim in claimed)
         {
+            // Whatever an earlier row left in the tracker — above all a save the database refused — is not this row's.
+            unitOfWork.DiscardChanges();
+
+            NotificationDelivery? delivery;
             try
             {
+                // Renewed from now, so the lease covers this row's send however long the rows before it took, and only
+                // while the claim is still this pass's: a row claimed since by another process is that process's.
+                if (!await deliveries.TryRenewClaimAsync(claim.DeliveryId, claim.Claims, clock.UtcNow.Add(settings.Lease), cancellationToken))
+                {
+                    takenOver++;
+                    LogClaimTakenOver(logger, claim.DeliveryId.Value);
+                    continue;
+                }
+
+                delivery = await deliveries.GetAsync(claim.DeliveryId, cancellationToken);
+                if (delivery is null || delivery.State.IsFinal || delivery.Attempts != claim.Claims)
+                {
+                    takenOver++;
+                    LogClaimTakenOver(logger, claim.DeliveryId.Value);
+                    continue;
+                }
+
                 if (delivery.Channel == NotificationChannel.Push)
                     await DeliverPushAsync(delivery, cancellationToken);
                 else
                     await DeliverEmailAsync(delivery, cancellationToken);
-
-                await unitOfWork.SaveChangesAsync(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -76,7 +105,28 @@ public sealed partial class DeliverNotificationsHandler(
             catch (Exception exception)
 #pragma warning restore CA1031
             {
-                LogDeliveryCrashed(logger, delivery.Id.Value, delivery.Channel.Name, exception);
+                LogDeliveryCrashed(logger, claim.DeliveryId.Value, exception);
+                continue;
+            }
+
+            // The transport has answered, so its answer is recorded even while the process stops — unless the claim was
+            // taken over during the send, which only a process frozen for longer than the lease can suffer. The row is
+            // then the other process's, and it may send the same message again.
+            try
+            {
+                await unitOfWork.SaveChangesAsync(CancellationToken.None);
+            }
+            catch (ConcurrencyConflictException)
+            {
+                takenOver++;
+                LogOutcomeLost(logger, claim.DeliveryId.Value, delivery.Channel.Name);
+                continue;
+            }
+#pragma warning disable CA1031 // One bad row must not stop the batch; its lease makes it come back.
+            catch (Exception exception)
+#pragma warning restore CA1031
+            {
+                LogDeliveryCrashed(logger, claim.DeliveryId.Value, exception);
                 continue;
             }
 
@@ -86,7 +136,8 @@ public sealed partial class DeliverNotificationsHandler(
             else retrying++;
         }
 
-        return new DeliveryReport(claimed.Count, sent, skipped, retrying, failed);
+        unitOfWork.DiscardChanges();
+        return new DeliveryReport(claimed.Count, sent, skipped, retrying, failed, takenOver);
     }
 
     private async Task DeliverPushAsync(NotificationDelivery delivery, CancellationToken cancellationToken)
@@ -203,6 +254,14 @@ public sealed partial class DeliverNotificationsHandler(
     [LoggerMessage(2301, LogLevel.Warning, "Email for {Kind} was not accepted (attempt {Attempt}); it will be retried.")]
     private static partial void LogEmailFailed(ILogger logger, string kind, int attempt, Exception exception);
 
-    [LoggerMessage(2302, LogLevel.Error, "Delivery {DeliveryId} on {Channel} crashed; its lease will bring it back.")]
-    private static partial void LogDeliveryCrashed(ILogger logger, Guid deliveryId, string channel, Exception exception);
+    [LoggerMessage(2302, LogLevel.Error, "Delivery {DeliveryId} crashed; its lease will bring it back.")]
+    private static partial void LogDeliveryCrashed(ILogger logger, Guid deliveryId, Exception exception);
+
+    [LoggerMessage(2303, LogLevel.Warning,
+        "Delivery {DeliveryId} was claimed by another process after this one outlived its lease; it is left to that process.")]
+    private static partial void LogClaimTakenOver(ILogger logger, Guid deliveryId);
+
+    [LoggerMessage(2304, LogLevel.Error,
+        "The outcome of delivery {DeliveryId} on {Channel} could not be recorded: another process claimed it during the send, after this one outlived its lease. That process may send it again.")]
+    private static partial void LogOutcomeLost(ILogger logger, Guid deliveryId, string channel);
 }

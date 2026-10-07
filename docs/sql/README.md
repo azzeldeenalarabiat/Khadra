@@ -25,8 +25,8 @@ The regeneration before (2026-09-20) added `AddCustomerShortlist`, which brought
 `customer_shortlists` and `shortlist_entries` and made script 2 mandatory,
 `DealerPublicProfile`, and `PenaltyReasonCode`.
 
-**Regenerated on 2026-10-07 (Fix & Polish Wave 4)**: every migration through `20261007032513_AdminDocumentAccess`,
-42 in all, creating 46 tables plus the history table. The copy before it had stopped at the 2026-09-24 migrations, so
+**Regenerated on 2026-10-07 (Fix & Polish Wave 4)**: every migration through
+`20261007142545_NotificationDeliveryClaimToken`, 43 in all, creating 46 tables plus the history table. The copy before it had stopped at the 2026-09-24 migrations, so
 this is also the first time the payments tables, the financial documents, the payables, the legal texts and the
 consents appear in it. Re-run script 2 after it.
 
@@ -210,11 +210,11 @@ names, the triggers refusing UPDATE, DELETE and TRUNCATE, each stored hash equal
 
 ## 9. `2026-10-07-fix-polish-wave4.sql`
 
-Fix & Polish Wave 4's four migrations, for a database at `20261005062940_LegalDocumentVersions` (Staging today),
+Fix & Polish Wave 4's five migrations, for a database at `20261005062940_LegalDocumentVersions` (Staging today),
 generated with:
 
 ```bash
-dotnet ef migrations script 20261005062940_LegalDocumentVersions 20261007032513_AdminDocumentAccess \
+dotnet ef migrations script 20261005062940_LegalDocumentVersions 20261007142545_NotificationDeliveryClaimToken \
   --idempotent --project Khadra.Infrastructure --startup-project Khadra.WebAPI \
   --output docs/sql/2026-10-07-fix-polish-wave4.sql
 ```
@@ -230,8 +230,10 @@ dotnet ef migrations script 20261005062940_LegalDocumentVersions 20261007032513_
 - **`AdminDocumentAccess`** makes `document_access_entries.dealer_id` and `booking_id` nullable under
   `ck_document_access_entries_scope` (null only for an administrator), and adds the `xmin` token on
   `customer_documents` (a system column again: nothing is added).
+- **`NotificationDeliveryClaimToken`** changes no schema. It makes `notification_deliveries.attempts` a concurrency
+  token in the model (pre-launch item 204), which lives in EF's UPDATE statements only, and writes its history row.
 
-All four are additive for the API that is live, which never reads the new columns and never writes a null into the
+All five are additive for the API that is live, which never reads the new columns and never writes a null into the
 loosened ones. So:
 
 1. Run it before deploying the Wave 4 API.

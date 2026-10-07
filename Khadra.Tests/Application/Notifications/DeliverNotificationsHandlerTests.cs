@@ -51,8 +51,17 @@ public sealed class DeliverNotificationsHandlerTests
         var delivery = NotificationDelivery.Owe(_notification.Id, channel, Now);
         for (var i = 0; i < attempts; i++)
             typeof(NotificationDelivery).GetProperty(nameof(NotificationDelivery.Attempts))!.SetValue(delivery, i + 1);
+        return Claimed(delivery);
+    }
+
+    /// <summary>The claim hands the handler this row, still its own: the renewal matches and the row reads back.</summary>
+    private NotificationDelivery Claimed(NotificationDelivery delivery)
+    {
         _deliveries.ClaimDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns([delivery]);
+            .Returns([new ClaimedNotificationDelivery(delivery.Id, delivery.Attempts)]);
+        _deliveries.TryRenewClaimAsync(delivery.Id, delivery.Attempts, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        _deliveries.GetAsync(delivery.Id, Arg.Any<CancellationToken>()).Returns(delivery);
         return delivery;
     }
 
@@ -97,8 +106,7 @@ public sealed class DeliverNotificationsHandlerTests
     {
         var rejected = Notification.Raise(_customer.Id, NotificationKind.YourDocumentRejected, Notification.PlatformActorName, Now);
         _notifications.GetAsync(rejected.Id, Arg.Any<CancellationToken>()).Returns(rejected);
-        _deliveries.ClaimDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns([NotificationDelivery.Owe(rejected.Id, NotificationChannel.Push, Now)]);
+        Claimed(NotificationDelivery.Owe(rejected.Id, NotificationChannel.Push, Now));
         _devices.ListDeliverableAsync(_customer.Id, Now, Arg.Any<CancellationToken>()).Returns([Device("a", Language.English)]);
         _push.SendAsync(Arg.Any<PushMessage>(), Arg.Any<CancellationToken>()).Returns(PushSendResult.Delivered);
 
@@ -197,7 +205,7 @@ public sealed class DeliverNotificationsHandlerTests
         _notifications.GetAsync(notification.Id, Arg.Any<CancellationToken>()).Returns(notification);
         _users.GetByIdAsync(unverified.Id, Arg.Any<CancellationToken>()).Returns(unverified);
         var delivery = NotificationDelivery.Owe(notification.Id, NotificationChannel.Email, Now);
-        _deliveries.ClaimDueAsync(default, default, default, default).ReturnsForAnyArgs([delivery]);
+        Claimed(delivery);
 
         await RunAsync();
 
@@ -216,6 +224,73 @@ public sealed class DeliverNotificationsHandlerTests
 
         Assert.Same(DeliveryState.Pending, delivery.State);
         Assert.Equal("HttpRequestException", delivery.LastError);
+    }
+
+    // Pre-launch item 204: a row is worked only while its claim is still this pass's.
+
+    [Fact]
+    public async Task A_row_claimed_again_by_another_process_before_its_send_is_left_to_that_process()
+    {
+        var delivery = Claim(NotificationChannel.Email);
+        _deliveries.TryRenewClaimAsync(delivery.Id, delivery.Attempts, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var report = (await RunAsync()).Value;
+
+        Assert.Equal(1, report.TakenOver);
+        Assert.Same(DeliveryState.Pending, delivery.State);
+        await _email.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+        await _unitOfWork.DidNotReceiveWithAnyArgs().SaveChangesAsync(default);
+    }
+
+    [Fact]
+    public async Task A_row_whose_claim_count_has_moved_is_not_sent()
+    {
+        var delivery = Claim(NotificationChannel.Push, attempts: 1);
+        // Claimed again between the renewal and the read: the count the row carries is no longer this pass's.
+        _deliveries.ClaimDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([new ClaimedNotificationDelivery(delivery.Id, 0)]);
+        _deliveries.TryRenewClaimAsync(delivery.Id, 0, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var report = (await RunAsync()).Value;
+
+        Assert.Equal(1, report.TakenOver);
+        await _push.DidNotReceiveWithAnyArgs().SendAsync(default!, default);
+    }
+
+    [Fact]
+    public async Task The_lease_is_renewed_from_the_moment_each_row_is_reached()
+    {
+        var delivery = Claim(NotificationChannel.Email);
+
+        await RunAsync();
+
+        await _deliveries.Received(1).TryRenewClaimAsync(delivery.Id, 1, Now.Add(TimeSpan.FromMinutes(2)), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_outcome_refused_because_the_claim_was_taken_over_during_the_send_does_not_stop_the_batch()
+    {
+        var first = NotificationDelivery.Owe(_notification.Id, NotificationChannel.Email, Now);
+        var second = NotificationDelivery.Owe(_notification.Id, NotificationChannel.Push, Now);
+        _deliveries.ClaimDueAsync(Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([new ClaimedNotificationDelivery(first.Id, 0), new ClaimedNotificationDelivery(second.Id, 0)]);
+        _deliveries.TryRenewClaimAsync(Arg.Any<Id>(), 0, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+        _deliveries.GetAsync(first.Id, Arg.Any<CancellationToken>()).Returns(first);
+        _deliveries.GetAsync(second.Id, Arg.Any<CancellationToken>()).Returns(second);
+        _devices.ListDeliverableAsync(_customer.Id, Now, Arg.Any<CancellationToken>()).Returns([Device("a", Language.English)]);
+        _push.SendAsync(Arg.Any<PushMessage>(), Arg.Any<CancellationToken>()).Returns(PushSendResult.Delivered);
+        var saves = 0;
+        _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+            ++saves == 1 ? throw new ConcurrencyConflictException("taken over") : Task.FromResult(1));
+
+        var report = (await RunAsync()).Value;
+
+        Assert.Equal(1, report.TakenOver);
+        Assert.Equal(1, report.Sent);
+        await _push.Received(1).SendAsync(Arg.Any<PushMessage>(), Arg.Any<CancellationToken>());
+        // The refused save's changes are forgotten before the next row, so they never ride into its save.
+        _unitOfWork.Received(3).DiscardChanges();
     }
 
     [Fact]

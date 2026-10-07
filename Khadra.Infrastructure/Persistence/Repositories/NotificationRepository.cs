@@ -98,7 +98,7 @@ internal sealed class Notifier(KhadraDbContext context) : INotifier
 
 internal sealed class NotificationDeliveryRepository(KhadraDbContext context) : INotificationDeliveryRepository
 {
-    public async Task<IReadOnlyList<NotificationDelivery>> ClaimDueAsync(
+    public async Task<IReadOnlyList<ClaimedNotificationDelivery>> ClaimDueAsync(
         DateTimeOffset now,
         TimeSpan lease,
         int batchSize,
@@ -150,10 +150,40 @@ internal sealed class NotificationDeliveryRepository(KhadraDbContext context) : 
         if (claimed.Count == 0)
             return [];
 
+        // The count each claim left, read back while the lease still holds the rows — nobody else can claim them
+        // before it runs out. It is what the sender checks before working a row (item 204), so a row whose lease ran
+        // out and was claimed again by another process is left to that process. Worked oldest first.
         var keys = claimed.Select(Id.From).ToList();
-        return await context.NotificationDeliveries
+        var counts = await context.NotificationDeliveries
+            .AsNoTracking()
             .Where(delivery => keys.Contains(delivery.Id))
-            .OrderBy(delivery => delivery.CreatedAt)
+            .Select(delivery => new { delivery.Id, delivery.Attempts, delivery.CreatedAt })
             .ToListAsync(cancellationToken);
+        return
+        [
+            .. counts
+                .OrderBy(row => row.CreatedAt)
+                .ThenBy(row => row.Id.Value)
+                .Select(row => new ClaimedNotificationDelivery(row.Id, row.Attempts)),
+        ];
     }
+
+    public async Task<bool> TryRenewClaimAsync(
+        Id deliveryId,
+        int claims,
+        DateTimeOffset leaseUntil,
+        CancellationToken cancellationToken = default)
+    {
+        // One conditional statement, so the check and the renewal cannot be split by another process's claim: a row
+        // claimed since has a higher count and is not touched.
+        var renewed = await context.NotificationDeliveries
+            .Where(delivery => delivery.Id == deliveryId
+                               && delivery.Attempts == claims
+                               && delivery.State == DeliveryState.Pending)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(delivery => delivery.NextAttemptAt, leaseUntil), cancellationToken);
+        return renewed == 1;
+    }
+
+    public Task<NotificationDelivery?> GetAsync(Id deliveryId, CancellationToken cancellationToken = default) =>
+        context.NotificationDeliveries.FirstOrDefaultAsync(delivery => delivery.Id == deliveryId, cancellationToken);
 }

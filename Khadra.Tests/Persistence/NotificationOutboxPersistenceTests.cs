@@ -1,5 +1,6 @@
 using Khadra.Domain.Common;
 using Khadra.Domain.Notifications;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Tests.Support;
@@ -74,8 +75,10 @@ public sealed class NotificationOutboxPersistenceTests : IDisposable
         await using (var first = NewContext())
         {
             var claimed = await new NotificationDeliveryRepository(first).ClaimDueAsync(Now, TimeSpan.FromMinutes(2), 10);
-            var row = Assert.Single(claimed);
-            Assert.Equal(1, row.Attempts);
+            var claim = Assert.Single(claimed);
+            Assert.Equal(1, claim.Claims);
+            var row = await new NotificationDeliveryRepository(first).GetAsync(claim.DeliveryId);
+            Assert.Equal(1, row!.Attempts);
             Assert.Equal(Now.AddMinutes(2), row.NextAttemptAt);
         }
 
@@ -85,7 +88,7 @@ public sealed class NotificationOutboxPersistenceTests : IDisposable
         // The first dispatcher died holding it: once the lease runs out, it comes back.
         await using var third = NewContext();
         var retried = Assert.Single(await new NotificationDeliveryRepository(third).ClaimDueAsync(Now.AddMinutes(3), TimeSpan.FromMinutes(2), 10));
-        Assert.Equal(2, retried.Attempts);
+        Assert.Equal(2, retried.Claims);
     }
 
     [Fact]
@@ -95,8 +98,9 @@ public sealed class NotificationOutboxPersistenceTests : IDisposable
 
         await using (var context = NewContext())
         {
-            var row = Assert.Single(await new NotificationDeliveryRepository(context).ClaimDueAsync(Now, TimeSpan.FromMinutes(2), 10));
-            row.RecordSent(Now);
+            var claim = Assert.Single(await new NotificationDeliveryRepository(context).ClaimDueAsync(Now, TimeSpan.FromMinutes(2), 10));
+            var row = await new NotificationDeliveryRepository(context).GetAsync(claim.DeliveryId);
+            row!.RecordSent(Now);
             await context.SaveChangesAsync();
         }
 
@@ -112,6 +116,49 @@ public sealed class NotificationOutboxPersistenceTests : IDisposable
 
         await using var context = NewContext();
         Assert.Equal(3, (await new NotificationDeliveryRepository(context).ClaimDueAsync(Now, TimeSpan.FromMinutes(2), 3)).Count);
+    }
+
+    // Pre-launch item 204: a claim taken over by another process is refused at the database, before and after a send.
+
+    [Fact]
+    public async Task A_claim_cannot_be_renewed_once_another_process_has_claimed_the_row()
+    {
+        await RaiseAsync(NotificationKind.YourBookingConfirmed);
+
+        ClaimedNotificationDelivery mine;
+        await using (var first = NewContext())
+            mine = Assert.Single(await new NotificationDeliveryRepository(first).ClaimDueAsync(Now, TimeSpan.FromMinutes(2), 10));
+
+        // This process stalled past its lease, and another claimed the row.
+        await using (var second = NewContext())
+            Assert.Single(await new NotificationDeliveryRepository(second).ClaimDueAsync(Now.AddMinutes(3), TimeSpan.FromMinutes(2), 10));
+
+        await using var stalled = NewContext();
+        var repository = new NotificationDeliveryRepository(stalled);
+        Assert.False(await repository.TryRenewClaimAsync(mine.DeliveryId, mine.Claims, Now.AddMinutes(5)));
+        Assert.True(await repository.TryRenewClaimAsync(mine.DeliveryId, mine.Claims + 1, Now.AddMinutes(5)));
+    }
+
+    [Fact]
+    public async Task An_outcome_written_after_a_takeover_during_the_send_is_refused()
+    {
+        await RaiseAsync(NotificationKind.YourBookingConfirmed);
+
+        await using var stalled = NewContext();
+        var mine = Assert.Single(await new NotificationDeliveryRepository(stalled).ClaimDueAsync(Now, TimeSpan.FromMinutes(2), 10));
+        var row = await new NotificationDeliveryRepository(stalled).GetAsync(mine.DeliveryId);
+
+        // Read, then frozen mid-send for longer than the lease; another process claims the row meanwhile.
+        await using (var other = NewContext())
+            Assert.Single(await new NotificationDeliveryRepository(other).ClaimDueAsync(Now.AddMinutes(3), TimeSpan.FromMinutes(2), 10));
+
+        row!.RecordSent(Now.AddMinutes(4));
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => stalled.SaveChangesAsync());
+
+        await using var after = NewContext();
+        var stored = await after.NotificationDeliveries.SingleAsync();
+        Assert.Same(DeliveryState.Pending, stored.State);
+        Assert.Equal(2, stored.Attempts);
     }
 
     [Fact]

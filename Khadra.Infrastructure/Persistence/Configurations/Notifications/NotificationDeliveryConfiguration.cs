@@ -14,7 +14,9 @@ internal sealed class NotificationDeliveryConfiguration : IEntityTypeConfigurati
         ConfigureId(entity.Property(delivery => delivery.NotificationId)).IsRequired();
         ConfigureEnumeration(entity.Property(delivery => delivery.Channel), 10);
         ConfigureEnumeration(entity.Property(delivery => delivery.State), 10);
-        entity.Property(delivery => delivery.Attempts).IsRequired();
+        // The claim count, and the proof a claim is still its dispatcher's (pre-launch item 204): every claim moves it,
+        // so an outcome written by a process whose lease ran out and whose row was claimed again is refused.
+        entity.Property(delivery => delivery.Attempts).IsRequired().IsConcurrencyToken();
         entity.Property(delivery => delivery.NextAttemptAt).IsRequired();
         entity.Property(delivery => delivery.CreatedAt).IsRequired();
         entity.Property(delivery => delivery.CompletedAt);

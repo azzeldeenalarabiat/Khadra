@@ -3402,3 +3402,14 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007142545_NotificationDeliveryClaimToken') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20261007142545_NotificationDeliveryClaimToken', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

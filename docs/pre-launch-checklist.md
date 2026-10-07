@@ -5178,6 +5178,18 @@ token on the outbox row, so a claim taken over between the read and the send is 
 the takeover on SQLite and on PostgreSQL — `FinancialDocumentEmailTests` and `PostgresFinancialDocumentEmailTests`
 show the pattern.
 
+**Built, 2026-10-07 (`claude/wonderful-lovelace-ztynsz`, on `fix/polish-wave4` at `4e2c1f1`), awaiting the Staging
+check.** As planned. `ClaimDueAsync` returns each row's id with the claim count it left
+(`ClaimedNotificationDelivery`). For each row, `DeliverNotificationsHandler` starts from an empty tracker, renews the
+lease from that moment with one conditional statement that matches the count (`TryRenewClaimAsync`), reads the row
+and checks the count again, sends, and saves the outcome. `notification_deliveries.attempts` is a concurrency token
+(migration `NotificationDeliveryClaimToken`, which changes no schema and only writes its history row), so an outcome
+written after a takeover during the send is refused by the database and logged (2304). A row taken over before its
+send is left alone (2303), and neither case stops the batch. The pass reports `TakenOver`. Proved on SQLite
+(`NotificationOutboxPersistenceTests`), on PostgreSQL (`PostgresOutboxAndReminderTests`) and at the handler
+(`DeliverNotificationsHandlerTests`). Delivery is still at least once: a process that stops after the transport
+accepts and before the row says so sends again once the lease runs out. That is item 187's question, not this one.
+
 ## The office payables ledger (payments Phase 8, 2026-09-30)
 
 What Khadra owes each rental office, booking by booking, and the settlements an administrator records by hand
