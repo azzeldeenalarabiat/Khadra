@@ -372,6 +372,21 @@ is already Applied gets past the replay fast path (`receipts.HasSeenAsync` match
 
 **Contract:** none for the customer app. The console words the two new outcomes.
 
+**As built (Wave 4, 2026-10-07; the advisor's review of the plan and of the D8 schema).** Five outcomes rather than
+two, every one at most twenty characters (the receipt's column): `Duplicate` (same reference, same money:
+Information), `AssumedDuplicate` (no reference on one side, same money: Warning, because a genuine second charge of
+the same amount reads the same — item 76 now requires a real adapter to send a capture reference), `AmountMismatch`
+(same reference, other money: the provider contradicts itself), `SecondCapture` (another reference, or no reference
+and other money) and `OtherAttempt` (a capture reference ANOTHER attempt already holds, judged before any tier).
+The last three are `payment_incidents` (kinds `SecondCapture`, `AmountMismatch`, `CaptureOnAnotherAttempt`), one per
+receipt, never refunded by code, closed by an administrator's "Mark as handled" with a note, audited
+(`PaymentIncidentHandled`). The reference is written by `Orphan` as well as `Apply`. A unique filtered index
+(`ux_payments_provider_capture_reference`) keeps one capture on one attempt; the race's loser is caught by that name,
+the tracker discarded, and the notice recorded as `OtherAttempt` with its incident — answered 2xx, never a 5xx loop.
+The sandbox derives `sbxcap_…` from the session under the webhook secret, and its page offers it in an editable field.
+Migration `PaymentCaptureIncidentsAndRefundBackoff` (one, with B4's columns). Proved on PostgreSQL by
+`PostgresCaptureReferenceRaceTests`.
+
 #### B5: the ledger finds ended bookings by the window each one froze (checklist 210)
 
 **What happens today.** The payables pass looks for cancelled and no-show bookings whose end is older than TODAY's
@@ -401,3 +416,13 @@ turned away on every pass until it is final.
 - the column against the domain's property for each ending;
 - a booking found by its own shorter window, without waiting for today's;
 - a booking ended before the column existed, found exactly as before.
+
+**As built (Wave 4, 2026-10-07).** Two corrections to the design above, both found in the code and confirmed by the
+advisor. A returned booking has no `finished_at` — `RecordReturn` sets `ReturnedAt` — so the return writes
+`ReturnedAt + window` and the others `FinishedAt + window`. And only the payables pass ever bounded by today's window:
+`ListDueForSettlementAsync` and `ListDueForDepositReleaseAsync` had no window bound, so they gain
+`column IS NULL OR column <= now` (never later than before), not a COALESCE with today's. The value is a PRIVATE field
+on `Booking` (`_disputeWindowEndsAt`), read only through `EF.Property` by those three queries: `DisputeWindowEndsAt`
+stays the one statement of the window for every reader, and reads null after completion while the column keeps the
+end it had. Migration `BookingDisputeWindowEnd`: the column and a partial index on `(status, dispute_window_ends_at)`,
+no backfill.

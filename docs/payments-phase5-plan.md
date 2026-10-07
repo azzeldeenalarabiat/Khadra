@@ -181,7 +181,7 @@ computed when it was issued and never again.
 | Issuer | Khadra's legal name (EN/AR), commercial registration, address (EN/AR), support email and phone — from configuration at issue (§17) |
 | Customer | id and name at issue — the name only, never the email or the phone (owner, 2026-09-27; §3.13) |
 | Rental office | id, business name, commercial registration, city (EN/AR), area and street — read past the soft-delete filter, so an office that has since left is still named on money it received |
-| Booking | id, reference, status at issue, rental start and end (UTC and Amman local), the frozen day count, pickup method |
+| Booking | id, reference, status at issue, rental start and end (UTC and Amman local), the frozen day count, pickup method; on a payment receipt, also the status after that payment (`statusAfterPayment`, Fix & Polish Wave 4, F57): the booking's state at the instant the payment was applied or orphaned — of several changes at one instant, the one the others led to — never today's |
 | Vehicle | make, model, year, plate, car type (EN/AR) — read past the soft-delete filter too |
 | Notice | "This document is not a tax invoice." / «هذا المستند ليس فاتورة ضريبية.» |
 | Content | the document laid out: title, sections and lines, **each label in English and Arabic**, each value a money amount with its currency, an instant, or a code (§3.7) |
@@ -1279,7 +1279,8 @@ right after the payables step — issues the new version, caused `PenaltyKept` (
 
 **Recorded by the settlement pass.** After the payment sweep and before documents, the pass asks SQL for paid
 bookings that ended — completed ones past `Payables:FinalityMarginMinutes` (10), first; cancellations and no-shows
-past the margin and today's window (item 210) — that have no payable and are not held until later, and records each
+past the margin and their OWN window, stored when it opened (`bookings.dispute_window_ends_at`, Wave 4 B5; today's
+window only for one that ended before the column existed) — that have no payable and are not held until later, and records each
 in its own scope from the calculator: `OfficePayable.Record` derives its figures from the lines and refuses anything
 the calculator should never produce. A booking whose records need review, or whose penalty cannot be kept, is HELD
 (`NeedsReview`, `PenaltyNotWholeDeposit`) and looked at again after a delay that doubles from `RetryInitialSeconds`

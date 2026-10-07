@@ -2036,6 +2036,13 @@ survives the build, not a gap in it.
 
 **Status:** open · **Raised:** 2026-09-08 · **Blocks:** every Confirmed booking
 
+**Two written gates for the real adapter (Fix & Polish Wave 4, 2026-10-07).** It MUST send a capture reference with
+every capture notice (`ProviderEvent.CaptureReference`): without one the platform can only compare amounts, and a
+genuine second charge of the same amount reads as the same capture said again (`AssumedDuplicate`, logged at Warning).
+And it MUST answer an outage — unreachable, timed out — with `PaymentErrors.ProviderUnavailable`, and a refusal with
+anything else (`IPaymentProvider.RefundAsync`): an outage answered as a refusal is counted against every refund and
+puts them all on the work queue as refused three times.
+
 **Also due before a real provider is connected** (recorded 2026-09-24, from the automatic
 free-cancellation refund): item 157 (back off a refund the provider keeps refusing), item 159 (the
 adapter's refund events must name the refund they settle), item 156 (the owner's policy for a
@@ -4348,6 +4355,18 @@ the count cannot be read: `Refund` stores only `FailedAt`, which `MarkFailed` ov
 refusal. What remains — the back-off and the log flood — needs that field first: a refusal counter on
 the refund (a migration), the growing interval and the cap read from it, and their tests.
 
+**Built in Fix & Polish Wave 4 (`fix/polish-wave4`, 2026-10-07, W4-3), awaiting the Staging check.** `payment_refunds`
+gained `refusal_count` and `next_attempt_at`. A refused SEND is counted (`Refund.RecordRefusedSend`); a provider's notice
+counts only when it moves a refund into Failed, so a notice said again changes nothing. The next send waits
+`Payments:RefundRetryFirstDelayMinutes` (1), doubling to `RefundRetryMaxDelayMinutes` (360), for ever; from
+`RefundRefusalsBeforeAlert` (3) refusals the refund is logged at Error and is on the work queue (the row now lists only
+those), and the refunds queue shows each one's count and next attempt. An unreachable provider refuses nothing and
+counts nothing (`ProviderUnavailable`; the advisor's review). `Refund` gained the `xmin` token, and the sweep loads,
+sends and saves one payment at a time, so a refund the webhook settled meanwhile stays Settled and a conflict costs
+one payment's sends. Existing Failed rows start at 1, a floor. Proved on PostgreSQL by `PostgresRefundBackoffTests`
+and `PostgresRefundBackoffMigrationTests`. The Staging check can reach only the notice path: the sandbox accepts every
+send, so a refused SEND exists on Staging only as these tests.
+
 ### 158. The gallery's screens still show commission and payout on a free-cancelled paid booking
 
 **Status:** closed · **Closed:** 2026-09-27 — the office's money section words commission from the server's state.
@@ -4818,7 +4837,12 @@ pre-check, not a true race. **To close:** run the PostgreSQL suite once against 
 
 ### 183. The shared document fixture does not carry every wording branch
 
-**Status:** open · **Raised:** 2026-09-28 (review of payments Phase 5b) · **Non-blocking** (owner, 2026-09-28)
+**Status:** closed · **Raised:** 2026-09-28 (review of payments Phase 5b) · **Closed:** 2026-10-07 (Fix & Polish Wave 4,
+W4-7) — the fixture now carries a `BookingEnded` statement with a delivery fee, and a statement with a refused refund
+and a balance not yet due; `The_shared_fixture_carries_every_reachable_wording_branch` pins them. A penalty stated as
+a RANGE is not among them, deliberately: a statement states only a penalty against the customer, and every penalty the
+domain assesses against a customer is fixed — a range is only ever the office's — so no real booking can reach that
+branch, and no page in a contract fixture pretends one can.
 
 `docs/contracts/financial-documents-v1.json` holds every shape of the version-1 grammar, and all three
 clients' tests read it — since `07a7284` a `ReceiptCorrected` statement too — but not every WORDING branch
@@ -5257,6 +5281,13 @@ where the window starts (cancellation, no-show, return), pinned equal to `Bookin
 and read as `COALESCE(column, finished_at + today's window)` — no SQL backfill of the window inside the `terms` JSON,
 whose TimeSpan text PostgreSQL cannot be trusted to parse.
 
+**Built in Fix & Polish Wave 4 (`fix/polish-wave4`, 2026-10-07, W4-4), awaiting the Staging check.** As planned, with the
+two corrections in `docs/payments-programme.md` (B5, as built): the return writes `ReturnedAt + window`, and the two
+repository queries, which never had a window bound, gain `column IS NULL OR column <= now` rather than a COALESCE. The
+column is a private field read only by the three queries; `DisputeWindowEndsAt` is unchanged. Proved on SQLite by
+`DisputeWindowEndPersistenceTests` and `OfficePayablesTests` (a shorter frozen window found without waiting for
+today's; a booking with no stored end found as before).
+
 ### 211. Two of the ledger's reads grow with the whole history
 
 **Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 8) · **Low priority**
@@ -5635,6 +5666,13 @@ Wave 3 the office's as well as the customer's — stay `Added` in the tracker; t
 because every later save fails. **To close:** on a conflict, detach the booking and every row staged for it before
 the next booking, with a test on a real context (the current one substitutes the unit of work).
 
+**Built in Fix & Polish Wave 4 (`fix/polish-wave4`, 2026-10-07, W4-5), awaiting the Staging check.** The five sweep
+queries return ids; each booking is loaded, changed and saved on its own, with the tracker discarded before every load
+and after ANY failure, which is caught per booking and logged with its reference (one clean scope per booking's work,
+accepted by the advisor in place of a scope per command). Proved on PostgreSQL with a real conflict mid-pass
+(`PostgresSettlementSweepTests`): the contested booking is left untouched with no stray notification, the others are
+saved, and the next pass settles it.
+
 ### 234. A lapse settled on load and saved by another command tells nobody
 
 **Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Pre-existing**
@@ -5647,6 +5685,13 @@ orphaned and saved — and the expiry with it. The sweep never sees that booking
 after the deadline. **To close:** raise the expiry's notifications wherever a settled lapse is committed, or have
 `BookingLapse.Settle` report the transition so the saving handler can.
 
+**Built in Fix & Polish Wave 4 (`fix/polish-wave4`, 2026-10-07, W4-5), awaiting the Staging check.** Both halves:
+`BookingLapse.Settle` returns which lapse it settled, and `SettlingBookingRepository` announces it through the one
+`BookingExpiryAnnouncer` onto the same tracker, so the notifications persist exactly when the expiry does. The sweep's
+expiry passes are "load, save" through the same seam, and a new request clearing a stale hold uses the same announcer.
+Proved on SQLite through the real webhook (`CaptureAfterTheDeadlineTests`) and on the seam itself
+(`SettlingBookingRepositoryTests`: a read that settles announces nothing; a save announces once).
+
 ### 235. The office is not told when a dispute is withdrawn
 
 **Status:** open · **Raised:** 2026-10-06 (advisor's review of Fix & Polish Wave 3) · **Owner decision**
@@ -5657,3 +5702,18 @@ website — nobody else is told, and an office that then answers meets `dispute.
 whether a withdrawal is news for the other party; if so, a `DisputeWithdrawn` kind for the office (and the
 customer's existing `YourDisputeUpdated` when the office withdraws), beside C7's choice not to tell an office of a
 request it let lapse.
+
+### 236. A booking or a stale checkout that fails the same way every pass is logged at Error every minute
+
+**Status:** open · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's payments half) · **Partly pre-existing**
+
+Since item 233 each booking in the settlement sweep is handled on its own, so one that fails the same way every time no
+longer stops the others — but it is logged at Error once a minute for as long as it stays broken (2102 and 2103 did
+this before Wave 4; 2104 replaced a failure that ended the whole pass every minute). The stale-checkout pass
+(`SettlePaymentsCommand.CloseStaleAsync`) has the provider-side form: with the provider unreachable it asks about every
+stale checkout, waits out each timeout and logs each one, every tick, where the refund sends now stop at the first
+`ProviderUnavailable`. A database outage is not this case: every pass reads its ids first, so an outage ends the run
+at the next read. **To close:** report a booking's repeated failure once per process at Error and lower after that (as
+`BookingSettlementService` does for a PDF it cannot draw), and stop `CloseStaleAsync` at the first
+`ProviderUnavailable`. Not "stop after K failures in a row": a few broken bookings at the head of the list would then
+starve every booking behind them, every tick. The second half is due before a real provider is connected (item 76).
