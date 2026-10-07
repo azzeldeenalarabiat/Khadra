@@ -144,12 +144,30 @@ describe('the consent gate', () => {
     await settle();
 
     expect(gate.blocked()).toBe(false);
+    expect(gate.open()).toBe(true);
     expect(gate.clear()).toBe(false);
 
     gate.raise();
     http.expectOne(CONSENTS).flush({ accepted: [], pending: [] });
     await settle();
     expect(gate.clear()).toBe(true);
+  });
+
+  // Found in the local run: the unread count fired between signing in and the answer, and was refused. Polls wait on
+  // `open`, which is false until the answer is in.
+  it('opens only once the answer is in and nothing is pending', async () => {
+    user.set(customer('rana'));
+    TestBed.tick();
+    expect(gate.open()).toBe(false);
+
+    http.expectOne(CONSENTS).flush({ accepted: [], pending: [TERMS] });
+    await settle();
+    expect(gate.open()).toBe(false);
+
+    const accepting = gate.accept('en');
+    http.expectOne((request) => request.method === 'POST' && request.url === CONSENTS).flush({ accepted: [], pending: [] });
+    await accepting;
+    expect(gate.open()).toBe(true);
   });
 
   it('knows its own refusal from every other 403', () => {

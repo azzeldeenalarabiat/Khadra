@@ -41,11 +41,11 @@ export class DealerPulseService {
   });
 
   /**
-   * Undefined keeps the resource idle, so an admin never asks a dealer question — and nobody polls behind the consent
-   * prompt (Wave 4, W4-8), where every answer would be a refusal.
+   * Undefined keeps the resource idle, so an admin never asks a dealer question — and nobody polls before the consent
+   * answer is in, or behind the prompt (Wave 4, W4-8), where every answer would be a refusal.
    */
   private readonly pulse = httpResource<DealerPulse>(() =>
-    this.isDealer() && !this.consent.blocked() ? '/api/v1/dealers/me/pulse' : undefined,
+    this.isDealer() && this.consent.open() ? '/api/v1/dealers/me/pulse' : undefined,
   );
 
   private seen: string | null = null;

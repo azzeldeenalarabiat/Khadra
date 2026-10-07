@@ -30,7 +30,7 @@ export class NotificationsService {
   /** Anyone signed in has a bell. What fills it differs by what raises rows, not by role. */
   private readonly signedIn = computed(() => !!this.session.user());
 
-  /** Silent behind the consent prompt (Wave 4, W4-8), and asked again the moment it is accepted. */
+  /** Silent until the consent answer is in and behind the prompt (Wave 4, W4-8), and asked the moment it is accepted. */
   private readonly consent = inject(ConsentGateService);
 
   private readonly live = inject(LiveRefreshService);
@@ -47,7 +47,7 @@ export class NotificationsService {
    * while the new one is on its way.
    */
   readonly feed = httpResource<NotificationFeed>(() => {
-    if (!this.signedIn() || this.consent.blocked()) return undefined;
+    if (!this.signedIn() || !this.consent.open()) return undefined;
     return { url: this.base, params: { page: this.page(), pageSize: 25 } };
   });
 

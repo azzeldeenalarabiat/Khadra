@@ -55,9 +55,9 @@ export class NotificationsService {
   constructor() {
     effect(() => {
       const signedIn = this.session.isSignedIn();
-      // Silent behind the consent prompt (Wave 4, W4-8), where every answer would be a refusal; asked again, and
-      // polled again, the moment the texts are accepted.
-      const blocked = this.consent.blocked();
+      // Silent until the consent answer is in and behind the prompt (Wave 4, W4-8), where every answer would be a
+      // refusal; asked, and polled, the moment the texts are known to be accepted.
+      const open = this.consent.open();
       if (!this.isBrowser) return;
       if (this.timer) clearInterval(this.timer);
       this.timer = null;
@@ -65,7 +65,7 @@ export class NotificationsService {
         this.unread.set(0);
         return;
       }
-      if (blocked) return;
+      if (!open) return;
       void this.refresh();
       this.timer = setInterval(() => {
         if (this.document.visibilityState === 'visible') void this.refresh();
@@ -100,7 +100,7 @@ export class NotificationsService {
   }
 
   async refresh(): Promise<void> {
-    if (!this.session.isSignedIn() || this.consent.blocked()) return;
+    if (!this.session.isSignedIn() || !this.consent.open()) return;
     const asked = ++this.generation;
     try {
       const count = await firstValueFrom(this.http.get<number>('/api/v1/notifications/unread-count'));

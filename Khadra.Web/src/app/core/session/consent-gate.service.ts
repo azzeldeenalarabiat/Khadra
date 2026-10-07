@@ -21,6 +21,8 @@ interface Known {
   /** Whose consents these are: the answer is about one person, never about whoever signs in next. */
   readonly userId: string;
   readonly pending: readonly LegalConfigDocument[];
+  /** False when the question went unanswered: nothing is known to be pending, and nothing is known to be clear. */
+  readonly answered: boolean;
 }
 
 /** True for the refusal the gate exists to answer, from any endpoint. */
@@ -59,11 +61,28 @@ export class ConsentGateService {
   /** The texts in force still to accept, with their pages; empty when nothing is owed, or nothing is known yet. */
   readonly pending = computed<readonly LegalConfigDocument[]>(() => this.mine()?.pending ?? []);
 
-  /** While true the website shows the prompt in place of the page, and asks nothing that would be refused. */
+  /** While true the website shows the prompt in place of the page. */
   readonly blocked = computed(() => this.pending().length > 0);
 
-  /** Asked, and nothing owed: what a write made on somebody's behalf, rather than at their click, waits for. */
-  readonly clear = computed(() => this.mine()?.pending.length === 0);
+  /**
+   * Whether requests may go on this person's behalf: once their consents were asked about and nothing is pending. A
+   * question that went unanswered counts — the server's gate still stands, and its refusal would ask again — so a
+   * failing endpoint never silences the page. What a poll like the unread count waits for.
+   */
+  readonly open = computed(() => {
+    const known = this.mine();
+    return !!known && known.pending.length === 0;
+  });
+
+  /**
+   * Asked, ANSWERED, and nothing owed: what a write made on somebody's behalf, rather than at their click, waits for.
+   * Unlike {@link open}, an unanswered question does not count (the advisor's review): a car saved before signing in
+   * keeps waiting rather than being sent to a refusal and forgotten.
+   */
+  readonly clear = computed(() => {
+    const known = this.mine();
+    return !!known && known.answered && known.pending.length === 0;
+  });
 
   constructor() {
     // The website has no guard in front of most pages, so being signed in is what starts the question. The server
@@ -101,7 +120,7 @@ export class ConsentGateService {
       const record = await firstValueFrom(
         this.http.post<MyLegalConsents>('/api/v1/auth/me/legal-consents', { versionIds, language }),
       );
-      this.known.set({ userId: user.id, pending: record.pending ?? [] });
+      this.known.set({ userId: user.id, pending: record.pending ?? [], answered: true });
       return 'accepted';
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.code === VERSION_NOT_CURRENT) {
@@ -117,11 +136,12 @@ export class ConsentGateService {
     if (!user) return Promise.resolve();
 
     this.asking ??= firstValueFrom(this.http.get<MyLegalConsents>('/api/v1/auth/me/legal-consents'))
-      .then((record) => this.known.set({ userId: user.id, pending: record.pending ?? [] }))
+      .then((record) => this.known.set({ userId: user.id, pending: record.pending ?? [], answered: true }))
       .catch(() => {
-        // Left unknown (the advisor's review), as the console leaves it: nothing is blocked, because the server's gate
-        // still stands and its next refusal asks again; and nothing is CLEAR, so what waits on `clear` — a car saved
-        // before signing in — keeps waiting rather than being sent to a refusal and forgotten.
+        // Unanswered (the advisor's review): nothing is blocked and polls may go, because the server's gate still
+        // stands and its next refusal asks again; but nothing is CLEAR, so what waits on `clear` — a car saved before
+        // signing in — keeps waiting rather than being sent to a refusal and forgotten.
+        this.known.set({ userId: user.id, pending: [], answered: false });
       })
       .finally(() => (this.asking = null));
     return this.asking;

@@ -173,6 +173,30 @@ describe('the consent gate', () => {
     await gate.settle();
 
     expect(gate.blocked()).toBe(false);
+    expect(gate.open()).toBe(true);
+  });
+
+  // Found in the local run: services left standing by an earlier session in the same tab fired the moment the next
+  // person signed in, before the answer, and were refused. They read `open`, which waits for the answer.
+  it('lets nothing go on a person’s behalf until their consents are known, and nothing while one is pending', async () => {
+    const { gate, http, session } = gateFor(user('owner-1', 'DealerOwner'));
+    http.answers.push({ accepted: [], pending: [TERMS] });
+
+    expect(gate.open()).toBe(false);
+    await gate.settle();
+    expect(gate.open()).toBe(false);
+
+    await gate.accept('en');
+    expect(gate.open()).toBe(true);
+
+    session.set(user('employee-2', 'DealerEmployee'));
+    expect(gate.open()).toBe(false);
+  });
+
+  it('is open for an administrator at once: the texts do not address Khadra’s staff', () => {
+    const { gate } = gateFor(user('admin-1', 'Admin'));
+
+    expect(gate.open()).toBe(true);
   });
 
   it('knows its own refusal from every other 403', () => {

@@ -37,9 +37,10 @@ export function isConsentPending(error: unknown): boolean {
  * where the guard waits for the answer so the frame never draws a page it is about to cover, and told by any refusal,
  * which is how a text published while the console was open arrives.
  *
- * Every root resource that would only be refused reads {@link blocked} and stays idle while it is true, which is what
- * pauses the pollers; the moment the person accepts, the same signal sends each of them back to the server, so nothing
- * has to remember to reload.
+ * Every root resource that would only be refused reads {@link open} and stays idle until it is true, which is what
+ * pauses the pollers — and keeps them quiet in the moment between signing in and the answer, when a service left
+ * standing by an earlier session in the same tab would otherwise fire at once and be refused. The moment the person
+ * accepts, the same signal sends each of them back to the server, so nothing has to remember to reload.
  */
 @Injectable({ providedIn: 'root' })
 export class ConsentGateService {
@@ -56,8 +57,21 @@ export class ConsentGateService {
     return known && user && known.userId === user.id ? known.pending : [];
   });
 
-  /** While true the console shows the prompt in place of the page, and asks nothing that would be refused. */
+  /** While true the console shows the prompt in place of the page. */
   readonly blocked = computed(() => this.pending().length > 0);
+
+  /**
+   * Whether requests may go on this person's behalf: an administrator's at once, anybody else's once their consents
+   * are known and nothing is pending. A question that could not be answered counts as known — the server's gate still
+   * stands, and its refusal would ask again — so a failing endpoint never strands the console.
+   */
+  readonly open = computed(() => {
+    const user = this.session.user();
+    if (!user) return false;
+    if (user.role === 'Admin') return true;
+    const known = this.known();
+    return !!known && known.userId === user.id && known.pending.length === 0;
+  });
 
   /**
    * Learns, once per person, whether anything is owed. An administrator is never asked: the texts address customers
@@ -120,6 +134,8 @@ export class ConsentGateService {
       .then((record) => this.known.set({ userId: user.id, pending: record.pending ?? [] }))
       .catch(() => {
         // Not knowing is no reason to stop anybody: the server's gate still stands, and its next refusal asks again.
+        // Recorded as nothing pending, so `open` lets the console work rather than wait on an answer that never comes.
+        this.known.set({ userId: user.id, pending: [] });
       })
       .finally(() => (this.asking = null));
     return this.asking;
