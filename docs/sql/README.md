@@ -25,6 +25,11 @@ The regeneration before (2026-09-20) added `AddCustomerShortlist`, which brought
 `customer_shortlists` and `shortlist_entries` and made script 2 mandatory,
 `DealerPublicProfile`, and `PenaltyReasonCode`.
 
+**Regenerated on 2026-10-07 (Fix & Polish Wave 4)**: every migration through `20261007032513_AdminDocumentAccess`,
+42 in all, creating 46 tables plus the history table. The copy before it had stopped at the 2026-09-24 migrations, so
+this is also the first time the payments tables, the financial documents, the payables, the legal texts and the
+consents appear in it. Re-run script 2 after it.
+
 Regenerate after adding a migration:
 
 ```bash
@@ -202,3 +207,38 @@ is evidence. Before anything is published, dropping the table and its history ro
 Proved on 2026-10-05 against a throwaway PostgreSQL 18 (`PostgresLegalDocumentsTests`): the constraint and index
 names, the triggers refusing UPDATE, DELETE and TRUNCATE, each stored hash equal to
 `encode(sha256(convert_to(body,'UTF8')),'hex')`, and the refused rollback.
+
+## 9. `2026-10-07-fix-polish-wave4.sql`
+
+Fix & Polish Wave 4's four migrations, for a database at `20261005062940_LegalDocumentVersions` (Staging today),
+generated with:
+
+```bash
+dotnet ef migrations script 20261005062940_LegalDocumentVersions 20261007032513_AdminDocumentAccess \
+  --idempotent --project Khadra.Infrastructure --startup-project Khadra.WebAPI \
+  --output docs/sql/2026-10-07-fix-polish-wave4.sql
+```
+
+- **`PaymentCaptureIncidentsAndRefundBackoff`** adds `payment_incidents` (a new table), the capture reference on
+  payments and provider events, the `xmin` concurrency token on refunds (a system column, so nothing is added), and the
+  refusal schedule on refunds. Its one write gives every refund already `Failed` a `refusal_count` of 1, so the sweep
+  tries it again at once and counts it as refused once.
+- **`BookingDisputeWindowEnd`** adds the nullable `bookings.dispute_window_ends_at` and its partial index.
+- **`LegalConsents`** adds `legal_consents` (a new table), append-only with row and TRUNCATE triggers, its CHECKs and
+  its foreign key to `legal_document_versions` (restrict). It writes no rows: consent arrives only from the people
+  giving it.
+- **`AdminDocumentAccess`** makes `document_access_entries.dealer_id` and `booking_id` nullable under
+  `ck_document_access_entries_scope` (null only for an administrator), and adds the `xmin` token on
+  `customer_documents` (a system column again: nothing is added).
+
+All four are additive for the API that is live, which never reads the new columns and never writes a null into the
+loosened ones. So:
+
+1. Run it before deploying the Wave 4 API.
+2. **Run script 2 (`supabase-lockdown.sql`) again**: `payment_incidents` and `legal_consents` are new tables in
+   `public`, and `legal_consents` records who accepted what.
+3. Deploy the API, the BFFs, the console and the website together. Consent is required, and the gate closes, only
+   once a legal text is in force.
+
+There is no rollback script. `LegalConsents`' `Down` refuses once anybody has consented, and `AdminDocumentAccess`'
+once an administrator has opened a document: both are evidence. Before either has happened, each `Down` runs.

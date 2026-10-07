@@ -2286,3 +2286,1119 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    ALTER TABLE payment_refunds ADD booking_part numeric(18,3);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    ALTER TABLE payment_refunds ADD fee_part numeric(18,3);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+
+    UPDATE payment_refunds AS r
+    SET fee_part = CASE
+            WHEN p.processing_fee = 0 OR r.currency <> p.currency THEN 0
+            WHEN r.reason = 'OrphanedCapture' THEN LEAST(p.processing_fee, r.amount)
+            WHEN r.reason IN ('FreeCancellation', 'PlatformCancellation', 'EndedBeforePickup')
+                 AND p.fee_refundable THEN LEAST(p.processing_fee, r.amount)
+            ELSE 0
+        END
+    FROM payments AS p
+    WHERE p.id = r.payment_id;
+
+    UPDATE payment_refunds SET booking_part = amount - fee_part;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    ALTER TABLE payment_refunds ALTER COLUMN booking_part SET NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    ALTER TABLE payment_refunds ALTER COLUMN fee_part SET NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+
+    ALTER TABLE payment_refunds ADD CONSTRAINT ck_payment_refunds_split
+        CHECK (fee_part >= 0 AND booking_part >= 0 AND booking_part + fee_part = amount);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE TABLE financial_document_issuance_holds (
+        id uuid NOT NULL,
+        document_type character varying(20) NOT NULL,
+        subject_id uuid NOT NULL,
+        booking_id uuid NOT NULL,
+        reason character varying(30) NOT NULL,
+        attempts integer NOT NULL,
+        first_failed_at timestamp with time zone NOT NULL,
+        last_failed_at timestamp with time zone NOT NULL,
+        next_attempt_at timestamp with time zone NOT NULL,
+        last_error character varying(300),
+        resolved_at timestamp with time zone,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_financial_document_issuance_holds PRIMARY KEY (id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE TABLE financial_document_series (
+        series_key character varying(24) NOT NULL,
+        last_number bigint NOT NULL,
+        updated_at timestamp with time zone NOT NULL,
+        CONSTRAINT pk_financial_document_series PRIMARY KEY (series_key),
+        CONSTRAINT ck_financial_document_series_last_number CHECK (last_number >= 1)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE TABLE financial_documents (
+        id uuid NOT NULL,
+        document_type character varying(20) NOT NULL,
+        document_number character varying(32) NOT NULL,
+        subject_id uuid NOT NULL,
+        version integer NOT NULL,
+        previous_version_id uuid,
+        related_document_id uuid,
+        booking_id uuid NOT NULL,
+        booking_reference character varying(20) NOT NULL,
+        customer_id uuid NOT NULL,
+        dealer_id uuid NOT NULL,
+        payment_id uuid,
+        refund_id uuid,
+        cause character varying(20) NOT NULL,
+        occurred_at timestamp with time zone NOT NULL,
+        issued_at timestamp with time zone NOT NULL,
+        covers_through timestamp with time zone,
+        checkpoint_fingerprint character(64),
+        headline_amount numeric(18,3) NOT NULL,
+        currency character varying(3) NOT NULL,
+        provider character varying(30) NOT NULL,
+        calculator_version integer NOT NULL,
+        snapshot_schema_version integer NOT NULL,
+        snapshot json NOT NULL,
+        content_sha256 character(64) NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_financial_documents PRIMARY KEY (id),
+        CONSTRAINT ck_financial_documents_previous CHECK ((version = 1) = (previous_version_id IS NULL)),
+        CONSTRAINT ck_financial_documents_statement_coverage CHECK ((document_type = 'BookingStatement') = (covers_through IS NOT NULL AND checkpoint_fingerprint IS NOT NULL)),
+        CONSTRAINT ck_financial_documents_subject CHECK ((document_type = 'PaymentReceipt' AND payment_id IS NOT NULL AND refund_id IS NULL AND subject_id = payment_id) OR (document_type = 'RefundReceipt' AND payment_id IS NOT NULL AND refund_id IS NOT NULL AND subject_id = refund_id) OR (document_type = 'BookingStatement' AND refund_id IS NULL AND subject_id = booking_id)),
+        CONSTRAINT ck_financial_documents_version CHECK (version >= 1),
+        CONSTRAINT fk_financial_documents_financial_documents_previous_version_id FOREIGN KEY (previous_version_id) REFERENCES financial_documents (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_financial_documents_financial_documents_related_document_id FOREIGN KEY (related_document_id) REFERENCES financial_documents (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE TABLE financial_document_voids (
+        document_id uuid NOT NULL,
+        voided_at timestamp with time zone NOT NULL,
+        voided_by_admin_id uuid NOT NULL,
+        reason character varying(500) NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_financial_document_voids PRIMARY KEY (document_id),
+        CONSTRAINT fk_financial_document_voids_financial_documents_document_id FOREIGN KEY (document_id) REFERENCES financial_documents (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE UNIQUE INDEX ix_financial_document_issuance_holds_document_type_subject_id ON financial_document_issuance_holds (document_type, subject_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_document_issuance_holds_next_attempt_at ON financial_document_issuance_holds (next_attempt_at) WHERE resolved_at IS NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_documents_booking_id_issued_at_id ON financial_documents (booking_id, issued_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_documents_customer_id_issued_at_id ON financial_documents (customer_id, issued_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE UNIQUE INDEX ix_financial_documents_document_number ON financial_documents (document_number);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE UNIQUE INDEX ix_financial_documents_document_type_subject_id_version ON financial_documents (document_type, subject_id, version);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_documents_issued_at_id ON financial_documents (issued_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_documents_payment_id ON financial_documents (payment_id) WHERE payment_id IS NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_documents_previous_version_id ON financial_documents (previous_version_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    CREATE INDEX ix_financial_documents_related_document_id ON financial_documents (related_document_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+
+    CREATE TRIGGER financial_documents_append_only
+    BEFORE UPDATE OR DELETE ON financial_documents
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER financial_documents_no_truncate
+    BEFORE TRUNCATE ON financial_documents
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER financial_document_voids_append_only
+    BEFORE UPDATE OR DELETE ON financial_document_voids
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER financial_document_voids_no_truncate
+    BEFORE TRUNCATE ON financial_document_voids
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260926230609_FinancialDocuments') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260926230609_FinancialDocuments', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260928222747_FinancialDocumentRenditions') THEN
+    CREATE TABLE financial_document_renditions (
+        id uuid NOT NULL,
+        document_id uuid NOT NULL,
+        language character varying(2) NOT NULL,
+        format character varying(10) NOT NULL,
+        template_version integer NOT NULL,
+        renderer_version character varying(64) NOT NULL,
+        storage_key character varying(300) NOT NULL,
+        content_sha256 character(64) NOT NULL,
+        size_bytes bigint NOT NULL,
+        snapshot_sha256 character(64) NOT NULL,
+        rendered_at timestamp with time zone NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_financial_document_renditions PRIMARY KEY (id),
+        CONSTRAINT ck_financial_document_renditions_size_bytes CHECK (size_bytes > 0),
+        CONSTRAINT ck_financial_document_renditions_template_version CHECK (template_version >= 1),
+        CONSTRAINT fk_financial_document_renditions_financial_documents_document_ FOREIGN KEY (document_id) REFERENCES financial_documents (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260928222747_FinancialDocumentRenditions') THEN
+    CREATE UNIQUE INDEX ix_financial_document_renditions_document_id_language_format_t ON financial_document_renditions (document_id, language, format, template_version);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260928222747_FinancialDocumentRenditions') THEN
+    CREATE UNIQUE INDEX ix_financial_document_renditions_storage_key ON financial_document_renditions (storage_key);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260928222747_FinancialDocumentRenditions') THEN
+
+    CREATE TRIGGER financial_document_renditions_append_only
+    BEFORE UPDATE OR DELETE ON financial_document_renditions
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER financial_document_renditions_no_truncate
+    BEFORE TRUNCATE ON financial_document_renditions
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260928222747_FinancialDocumentRenditions') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260928222747_FinancialDocumentRenditions', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929020747_FinancialDocumentRenditionKind') THEN
+    DROP INDEX ix_financial_document_renditions_document_id_language_format_t;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929020747_FinancialDocumentRenditionKind') THEN
+    ALTER TABLE financial_document_renditions ADD kind character varying(10) NOT NULL DEFAULT 'AsIssued';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929020747_FinancialDocumentRenditionKind') THEN
+
+    ALTER TABLE financial_document_renditions ALTER COLUMN kind DROP DEFAULT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929020747_FinancialDocumentRenditionKind') THEN
+    CREATE UNIQUE INDEX ix_financial_document_renditions_document_id_language_format_k ON financial_document_renditions (document_id, language, format, kind, template_version);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929020747_FinancialDocumentRenditionKind') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260929020747_FinancialDocumentRenditionKind', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE TABLE financial_document_deliveries (
+        id uuid NOT NULL,
+        document_id uuid NOT NULL,
+        channel character varying(10) NOT NULL,
+        state character varying(10) NOT NULL,
+        requested_by_admin_id uuid,
+        queued_at timestamp with time zone NOT NULL,
+        next_attempt_at timestamp with time zone NOT NULL,
+        claims integer NOT NULL,
+        send_attempts integer NOT NULL,
+        completed_at timestamp with time zone,
+        recipient_address character varying(320),
+        languages character varying(10),
+        waiting_reason character varying(20),
+        waiting_since timestamp with time zone,
+        last_error character varying(300),
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_financial_document_deliveries PRIMARY KEY (id),
+        CONSTRAINT ck_financial_document_deliveries_completed CHECK ((state = 'Queued') = (completed_at IS NULL)),
+        CONSTRAINT ck_financial_document_deliveries_counts CHECK (claims >= 0 AND send_attempts >= 0),
+        CONSTRAINT ck_financial_document_deliveries_waiting CHECK ((waiting_reason IS NULL) = (waiting_since IS NULL) AND (state = 'Queued' OR waiting_reason IS NULL)),
+        CONSTRAINT fk_financial_document_deliveries_document FOREIGN KEY (document_id) REFERENCES financial_documents (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE TABLE financial_document_delivery_attempts (
+        id uuid NOT NULL,
+        delivery_id uuid NOT NULL,
+        number integer NOT NULL,
+        outcome character varying(10) NOT NULL,
+        attempted_at timestamp with time zone NOT NULL,
+        error character varying(300),
+        provider character varying(20),
+        provider_message_id character varying(200),
+        english_rendition_id uuid,
+        arabic_rendition_id uuid,
+        CONSTRAINT pk_financial_document_delivery_attempts PRIMARY KEY (id),
+        CONSTRAINT ck_financial_document_delivery_attempts_number CHECK (number >= 1),
+        CONSTRAINT fk_financial_document_delivery_attempts_arabic_rendition FOREIGN KEY (arabic_rendition_id) REFERENCES financial_document_renditions (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_financial_document_delivery_attempts_delivery FOREIGN KEY (delivery_id) REFERENCES financial_document_deliveries (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_financial_document_delivery_attempts_english_rendition FOREIGN KEY (english_rendition_id) REFERENCES financial_document_renditions (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE INDEX ix_financial_document_deliveries_document_id_queued_at ON financial_document_deliveries (document_id, queued_at);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE INDEX ix_financial_document_deliveries_failed ON financial_document_deliveries (queued_at) WHERE state = 'Failed';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE UNIQUE INDEX ix_financial_document_deliveries_one_queued ON financial_document_deliveries (document_id) WHERE state = 'Queued';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE INDEX ix_financial_document_deliveries_queued_due ON financial_document_deliveries (next_attempt_at) WHERE state = 'Queued';
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE INDEX ix_financial_document_delivery_attempts_arabic_rendition_id ON financial_document_delivery_attempts (arabic_rendition_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE UNIQUE INDEX ix_financial_document_delivery_attempts_delivery_id_number ON financial_document_delivery_attempts (delivery_id, number);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    CREATE INDEX ix_financial_document_delivery_attempts_english_rendition_id ON financial_document_delivery_attempts (english_rendition_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+
+    CREATE TRIGGER financial_document_delivery_attempts_append_only
+    BEFORE UPDATE OR DELETE ON financial_document_delivery_attempts
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER financial_document_delivery_attempts_no_truncate
+    BEFORE TRUNCATE ON financial_document_delivery_attempts
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929164711_FinancialDocumentDeliveries') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260929164711_FinancialDocumentDeliveries', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE TABLE office_settlements (
+        id uuid NOT NULL,
+        settlement_number character varying(32) NOT NULL,
+        dealer_id uuid NOT NULL,
+        currency character varying(3) NOT NULL,
+        provider character varying(30) NOT NULL,
+        direction character varying(10) NOT NULL,
+        amount numeric(18,3) NOT NULL,
+        paid_on date NOT NULL,
+        reference character varying(100),
+        note character varying(500),
+        recorded_by_admin_id uuid NOT NULL,
+        recorded_at timestamp with time zone NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_office_settlements PRIMARY KEY (id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE TABLE office_payables (
+        id uuid NOT NULL,
+        booking_id uuid NOT NULL,
+        dealer_id uuid NOT NULL,
+        booking_reference character varying(20) NOT NULL,
+        currency character varying(3) NOT NULL,
+        provider character varying(30) NOT NULL,
+        outcome character varying(30) NOT NULL,
+        final_at timestamp with time zone NOT NULL,
+        recorded_at timestamp with time zone NOT NULL,
+        office_money numeric(18,3) NOT NULL,
+        commission numeric(18,3) NOT NULL,
+        office_charges numeric(18,3) NOT NULL,
+        net numeric(18,3) NOT NULL,
+        calculator_version integer NOT NULL,
+        settlement_id uuid,
+        settled_at timestamp with time zone,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_office_payables PRIMARY KEY (id),
+        CONSTRAINT ck_office_payables_calculator_version CHECK (calculator_version >= 1),
+        CONSTRAINT ck_office_payables_settled CHECK ((settlement_id IS NULL) = (settled_at IS NULL)),
+        CONSTRAINT fk_office_payables_settlement FOREIGN KEY (settlement_id) REFERENCES office_settlements (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE TABLE office_settlement_voids (
+        settlement_id uuid NOT NULL,
+        voided_at timestamp with time zone NOT NULL,
+        voided_by_admin_id uuid NOT NULL,
+        reason character varying(500) NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_office_settlement_voids PRIMARY KEY (settlement_id),
+        CONSTRAINT fk_office_settlement_voids_settlement FOREIGN KEY (settlement_id) REFERENCES office_settlements (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE TABLE office_payable_holds (
+        id uuid NOT NULL,
+        booking_id uuid NOT NULL,
+        dealer_id uuid NOT NULL,
+        payable_id uuid,
+        reason character varying(30) NOT NULL,
+        detail character varying(500),
+        opened_at timestamp with time zone NOT NULL,
+        opened_by_admin_id uuid,
+        checks integer NOT NULL,
+        last_checked_at timestamp with time zone NOT NULL,
+        next_check_at timestamp with time zone,
+        released_at timestamp with time zone,
+        released_by_admin_id uuid,
+        release_note character varying(500),
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_office_payable_holds PRIMARY KEY (id),
+        CONSTRAINT ck_office_payable_holds_checks CHECK (checks >= 0),
+        CONSTRAINT ck_office_payable_holds_manual CHECK ((reason = 'Manual') = (opened_by_admin_id IS NOT NULL) AND (released_by_admin_id IS NULL OR reason = 'Manual')),
+        CONSTRAINT ck_office_payable_holds_payable CHECK ((payable_id IS NULL) = (reason IN ('NeedsReview', 'PenaltyNotWholeDeposit'))),
+        CONSTRAINT fk_office_payable_holds_payable FOREIGN KEY (payable_id) REFERENCES office_payables (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE TABLE office_payable_lines (
+        id uuid NOT NULL,
+        payable_id uuid NOT NULL,
+        position integer NOT NULL,
+        kind character varying(20) NOT NULL,
+        amount numeric(18,3) NOT NULL,
+        source_id uuid,
+        CONSTRAINT pk_office_payable_lines PRIMARY KEY (id),
+        CONSTRAINT ck_office_payable_lines_position CHECK (position >= 1),
+        CONSTRAINT fk_office_payable_lines_payable FOREIGN KEY (payable_id) REFERENCES office_payables (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE TABLE office_settlement_lines (
+        id uuid NOT NULL,
+        settlement_id uuid NOT NULL,
+        payable_id uuid NOT NULL,
+        net numeric(18,3) NOT NULL,
+        CONSTRAINT pk_office_settlement_lines PRIMARY KEY (id),
+        CONSTRAINT fk_office_settlement_lines_payable FOREIGN KEY (payable_id) REFERENCES office_payables (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_office_settlement_lines_settlement FOREIGN KEY (settlement_id) REFERENCES office_settlements (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_dispute_tickets_booking ON dispute_tickets (booking_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE UNIQUE INDEX ix_office_payable_holds_one_open ON office_payable_holds (booking_id, reason) WHERE released_at IS NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payable_holds_open_dealer ON office_payable_holds (dealer_id) WHERE released_at IS NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payable_holds_open_next_check ON office_payable_holds (next_check_at) WHERE released_at IS NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payable_holds_payable_id ON office_payable_holds (payable_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE UNIQUE INDEX ix_office_payable_lines_payable_id_position ON office_payable_lines (payable_id, position);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE UNIQUE INDEX ix_office_payables_booking ON office_payables (booking_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payables_dealer_final ON office_payables (dealer_id, final_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payables_final ON office_payables (final_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payables_open ON office_payables (dealer_id, currency, provider) WHERE settlement_id IS NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_payables_settlement ON office_payables (settlement_id) WHERE settlement_id IS NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_settlement_lines_payable_id ON office_settlement_lines (payable_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE UNIQUE INDEX ix_office_settlement_lines_settlement_id_payable_id ON office_settlement_lines (settlement_id, payable_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_settlements_dealer_recorded ON office_settlements (dealer_id, recorded_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE INDEX ix_office_settlements_paid_on ON office_settlements (paid_on);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    CREATE UNIQUE INDEX ix_office_settlements_settlement_number ON office_settlements (settlement_number);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+
+    ALTER TABLE office_payables ADD CONSTRAINT ck_office_payables_figures
+        CHECK (office_money >= 0 AND commission >= 0 AND office_charges >= 0
+               AND commission <= office_money
+               AND net = office_money - commission - office_charges);
+
+    ALTER TABLE office_payable_lines ADD CONSTRAINT ck_office_payable_lines_amount
+        CHECK (amount > 0);
+
+    ALTER TABLE office_settlements ADD CONSTRAINT ck_office_settlements_direction
+        CHECK ((direction = 'Payout' AND amount > 0)
+            OR (direction = 'Received' AND amount < 0)
+            OR (direction = 'Netted' AND amount = 0));
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+
+    CREATE FUNCTION khadra_office_payable_is_frozen()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        IF TG_OP = 'DELETE' THEN
+            RAISE EXCEPTION 'office_payables is a ledger: DELETE is not permitted';
+        END IF;
+        IF (to_jsonb(NEW) - 'settlement_id' - 'settled_at' - 'updated_at')
+           IS DISTINCT FROM (to_jsonb(OLD) - 'settlement_id' - 'settled_at' - 'updated_at') THEN
+            RAISE EXCEPTION 'office_payables: a payable''s figures are frozen; only its settlement may change';
+        END IF;
+        IF OLD.settlement_id IS NOT NULL AND NEW.settlement_id IS NOT NULL AND OLD.settlement_id <> NEW.settlement_id THEN
+            RAISE EXCEPTION 'office_payables: a payable leaves a settlement only when that settlement is voided';
+        END IF;
+        IF OLD.settlement_id IS NOT DISTINCT FROM NEW.settlement_id AND OLD.settled_at IS DISTINCT FROM NEW.settled_at THEN
+            RAISE EXCEPTION 'office_payables: when a payable was settled is part of its settlement, and never rewritten';
+        END IF;
+        RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE FUNCTION khadra_office_payable_hold_is_kept()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        RAISE EXCEPTION 'office_payable_holds keeps every hold, released or not: % is not permitted', TG_OP;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE TRIGGER office_payables_frozen
+    BEFORE UPDATE OR DELETE ON office_payables
+    FOR EACH ROW EXECUTE FUNCTION khadra_office_payable_is_frozen();
+
+    CREATE TRIGGER office_payables_no_truncate
+    BEFORE TRUNCATE ON office_payables
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_payable_lines_append_only
+    BEFORE UPDATE OR DELETE ON office_payable_lines
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_payable_lines_no_truncate
+    BEFORE TRUNCATE ON office_payable_lines
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_settlements_append_only
+    BEFORE UPDATE OR DELETE ON office_settlements
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_settlements_no_truncate
+    BEFORE TRUNCATE ON office_settlements
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_settlement_lines_append_only
+    BEFORE UPDATE OR DELETE ON office_settlement_lines
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_settlement_lines_no_truncate
+    BEFORE TRUNCATE ON office_settlement_lines
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_settlement_voids_append_only
+    BEFORE UPDATE OR DELETE ON office_settlement_voids
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_settlement_voids_no_truncate
+    BEFORE TRUNCATE ON office_settlement_voids
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER office_payable_holds_kept
+    BEFORE DELETE ON office_payable_holds
+    FOR EACH ROW EXECUTE FUNCTION khadra_office_payable_hold_is_kept();
+
+    CREATE TRIGGER office_payable_holds_no_truncate
+    BEFORE TRUNCATE ON office_payable_holds
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_office_payable_hold_is_kept();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260929195432_OfficePayables') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260929195432_OfficePayables', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261005062940_LegalDocumentVersions') THEN
+    CREATE TABLE legal_document_versions (
+        id uuid NOT NULL,
+        kind character varying(30) NOT NULL,
+        version_label character varying(40) NOT NULL,
+        effective_from timestamp with time zone NOT NULL,
+        published_at timestamp with time zone NOT NULL,
+        published_by_admin_id uuid NOT NULL,
+        body_en text NOT NULL,
+        body_ar text NOT NULL,
+        body_en_sha256 character(64) NOT NULL,
+        body_ar_sha256 character(64) NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_legal_document_versions PRIMARY KEY (id),
+        CONSTRAINT ck_legal_document_versions_bodies CHECK (length(body_en) BETWEEN 1 AND 200000 AND length(body_ar) BETWEEN 1 AND 200000),
+        CONSTRAINT ck_legal_document_versions_effective_from CHECK (effective_from >= published_at),
+        CONSTRAINT ck_legal_document_versions_hashes CHECK (length(body_en_sha256) = 64 AND length(body_ar_sha256) = 64),
+        CONSTRAINT ck_legal_document_versions_kind CHECK (kind IN ('Terms', 'Privacy')),
+        CONSTRAINT ck_legal_document_versions_version_label CHECK (length(version_label) BETWEEN 1 AND 40 AND version_label = trim(version_label))
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261005062940_LegalDocumentVersions') THEN
+    CREATE UNIQUE INDEX ux_legal_document_versions_kind_effective_from ON legal_document_versions (kind, effective_from);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261005062940_LegalDocumentVersions') THEN
+    CREATE UNIQUE INDEX ux_legal_document_versions_kind_version_label ON legal_document_versions (kind, version_label);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261005062940_LegalDocumentVersions') THEN
+
+    CREATE TRIGGER legal_document_versions_append_only
+    BEFORE UPDATE OR DELETE ON legal_document_versions
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER legal_document_versions_no_truncate
+    BEFORE TRUNCATE ON legal_document_versions
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261005062940_LegalDocumentVersions') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20261005062940_LegalDocumentVersions', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    ALTER TABLE payments ADD provider_capture_reference character varying(200);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    ALTER TABLE payment_refunds ADD next_attempt_at timestamp with time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    ALTER TABLE payment_refunds ADD refusal_count integer NOT NULL DEFAULT 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    UPDATE payment_refunds SET refusal_count = 1 WHERE status = 'Failed' AND refusal_count = 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    ALTER TABLE payment_provider_events ADD capture_reference character varying(200);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    CREATE TABLE payment_incidents (
+        id uuid NOT NULL,
+        kind character varying(30) NOT NULL,
+        payment_id uuid NOT NULL,
+        receipt_id uuid NOT NULL,
+        provider character varying(30) NOT NULL,
+        capture_reference character varying(200),
+        reported_amount numeric(18,3) NOT NULL,
+        reported_currency character varying(3) NOT NULL,
+        expected_amount numeric(18,3) NOT NULL,
+        expected_currency character varying(3) NOT NULL,
+        other_payment_id uuid,
+        detected_at timestamp with time zone NOT NULL,
+        handled_at timestamp with time zone,
+        handled_by_admin_id uuid,
+        handled_note character varying(500),
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_payment_incidents PRIMARY KEY (id),
+        CONSTRAINT fk_payment_incidents_payment_provider_events_receipt_id FOREIGN KEY (receipt_id) REFERENCES payment_provider_events (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_payment_incidents_payments_payment_id FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    CREATE UNIQUE INDEX ux_payments_provider_capture_reference ON payments (provider, provider_capture_reference) WHERE provider_capture_reference IS NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    CREATE INDEX ix_payment_incidents_detected_at ON payment_incidents (detected_at) WHERE handled_at IS NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    CREATE INDEX ix_payment_incidents_payment_id ON payment_incidents (payment_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    CREATE UNIQUE INDEX ix_payment_incidents_receipt_id ON payment_incidents (receipt_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261006235151_PaymentCaptureIncidentsAndRefundBackoff') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20261006235151_PaymentCaptureIncidentsAndRefundBackoff', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007001707_BookingDisputeWindowEnd') THEN
+    ALTER TABLE bookings ADD dispute_window_ends_at timestamp with time zone;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007001707_BookingDisputeWindowEnd') THEN
+    CREATE INDEX ix_bookings_status_dispute_window_ends_at ON bookings (status, dispute_window_ends_at) WHERE dispute_window_ends_at IS NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007001707_BookingDisputeWindowEnd') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20261007001707_BookingDisputeWindowEnd', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007025537_LegalConsents') THEN
+    CREATE TABLE legal_consents (
+        id uuid NOT NULL,
+        user_id uuid NOT NULL,
+        document_version_id uuid NOT NULL,
+        occurred_at timestamp with time zone NOT NULL,
+        channel character varying(20) NOT NULL,
+        language character varying(2) NOT NULL,
+        action character varying(20) NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_legal_consents PRIMARY KEY (id),
+        CONSTRAINT ck_legal_consents_action CHECK (action IN ('Accepted')),
+        CONSTRAINT ck_legal_consents_channel CHECK (channel IN ('Website', 'App', 'Console')),
+        CONSTRAINT ck_legal_consents_language CHECK (language IN ('ar', 'en')),
+        CONSTRAINT fk_legal_consents_legal_document_versions_document_version_id FOREIGN KEY (document_version_id) REFERENCES legal_document_versions (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007025537_LegalConsents') THEN
+    CREATE INDEX ix_legal_consents_document_version_id ON legal_consents (document_version_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007025537_LegalConsents') THEN
+    CREATE INDEX ix_legal_consents_user_id_document_version_id ON legal_consents (user_id, document_version_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007025537_LegalConsents') THEN
+    CREATE INDEX ix_legal_consents_user_id_occurred_at ON legal_consents (user_id, occurred_at DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007025537_LegalConsents') THEN
+
+    CREATE TRIGGER legal_consents_append_only
+    BEFORE UPDATE OR DELETE ON legal_consents
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER legal_consents_no_truncate
+    BEFORE TRUNCATE ON legal_consents
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007025537_LegalConsents') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20261007025537_LegalConsents', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007032513_AdminDocumentAccess') THEN
+    ALTER TABLE document_access_entries ALTER COLUMN dealer_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007032513_AdminDocumentAccess') THEN
+    ALTER TABLE document_access_entries ALTER COLUMN booking_id DROP NOT NULL;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007032513_AdminDocumentAccess') THEN
+    ALTER TABLE document_access_entries ADD CONSTRAINT ck_document_access_entries_scope CHECK ((dealer_id IS NOT NULL AND booking_id IS NOT NULL) OR actor_role = 'Admin');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20261007032513_AdminDocumentAccess') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20261007032513_AdminDocumentAccess', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

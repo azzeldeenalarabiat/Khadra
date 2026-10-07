@@ -7,7 +7,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Context | Domain model | Persistence | Use cases and endpoints |
 |---|---|---|---|
 | Identity & Access | done | done | auth done; dashboard read model done |
-| Auditing | done | done | read model done; every dealer review decision writes an entry; `document_access_entries` records every renter-document disclosure |
+| Auditing | done | done | read model done; every dealer review decision writes an entry; `document_access_entries` records every renter-document disclosure, an administrator's included (Wave 4 W4-9: no dealership, no booking) |
 | Dealers | done | done | **registration + full review lifecycle** (approve / reject / clarify / resubmit / suspend / reactivate) |
 | Fleet | done | done | dealer fleet management done; **customer catalogue done** (search, listing, gallery page) |
 | Bookings | done | done | dealer decisions and handover done; **quote done**; creation NOT built |
@@ -18,7 +18,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Shortlist | done | done | **save / forget / list / membership done** |
 | Financial Documents | done | done | **issued by the settlement pass, with holds; customer and administrator endpoints; void and correct** (payments Phase 5a); **read on the website, in the app and in the console** (payments Phase 5b) |
 | Payables | done | done | **the office payables ledger, recorded by the settlement pass; manual settlements, voids and holds; administrator and office endpoints; Payouts and Finance in the console** (payments Phase 8) |
-| Legal | done | done | **the Terms of Service and the Privacy notice, published from the console one append-only version at a time; the version in force read anonymously; pages on the website, links in the console** (Wave 2 G1); consent capture is Wave 4 |
+| Legal | done | done | **the Terms of Service and the Privacy notice, published from the console one append-only version at a time; the version in force read anonymously; pages on the website, links in the console** (Wave 2 G1); **consent captured at registration and invitation, the record readable by its subject, and the website and console refused until a text in force is accepted** (Wave 4 W4-8; the app in 1.4.0, item 238) |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
@@ -419,9 +419,17 @@ migration `Down` that refuses while any version exists.
   a weak ETag naming the version and the renderer. `/app-config` carries a `legal` block: each text in force, and its
   page on the website from `App:CustomerAppBaseUrl`. The block is null, "not known", when the database cannot be
   read, never an empty list (item 228).
-- **Consent (Wave 4)**, designed now so this table never moves: `legal_consents` with the user's bare id, the version
-  id (FK, restrict), when, channel and language as smart enums, and an action (a withdrawal is a new row); not
-  unique; no IP address or user agent.
+- **Consent (Wave 4 W4-8, built 2026-10-07).** `LegalConsent` (`legal_consents`), append-only like the versions: the
+  user's bare id, the version id (FK, restrict), when, channel (`Website`, `App`, `Console`) and language as smart
+  enums with CHECKs, and an action (`Accepted`; a withdrawal would be a new row). Not unique, but a version already
+  accepted writes nothing. No IP address or user agent. Its `Down` refuses once anybody has consented.
+  - **Captured** in the account's own save by `LegalConsentRecorder` (website and app registration, dealer-owner
+    registration, staff invitations; an administrator's invitation asks nothing), and later through
+    `POST /auth/me/legal-consents`. `ILegalConsentReader.PendingAsync` is the one statement of "pending": the gate,
+    the prompt and `/auth/me` all ask it.
+  - **Enforced** by `LegalConsentGate`, after authorization: 403 `legal.consent_pending` for a signed-in request from
+    somebody with a text pending, except what resolves it. It never judges an administrator (the texts do not address
+    Khadra's staff) or a request that declares an app version (item 238); both BFFs strip that header.
 
 ## Owner decisions required
 

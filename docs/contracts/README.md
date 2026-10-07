@@ -101,6 +101,18 @@ session, and never reads it as bad credentials.
 `/api/v1/app-config`; and every request that is not the app — the console through the BFF, browsers,
 server-to-server calls, CORS preflights.
 
+## The version header and the consent gate (Wave 4, W4-8)
+
+The header has a second reader. `LegalConsentGate` refuses a signed-in request from somebody who has not accepted a
+legal text in force — 403 `legal.consent_pending`, with `pending[]` — and it does **not** judge a request that
+declares an app version: no installed build knows to ask for consent, and an installed build cannot be patched. The
+app's own checkbox and prompt arrive in 1.4.0.
+
+So a browser must never be able to pass for the app: **both BFFs strip `X-Khadra-App-Version`** from everything they
+forward (`ProxyRequestHeaders`), and `BffProxyRequestHeadersTests` pins it. A caller holding a customer's own token and
+calling the API directly can still declare a version and skip the gate; pre-launch item 238 records that, and it
+closes in the release that raises `MobileApp:MinimumSupportedVersion` to 1.4.0 — published first, as always.
+
 ## Version order
 
 [Semantic Versioning 2.0.0](https://semver.org/#spec-item-11) precedence, never text comparison:

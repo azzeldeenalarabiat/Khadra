@@ -538,7 +538,7 @@ let the customer search filter by it.
 
 ### 27. Admins cannot view a customer's identity documents
 
-**Status:** open by decision · **Raised:** 2026-09-04 · **See also:** item 63, which the owner has made a hard launch blocker
+**Status:** built, awaiting the Staging check (Wave 4) · **Raised:** 2026-09-04 · **See also:** item 63, which the owner has made a hard launch blocker
 
 The customer profile lists what is on file — type, state, format, size, when — and mints no signed
 URL. `CustomerDocument` scopes viewing to the customer themselves and to a dealer with an active
@@ -551,6 +551,20 @@ is the owner's call, not a convenience to add quietly. Cheap to add once decided
 
 **To close:** the owner decides whether an Admin may open these, and whether admin review is how a
 document becomes verified. Then a signed link and the two review actions.
+
+**Decided and built, 2026-10-07 (owner D3 = A; Fix & Polish Wave 4 W4-9, `fix/polish-wave4`), awaiting the Staging
+check.** An administrator may open a renter's document and reject it, and nothing on the platform ever calls one
+verified: `MarkVerified` is gone, and `Verified` stays in the enum only because stored values are add-only.
+
+- Opening streams the file through `GET /api/v1/admin/customers/{id}/documents/{documentId}` under the Admin policy
+  and the private-documents limiter. There is no signed link, so item 14 is not widened. The view is written to
+  `document_access_entries` before a byte is sent, with no dealership and no booking — admitted for an administrator
+  only by `ck_document_access_entries_scope`. The console offers the file only from inside the reject dialog.
+- Rejecting (`POST …/reject`) takes a reason (500) and the `uploadedAt` the profile showed, so a file the customer
+  replaced since is refused (409 `documents.changed_since_viewed`), in memory and by the document's own `xmin`
+  token. It is audited in the same save as `CustomerDocumentRejected`. The customer is told by `YourDocumentRejected`
+  (push and email, never the reason), and a rejected file counts as not filed: a new request is refused until they
+  upload another. Bookings already made are not touched; the office still checks at pickup.
 
 ### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
 
@@ -5538,12 +5552,25 @@ subject; links on every client; clients enforce first, the server only in a rele
 - The website's `/{en,ar}/terms` and `/{en,ar}/privacy` pages, footer links and sitemap entries.
 - Links on the console's sign-in, registration and invitation pages, from `/app-config`.
 
+**Consent built, 2026-10-07 (Wave 4 W4-8, `fix/polish-wave4`), awaiting the Staging check.** Owner decisions D6
+(existing accounts are blocked by a prompt, not shown a banner) and D7 (the server enforces it now for every caller
+that is not the app), approved with administrators exempt:
+
+- `legal_consents`, append-only with row and TRUNCATE triggers: who, which version, when, channel (Website, App,
+  Console) and the language read. No address and no user agent. A second acceptance writes nothing.
+- Registration on the website, dealer-owner registration and staff invitations accept the texts in force with a
+  required checkbox; the account and its consents are saved together. A replaced text answers 409
+  `legal.version_not_current`, and a missing consent 400 `legal.consent_required`; both clients reload the texts and
+  ask again. An administrator's invitation asks for nothing.
+- `GET`/`POST /api/v1/auth/me/legal-consents` give the data subject their record and what is pending, and accept;
+  `/auth/me` carries `pendingConsents`.
+- `LegalConsentGate` refuses every other signed-in website or console request with 403 `legal.consent_pending` while
+  a text is pending. Both clients answer it with one prompt in place of the page.
+
 Still open, so the item stays open:
 
 - the texts themselves (DRAFT, for the owner's review, then legal review before any Production use);
-- the consent record and its capture (Wave 4);
-- the app's link and consent (1.4.0);
-- server enforcement, only in a release that raises the minimum app version;
+- the app's link, checkbox and prompt (1.4.0), and the gate's exemption for the app until then (item 238);
 - items 228 and 229.
 
 ### 225. A pickup and its code are allowed at any time before the rental starts
@@ -5746,3 +5773,22 @@ pages; and the logs hold no `EMAXCONNSESSION`, no pool exhaustion and no other d
 overlap, a backup and a person's SQL session. Do it either with `Maximum Pool Size` in its connection string, as on
 Staging, or with a tracked `Database:MaxPoolSize` applied to the data source, so that nobody has to edit a secret.
 Otherwise size the pooler for the plan. Either way, write the cap into `docs/deployment.md` and `docs/production.md`.
+
+### 238. The customer app is not asked for consent, and anything that declares an app version is not judged
+
+**Status:** open, launch blocker with item 224 · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's
+consent design)
+
+Since Wave 4 the API refuses a signed-in website or console request from somebody who has not accepted a legal text
+in force (403 `legal.consent_pending`, item 224). It does not judge a request that declares an app version
+(`X-Khadra-App-Version`): no installed build knows to ask for consent, an installed build cannot be patched, and a
+refusal it cannot word would lock customers out of the app. For the same reason an app registration is not required
+to carry consent (`RegisterCustomerCommand`, `ClientInfo.IsCustomerApp`). Both BFFs strip the header, so a browser can
+never pass for the app; a caller holding a customer's own token and calling the API directly can, and skip the gate.
+Until this closes, a customer who registers or keeps using the app has no consent on record.
+
+**To close, in the release that raises the minimum (Wave 7, app 1.4.0):** the app shows the checkbox on registration
+and the prompt on `pendingConsents` or 403 `legal.consent_pending` (the 1.4.0 ledger in
+`docs/fix-and-polish-ledger.md`). Publish 1.4.0 first; then deploy the API with `MobileApp:MinimumSupportedVersion`
+raised to 1.4.0, consent required of the app's registration, and the gate's exemption for a declared version removed —
+every build the minimum still admits can answer it then. `docs/contracts/README.md` describes the exemption.
