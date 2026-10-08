@@ -8,14 +8,17 @@ namespace Khadra.WebAPI.Controllers;
 /// Serves a private document to a caller holding a valid short-lived link (spec 7).
 ///
 /// Two independent checks, deliberately. The signature proves the link was minted by this platform
-/// for this exact file and has not expired; the inherited authentication requirement proves there is
-/// still a live session behind the request. A signature alone would turn a leaked URL into a working
-/// one for as long as it lasted, and a session alone would let any signed-in user enumerate keys.
+/// for this exact file, for THIS signed-in person, and has not expired; the inherited authentication
+/// requirement proves there is still a live session behind the request. A signature alone would turn a
+/// leaked URL into a working one for as long as it lasted, and a session alone would let any signed-in
+/// user enumerate keys. Binding the signature to the viewer (pre-launch item 14) is what stops a link
+/// an administrator minted from working in a customer's session, or one customer's in another's.
 /// </summary>
 [Route("api/v1/documents")]
 public sealed class DocumentsController(
     IDocumentStorage storage,
     IDocumentLinkSigner signer,
+    Application.Common.ICurrentActor actor,
     Application.Common.IClock clock) : ApiControllerBase
 {
     // PrivateDocuments, not Auth (payments Phase 6): on a GET, Auth is ten a minute per ADDRESS, and a carrier's
@@ -33,9 +36,10 @@ public sealed class DocumentsController(
         if (!signer.TryDecodeToken(token, out var storageKey))
             return NotFound();
 
-        // A bad or stale signature is reported as "not found", not "forbidden": a 403 would confirm
-        // that the document exists to someone holding nothing but a guessed key.
-        if (!signer.IsValid(storageKey, expires, signature, clock.UtcNow))
+        // A bad or stale signature, or one minted for somebody else, is reported as "not found", not
+        // "forbidden": a 403 would confirm that the document exists to someone holding nothing but a
+        // guessed key or another person's link.
+        if (actor.UserId is not { } viewer || !signer.IsValid(storageKey, expires, signature, viewer, clock.UtcNow))
             return NotFound();
 
         var content = await storage.OpenAsync(storageKey, cancellationToken);

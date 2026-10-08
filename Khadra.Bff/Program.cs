@@ -30,6 +30,8 @@ if (builder.Environment.IsDevelopment())
     builder.Configuration.AddUserSecrets<BffAssemblyMarker>(optional: true);
 builder.Configuration.AddEnvironmentVariables();
 
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = BffConstants.MaxRequestBodyBytes);
+
 // One codebase, two deployments: the staff console and the customer website. What differs between them
 // -- the route table, the roles allowed a session, cookie names, what serves the pages -- is a file per
 // deployment, loaded just above appsettings.Local.json so the environment still overrides it. A file
@@ -116,6 +118,7 @@ builder.Services.AddDataProtection()
     .PersistKeysToStackExchangeRedis(redis, realm.KeyRingKey);
 
 builder.Services.AddSingleton<DistributedCacheTicketStore>();
+builder.Services.AddSingleton<SessionActivity>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, ConfigureSessionCookie>();
 builder.Services.AddScoped<BffAccessTokenService>();
 builder.Services.AddScoped<AuthApiClient>();
@@ -160,6 +163,17 @@ builder.Services
             {
                 var role = context.Principal?.FindFirstValue(ClaimTypes.Role);
                 if (role is null || !allowedRoles.Contains(role))
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(BffConstants.CookieScheme);
+                    return;
+                }
+
+                // The idle timeout, on the server's own clock and out of reach of background polling (pre-launch
+                // item 129). Ended the same way as a refused role: the cookie goes, and the console's next call is a
+                // 401 that takes it to sign-in.
+                var activity = context.HttpContext.RequestServices.GetRequiredService<SessionActivity>();
+                if (!await activity.TouchAsync(context.Properties, context.HttpContext.Request, DateTimeOffset.UtcNow))
                 {
                     context.RejectPrincipal();
                     await context.HttpContext.SignOutAsync(BffConstants.CookieScheme);
@@ -679,6 +693,7 @@ static async Task SignInAsync(HttpContext context, ApiAuthTokens tokens, BffSecu
     };
     SessionLifetime.Start(properties, now, tokens.RefreshTokenExpiresAt, security.SessionAbsoluteHours);
     BffAccessTokenService.StoreTokens(properties, tokens);
+    await context.RequestServices.GetRequiredService<SessionActivity>().StartAsync(properties, now);
 
     var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, BffConstants.CookieScheme, ClaimTypes.Name, ClaimTypes.Role));
     await context.SignInAsync(BffConstants.CookieScheme, principal, properties);

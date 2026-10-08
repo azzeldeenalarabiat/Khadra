@@ -7,6 +7,10 @@ namespace Khadra.Domain.Auditing;
 // A smart enum rather than a free string on purpose: the audit screen and the activity feed both have
 // to turn an action into readable text, and a controlled vocabulary makes that mapping total. Adding
 // an action becomes a deliberate act, which is what an audit trail wants.
+//
+// ADD-ONLY (pre-launch item 19): rows store the NAME and are read back through Enumeration.FromName, which throws
+// for a name that no longer exists. Renaming or removing a member makes every row carrying it unreadable, and audit
+// rows cannot be corrected. Add members; never rename or remove one. PersistedEnumerationNamesTests holds the list.
 public sealed class AuditAction : Enumeration
 {
     public static readonly AuditAction DealerApproved = new(1, "DealerApproved");
@@ -89,6 +93,9 @@ public sealed class AuditAction : Enumeration
     }
 }
 
+// ADD-ONLY (pre-launch item 19): rows store the NAME and are read back through Enumeration.FromName, which throws
+// for a name that no longer exists. Renaming or removing a member makes every row carrying it unreadable, and audit
+// rows cannot be corrected. Add members; never rename or remove one. PersistedEnumerationNamesTests holds the list.
 public sealed class AuditEntityType : Enumeration
 {
     public static readonly AuditEntityType Dealer = new(1, "Dealer");

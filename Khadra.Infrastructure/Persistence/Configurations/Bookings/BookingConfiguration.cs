@@ -162,21 +162,21 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         entity.HasMany(booking => booking.Handovers)
             .WithOne()
             .HasForeignKey(handover => handover.BookingId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(Booking.Handovers))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         entity.HasMany(booking => booking.StatusHistory)
             .WithOne()
             .HasForeignKey(change => change.BookingId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(Booking.StatusHistory))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         entity.HasMany(booking => booking.RenterDocumentReviews)
             .WithOne()
             .HasForeignKey(review => review.BookingId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(Booking.RenterDocumentReviews))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 

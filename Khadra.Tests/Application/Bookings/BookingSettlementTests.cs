@@ -124,7 +124,12 @@ public sealed class BookingSettlementTests
 
         public SettleDueBookingsHandler Handler() =>
             new(Bookings, Payments, Disputes, Dealers, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork,
-                NullLogger<SettleDueBookingsHandler>.Instance);
+                Reported, Log);
+
+        /// <summary>Which failures this "process" has reported (pre-launch item 236): one per test unless shared.</summary>
+        public RepeatedFailureLog Reported { get; init; } = new();
+
+        public RecordingLogger<SettleDueBookingsHandler> Log { get; } = new();
 
         public Task<CSharpFunctionalExtensions.Result<SettlementReport, Error>> Run() =>
             Handler().Handle(new SettleDueBookingsCommand(), CancellationToken.None);
@@ -434,6 +439,47 @@ public sealed class BookingSettlementTests
         Assert.Single(payment.Refunds);
         Assert.Equal(1, report.Value.MarkedNoShow);
         Assert.Equal(1, report.Value.Failed);
+    }
+
+    /// <summary>
+    /// Pre-launch item 236: a booking that fails the same way every pass is reported at Error once per process and at
+    /// Debug after that — one problem, not one a minute — and is still counted as deferred every pass.
+    /// </summary>
+    [Fact]
+    public async Task A_booking_that_fails_the_same_way_every_pass_is_an_error_once_per_process()
+    {
+        var process = new RepeatedFailureLog();
+        var (orphaned, _) = Build.PaidBooking(inFull: true);
+
+        var levels = new List<Microsoft.Extensions.Logging.LogLevel>();
+        for (var pass = 0; pass < 3; pass++)
+        {
+            var context = new Context { Reported = process };
+            context.Clock.UtcNow = orphaned.Period.Start.Add(orphaned.Terms.NoShowTimeout).AddMinutes(1);
+            context.DueForNoShow(orphaned);
+
+            Assert.Equal(1, (await context.Run()).Value.Failed);
+            levels.AddRange(context.Log.Entries.Where(entry => entry.Id.Id == 2102).Select(entry => entry.Level));
+        }
+
+        Assert.Equal(
+            [Microsoft.Extensions.Logging.LogLevel.Error, Microsoft.Extensions.Logging.LogLevel.Debug, Microsoft.Extensions.Logging.LogLevel.Debug],
+            levels);
+        // A restart is a new process, and says it again.
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, new RepeatedFailureLog().LevelFor($"2102:{orphaned.Reference.Value}"));
+    }
+
+    [Fact]
+    public void A_different_booking_or_a_different_failure_is_a_new_error()
+    {
+        var process = new RepeatedFailureLog();
+
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, process.LevelFor("2104:KH-1:System.InvalidOperationException"));
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Debug, process.LevelFor("2104:KH-1:System.InvalidOperationException"));
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, process.LevelFor("2104:KH-1:System.TimeoutException"));
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, process.LevelFor("2104:KH-2:System.InvalidOperationException"));
+        process.Forget("2104:KH-1:System.InvalidOperationException");
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, process.LevelFor("2104:KH-1:System.InvalidOperationException"));
     }
 
     /// <summary>A gallery cancelled a paid booking after the free window: the penalty is against the office.</summary>

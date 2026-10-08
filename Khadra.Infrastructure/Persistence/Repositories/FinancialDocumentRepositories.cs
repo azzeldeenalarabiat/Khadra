@@ -93,6 +93,22 @@ internal sealed class FinancialDocumentRenditionRepository(KhadraDbContext conte
             .ToListAsync(cancellationToken);
 
     public void Add(FinancialDocumentRendition rendition) => context.FinancialDocumentRenditions.Add(rendition);
+
+    public Task<FinancialDocumentRenditionHold?> HoldAsync(
+        Id documentId,
+        Language language,
+        RenditionKind kind,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        ArgumentNullException.ThrowIfNull(kind);
+        return context.FinancialDocumentRenditionHolds
+            .SingleOrDefaultAsync(
+                hold => hold.DocumentId == documentId && hold.Language == language && hold.Kind == kind,
+                cancellationToken);
+    }
+
+    public void AddHold(FinancialDocumentRenditionHold hold) => context.FinancialDocumentRenditionHolds.Add(hold);
 }
 
 /// <summary>The emails owed for issued receipts (payments Phase 7): the outbox the email service works.</summary>

@@ -38,7 +38,9 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
                 context.Bookings
                     .Where(booking => booking.Id == ticket.BookingId)
                     .Select(booking => booking.Reference.Value)
-                    .FirstOrDefault() ?? "—",
+                    // Null when the booking does not resolve, never an invented "—" (pre-launch item 108): bookings are
+                    // never deleted, so it cannot happen, and if it does the console says so in its own words.
+                    .FirstOrDefault(),
                 // Each party's name arrives as null when it no longer resolves. The Admin console is
                 // the only reader and words that in the reader's language; the English it used to be
                 // sent here reached an Arabic screen as it was.

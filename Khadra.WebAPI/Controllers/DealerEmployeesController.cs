@@ -39,7 +39,7 @@ public sealed class DealerEmployeesController(ICurrentActor actor) : ApiControll
 
     /// <summary>Creates the account and emails an invitation; the person sets their own password.</summary>
     [HttpPost]
-    [ProducesResponseType<EmployeeListItem>(StatusCodes.Status201Created)]
+    [ProducesResponseType<InvitedEmployee>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> Invite([FromBody] InviteRequest request, CancellationToken cancellationToken)
     {

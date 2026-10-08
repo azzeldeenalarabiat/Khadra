@@ -51,7 +51,7 @@ public sealed class DocumentAccessRecorder(IDocumentAccessLog log, ICurrentActor
         log.Record(DocumentAccessEntry.Record(
             action,
             actorUserId,
-            actor.Name ?? "Unknown",
+            actor.RecordedName(actorUserId),
             role,
             dealerId,
             bookingId,
@@ -78,7 +78,7 @@ public sealed class DocumentAccessRecorder(IDocumentAccessLog log, ICurrentActor
 
         log.Record(DocumentAccessEntry.RecordAdminView(
             actorUserId,
-            actor.Name ?? "Unknown",
+            actor.RecordedName(actorUserId),
             subjectUserId,
             documentId,
             documentType,

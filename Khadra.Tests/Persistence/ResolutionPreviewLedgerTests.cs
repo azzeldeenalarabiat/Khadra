@@ -68,6 +68,7 @@ public sealed class ResolutionPreviewLedgerTests : IDisposable
             new BookingReader(context),
             new DisputeAdminReader(context),
             Substitute.For<IDocumentLinkSigner>(),
+            actor,
             new DisputeTicketRepository(context),
             dashboard,
             new OfficePayableRepository(context),

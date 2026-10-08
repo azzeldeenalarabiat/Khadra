@@ -77,6 +77,14 @@ public static class IdentityErrors
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("auth.invalid_credentials", "The email or password is incorrect.");
 
+    /// <summary>
+    /// Too many failed sign-ins for one account name (pre-launch item 51). Deliberately the code and the words of the
+    /// rate-limiting middleware's own 429: the same answer whichever layer refused, and whether or not an account holds
+    /// the name, so the refusal says nothing about who is registered.
+    /// </summary>
+    public static Error TooManySignInAttempts(TimeSpan retryAfter) =>
+        Error.TooManyRequests("rate_limited", "Too many requests. Try again later.", retryAfter);
+
     public static readonly Error EmailNotVerified =
         Error.Forbidden("auth.email_not_verified", "Verify your email address before signing in.");
 

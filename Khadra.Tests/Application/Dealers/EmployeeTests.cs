@@ -123,6 +123,30 @@ public sealed class EmployeeTests
         Assert.Equal(context.Opaque.Issued.Single().Value, email.HtmlBody);
     }
 
+    /// <summary>
+    /// Pre-launch item 47: the owner is told when the first invitation did not go out. The employee is created either
+    /// way — the account is committed before the email is attempted — so the list can offer to resend it.
+    /// </summary>
+    [Fact]
+    public async Task The_first_invitation_says_whether_its_email_went_out()
+    {
+        var delivered = new Context();
+        Assert.True((await delivered.Handlers().Handle(Invite(OwnerId), CancellationToken.None)).Value.InvitationEmailSent);
+
+        var refused = new Context();
+        refused.Sender.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns<Task<EmailSendReceipt>>(_ => throw new InvalidOperationException("550 relay refused"));
+
+        var result = await refused.Handlers().Handle(Invite(OwnerId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.InvitationEmailSent);
+        // Still the list's own row, every field of it: the employee exists and is waiting on an invitation.
+        Assert.Equal("Invited", result.Value.Status);
+        Assert.Equal(Assert.Single(refused.Dealer.Employees).Id.Value, result.Value.EmployeeId);
+        await refused.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task An_employee_cannot_invite_anyone()
     {

@@ -45,6 +45,8 @@ public static class DependencyInjection
         services.AddScoped<Bookings.BookingEmailDispatcher>();
         // Issued financial documents (payments Phase 5): the composer is pure, the other two share the scope.
         services.AddSingleton<FinancialDocuments.Composition.FinancialDocumentComposer>();
+        // Which repeated sweep failures this process has already reported at Error (pre-launch item 236).
+        services.AddSingleton<Common.RepeatedFailureLog>();
         services.AddScoped<FinancialDocuments.Issuance.DocumentPreparation>();
         services.AddScoped<FinancialDocuments.Issuance.FinancialDocumentIssuing>();
 

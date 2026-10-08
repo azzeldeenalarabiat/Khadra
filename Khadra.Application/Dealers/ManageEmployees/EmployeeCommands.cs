@@ -17,7 +17,39 @@ namespace Khadra.Application.Dealers.ManageEmployees;
 // pipeline policy (ApprovedDealer) has already required the business to be able to trade.
 
 public sealed record InviteEmployeeCommand(Id OwnerUserId, string FullName, string Email, string Phone, bool CanViewReports)
-    : ICommand<Result<EmployeeListItem, Error>>;
+    : ICommand<Result<InvitedEmployee, Error>>;
+
+/// <summary>
+/// The new member of staff as the list shows them, and whether the invitation email was accepted for delivery
+/// (pre-launch item 47).
+/// </summary>
+/// <remarks>
+/// Flat — every field of <see cref="EmployeeListItem"/> plus one — so a console that reads only the list item's fields
+/// reads this unchanged. <see cref="InvitationEmailSent"/> is not a fact the list can carry: the reader rebuilds rows
+/// from the database, and "was this one message accepted" is not stored. It is the answer to this request only.
+/// </remarks>
+public sealed record InvitedEmployee(
+    Guid EmployeeId,
+    Guid UserId,
+    string FullName,
+    string Email,
+    string Phone,
+    bool CanViewReports,
+    bool IsActive,
+    string Status,
+    DateTimeOffset? LastLoginAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DeactivatedAt,
+    bool InvitationEmailSent)
+{
+    public static InvitedEmployee From(EmployeeListItem item, bool invitationEmailSent)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return new InvitedEmployee(
+            item.EmployeeId, item.UserId, item.FullName, item.Email, item.Phone, item.CanViewReports, item.IsActive,
+            item.Status, item.LastLoginAt, item.CreatedAt, item.DeactivatedAt, invitationEmailSent);
+    }
+}
 
 public sealed record ResendEmployeeInvitationCommand(Id OwnerUserId, Id EmployeeId) : ICommand<Result<EmployeeListItem, Error>>;
 
@@ -49,14 +81,14 @@ public sealed class EmployeeHandlers(
     Notifications.DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork) :
-    IRequestHandler<InviteEmployeeCommand, Result<EmployeeListItem, Error>>,
+    IRequestHandler<InviteEmployeeCommand, Result<InvitedEmployee, Error>>,
     IRequestHandler<ResendEmployeeInvitationCommand, Result<EmployeeListItem, Error>>,
     IRequestHandler<SetEmployeeReportAccessCommand, Result<EmployeeListItem, Error>>,
     IRequestHandler<DeactivateEmployeeCommand, Result<EmployeeListItem, Error>>,
     IRequestHandler<ReactivateEmployeeCommand, Result<EmployeeListItem, Error>>,
     IRequestHandler<ListMyEmployeesQuery, Result<IReadOnlyList<EmployeeListItem>, Error>>
 {
-    public async Task<Result<EmployeeListItem, Error>> Handle(InviteEmployeeCommand request, CancellationToken cancellationToken)
+    public async Task<Result<InvitedEmployee, Error>> Handle(InviteEmployeeCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -81,16 +113,13 @@ public sealed class EmployeeHandlers(
 
         // After commit, and deliberately not a reason to fail: the employee EXISTS now, and throwing
         // that away because a relay hiccuped would be worse than an unsent email that can be re-sent
-        // from the list.
-        //
-        // The owner is nonetheless not told when it fails, and the row looks identical either way --
-        // "Invited, has not set a password yet" -- so they wait for an email nobody sent. Saying so
-        // needs a command result carrying the outcome beside the read model, which EmployeeListItem
-        // cannot hold because the reader rebuilds it from the database. Checklist item 47.
-        await emails.SendEmployeeInvitationAsync(
+        // from the list. But the owner is TOLD (pre-launch item 47): the row would otherwise read
+        // "Invited, has not set a password yet" either way, and they would wait for an email nobody sent.
+        var delivered = await emails.SendEmployeeInvitationAsync(
             provisioned.Value.User, dealer.BusinessName.Value, provisioned.Value.RawInvitationToken, cancellationToken);
 
-        return await ItemAsync(dealer.Id, hired.Value.Id, cancellationToken);
+        var item = await ItemAsync(dealer.Id, hired.Value.Id, cancellationToken);
+        return item.IsFailure ? item.Error : InvitedEmployee.From(item.Value, delivered);
     }
 
     public async Task<Result<EmployeeListItem, Error>> Handle(ResendEmployeeInvitationCommand request, CancellationToken cancellationToken)

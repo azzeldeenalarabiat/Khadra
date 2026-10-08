@@ -21,6 +21,10 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         entity.Property(notification => notification.ActorName)
             .HasMaxLength(Notification.MaxActorNameLength)
             .IsRequired();
+        // Null for a named actor and for every row written before 2026-10-08 (pre-launch item 103).
+        entity.Property(notification => notification.ActorStandIn)
+            .HasConversion(standIn => standIn!.Name, name => Domain.Common.Enumeration.FromName<NotificationStandIn>(name))
+            .HasMaxLength(20);
         entity.Property(notification => notification.OccurredAt).IsRequired();
         entity.Property(notification => notification.DueAt);
         entity.Property(notification => notification.ReadAt);

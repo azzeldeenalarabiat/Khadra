@@ -85,8 +85,10 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
             // ToLowerInvariant instead, which is what the analyzer would accept, is exactly the thing
             // that does NOT translate, and the query would fail at runtime.
 #pragma warning disable CA1304, CA1311
+            // The Arabic name too (item 176), so a city is found by the name its reader knows it by.
             query = query.Where(entry =>
                 EF.Functions.Like(entry.SubjectLabel.ToLower(), pattern, @"\") ||
+                (entry.SubjectLabelAr != null && EF.Functions.Like(entry.SubjectLabelAr.ToLower(), pattern, @"\")) ||
                 EF.Functions.Like(entry.ActorName.ToLower(), pattern, @"\"));
 #pragma warning restore CA1304, CA1311
         }
@@ -125,7 +127,8 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
                 row.NewValue,
                 row.Reason,
                 row.CorrelationId,
-                row.Booking?.Value))
+                row.Booking?.Value,
+                row.SubjectLabelAr))
             .ToList();
 
         return new PagedResult<AuditLogEntry>(items, page.Page, page.PageSize, total);

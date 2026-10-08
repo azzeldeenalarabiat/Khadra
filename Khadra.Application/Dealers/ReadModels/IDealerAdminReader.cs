@@ -19,6 +19,9 @@ public sealed record DealerListItem(
     bool CanTrade,
     DateTimeOffset SubmittedAt,
     DateTimeOffset ReviewDueAt,
+    // Whether the application has outlived its review promise at the moment the list was read (pre-launch item 106):
+    // the server's own clock, which the console consults beside the browser's, as it does on the review screen.
+    bool IsBreachingSla,
     DateTimeOffset CreatedAt,
     int DocumentCount,
     // How many DocumentCount is measured against. It is the same number on every row, and it is on
@@ -41,8 +44,10 @@ public sealed record DealerListFilter(string? Status, bool? SuspendedOnly, strin
 
 public interface IDealerAdminReader
 {
+    /// <param name="now">The moment the SLA flag on each row is judged at.</param>
     Task<PagedResult<DealerListItem>> ListAsync(
         DealerListFilter filter,
         PageRequest page,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 }

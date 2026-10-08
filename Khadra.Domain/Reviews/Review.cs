@@ -27,6 +27,34 @@ public static class ReviewErrors
     public static readonly Error ReputationNotAvailable = Error.Conflict(
         "review.reputation_not_available",
         "A customer's history is only visible while you have a live booking with them.");
+
+    public static readonly Error NotFound = Error.NotFound("review.not_found", "No such review.");
+
+    public static readonly Error AlreadyHidden =
+        Error.Conflict("review.already_hidden", "This review is already hidden.");
+
+    public static readonly Error NotHidden =
+        Error.Conflict("review.not_hidden", "This review is not hidden.");
+}
+
+/// <summary>
+/// Why an administrator hid a review (pre-launch item 81): a closed list, the four policy reasons the design names.
+/// </summary>
+/// <remarks>
+/// A code rather than prose for the same reason rejections and cancellations became codes: a reason nobody has to read
+/// to count, which each console words in its reader's language, and which writes no administrator's sentence into the
+/// append-only audit trail. Stored by name, so the list is add-only (item 19; PersistedEnumerationNamesTests holds it).
+/// </remarks>
+public sealed class ReviewHideReason : Enumeration
+{
+    public static readonly ReviewHideReason PersonalContactDetails = new(1, "PersonalContactDetails");
+    public static readonly ReviewHideReason AbusiveLanguage = new(2, "AbusiveLanguage");
+    public static readonly ReviewHideReason NotAboutThisRental = new(3, "NotAboutThisRental");
+    public static readonly ReviewHideReason SpamOrPromotion = new(4, "SpamOrPromotion");
+
+    private ReviewHideReason(int id, string name) : base(id, name)
+    {
+    }
 }
 
 public sealed class ReviewDirection : Enumeration
@@ -118,7 +146,7 @@ public sealed class Review : AggregateRoot
     public DateTimeOffset VisibleFrom { get; private set; }
 
     public bool IsHidden { get; private set; }
-    public string? HiddenReason { get; private set; }
+    public ReviewHideReason? HiddenReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset? UpdatedAt { get; private set; }
 
@@ -205,17 +233,35 @@ public sealed class Review : AggregateRoot
         return UnitResult.Success<Error>();
     }
 
-    // Admin moderation (spec 3.2). Hiding removes the text from display; the rating still counts,
-    // because letting a dealer erase a bad score by reporting it would corrupt the rating system.
-    public void Hide(string reason)
+    /// <summary>
+    /// Admin moderation (spec 3.2; pre-launch item 81). What hiding takes away depends on the direction
+    /// (<see cref="ReviewDirection.HiddenScoreStillCounts"/>): a customer's review of a gallery loses its text and keeps
+    /// its score, so a gallery cannot erase a bad rating by reporting it; a gallery's rating of a customer stops counting
+    /// at all, because the score is the only thing it has.
+    /// </summary>
+    /// <remarks>
+    /// Refused on a review already hidden, rather than quietly re-hidden: every hide is an audit entry, and a second
+    /// click must not write a second one claiming another decision was made.
+    /// </remarks>
+    public UnitResult<Error> Hide(ReviewHideReason reason)
     {
+        ArgumentNullException.ThrowIfNull(reason);
+        if (IsHidden)
+            return UnitResult.Failure(ReviewErrors.AlreadyHidden);
+
         IsHidden = true;
-        HiddenReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        HiddenReason = reason;
+        return UnitResult.Success<Error>();
     }
 
-    public void Unhide()
+    /// <summary>Puts a hidden review back as it was. Refused on one that is not hidden, for the same reason.</summary>
+    public UnitResult<Error> Unhide()
     {
+        if (!IsHidden)
+            return UnitResult.Failure(ReviewErrors.NotHidden);
+
         IsHidden = false;
         HiddenReason = null;
+        return UnitResult.Success<Error>();
     }
 }

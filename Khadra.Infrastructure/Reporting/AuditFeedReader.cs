@@ -35,6 +35,7 @@ internal sealed class AuditFeedReader(KhadraDbContext context) : IAuditFeedReade
             row.EntityType,
             row.SubjectLabel,
             row.EntityId,
-            row.Booking?.Value))];
+            row.Booking?.Value,
+            row.SubjectLabelAr))];
     }
 }

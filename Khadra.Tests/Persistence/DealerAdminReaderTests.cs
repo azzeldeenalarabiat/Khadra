@@ -57,7 +57,8 @@ public sealed class DealerAdminReaderTests : IDisposable
         await using var read = new KhadraDbContext(_options);
         var page = await new DealerAdminReader(read).ListAsync(
             new DealerListFilter(null, null, null),
-            new PageRequest(1, 20));
+            new PageRequest(1, 20),
+            Build.Now);
         return page.Items;
     }
 
@@ -90,6 +91,22 @@ public sealed class DealerAdminReaderTests : IDisposable
         Assert.Equal(
             ["Jerash Rentals", "Salt Vehicle Rental", "Wadi Rum Motors"],
             rows.Select(row => row.BusinessName));
+        // The server says which promise is already broken (pre-launch item 106), on its own clock.
+        Assert.Equal([true, false, false], rows.Select(row => row.IsBreachingSla));
+    }
+
+    /// <summary>A dealership that is no longer awaiting the administrator breaches nothing, however old its deadline.</summary>
+    [Fact]
+    public async Task Only_an_application_awaiting_a_decision_can_breach_its_review_promise()
+    {
+        var settled = Registered("Mafraq Motors", "907811", Build.Now.AddMonths(-8));
+        settled.Approve(Id.New(), Build.Now.AddMonths(-8).AddHours(3));
+        var sentBack = Registered("Ajloun Auto", "905071", Build.Now.AddHours(-90));
+        sentBack.RequestClarification(Id.New(), "The registration scan is cut off.", Build.Now.AddHours(-1));
+
+        var rows = await ListAsync(settled, sentBack);
+
+        Assert.All(rows, row => Assert.False(row.IsBreachingSla));
     }
 
     [Fact]
@@ -128,8 +145,8 @@ public sealed class DealerAdminReaderTests : IDisposable
         var reader = new DealerAdminReader(read);
         var filter = new DealerListFilter(null, null, null);
 
-        var first = await reader.ListAsync(filter, new PageRequest(1, 3));
-        var second = await reader.ListAsync(filter, new PageRequest(2, 3));
+        var first = await reader.ListAsync(filter, new PageRequest(1, 3), Build.Now);
+        var second = await reader.ListAsync(filter, new PageRequest(2, 3), Build.Now);
 
         var seen = first.Items.Concat(second.Items).Select(row => row.DealerId).ToList();
         Assert.Equal(6, seen.Count);
@@ -155,7 +172,8 @@ public sealed class DealerAdminReaderTests : IDisposable
         await using var read = new KhadraDbContext(_options);
         var page = await new DealerAdminReader(read).ListAsync(
             new DealerListFilter(null, SuspendedOnly: true, null),
-            new PageRequest(1, 20));
+            new PageRequest(1, 20),
+            Build.Now);
 
         var row = Assert.Single(page.Items);
         Assert.Equal("Dead Sea Drive", row.BusinessName);

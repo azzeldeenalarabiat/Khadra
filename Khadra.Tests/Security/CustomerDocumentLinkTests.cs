@@ -34,6 +34,8 @@ namespace Khadra.Tests.Security;
 /// </remarks>
 public sealed class CustomerDocumentLinkTests : IDisposable
 {
+    private static readonly Id Viewer = Id.New();
+
     private readonly WebApplicationFactory<Khadra.WebAPI.WebApiAssemblyMarker> _factory =
         new WebApplicationFactory<Khadra.WebAPI.WebApiAssemblyMarker>()
             .WithWebHostBuilder(builder =>
@@ -68,7 +70,7 @@ public sealed class CustomerDocumentLinkTests : IDisposable
         // Not merely "a link": one this platform will accept back, for THIS file.
         var (key, expires, signature) = Parse(result.Value.Url);
         Assert.Equal(document.StorageKey, key);
-        Assert.True(signer.IsValid(key, expires, signature, Build.Now));
+        Assert.True(signer.IsValid(key, expires, signature, customer.Id, Build.Now));
     }
 
     // ── Ownership ────────────────────────────────────────────────────────────────
@@ -113,24 +115,24 @@ public sealed class CustomerDocumentLinkTests : IDisposable
     public void An_expired_signature_is_refused()
     {
         var signer = Signer();
-        var link = signer.Sign("customers/abc/licence.pdf", Build.Now);
+        var link = signer.Sign("customers/abc/licence.pdf", Viewer, Build.Now);
         var (key, expires, signature) = Parse(link.Url);
 
-        Assert.True(signer.IsValid(key, expires, signature, Build.Now));
+        Assert.True(signer.IsValid(key, expires, signature, Viewer, Build.Now));
         // One second past the stamped expiry is past it.
-        Assert.False(signer.IsValid(key, expires, signature, link.ExpiresAt.AddSeconds(1)));
+        Assert.False(signer.IsValid(key, expires, signature, Viewer, link.ExpiresAt.AddSeconds(1)));
     }
 
     [Fact]
     public void A_signature_is_bound_to_ONE_file()
     {
         var signer = Signer();
-        var link = signer.Sign("customers/abc/licence.pdf", Build.Now);
+        var link = signer.Sign("customers/abc/licence.pdf", Viewer, Build.Now);
         var (_, expires, signature) = Parse(link.Url);
 
         // The same signature, pointed at a different key: refused. Otherwise one valid link would be
         // a key to every document in the store.
-        Assert.False(signer.IsValid("customers/abc/passport.pdf", expires, signature, Build.Now));
+        Assert.False(signer.IsValid("customers/abc/passport.pdf", expires, signature, Viewer, Build.Now));
     }
 
     [Theory]
@@ -140,21 +142,80 @@ public sealed class CustomerDocumentLinkTests : IDisposable
     public void A_missing_or_invented_signature_is_refused(string signature)
     {
         var signer = Signer();
-        var link = signer.Sign("customers/abc/licence.pdf", Build.Now);
+        var link = signer.Sign("customers/abc/licence.pdf", Viewer, Build.Now);
         var (key, expires, _) = Parse(link.Url);
 
-        Assert.False(signer.IsValid(key, expires, signature, Build.Now));
+        Assert.False(signer.IsValid(key, expires, signature, Viewer, Build.Now));
     }
 
     [Fact]
     public void A_tampered_expiry_is_refused()
     {
         var signer = Signer();
-        var link = signer.Sign("customers/abc/licence.pdf", Build.Now);
+        var link = signer.Sign("customers/abc/licence.pdf", Viewer, Build.Now);
         var (key, expires, signature) = Parse(link.Url);
 
         // Pushing the expiry out by hand does not extend the link: the timestamp is signed too.
-        Assert.False(signer.IsValid(key, expires + 86_400, signature, Build.Now));
+        Assert.False(signer.IsValid(key, expires + 86_400, signature, Viewer, Build.Now));
+    }
+
+    // ── Bound to the person it was minted for (pre-launch item 14) ───────────────
+
+    [Fact]
+    public async Task The_owners_link_does_not_validate_for_anybody_else()
+    {
+        var customer = Build.Customer();
+        var (handler, signer) = HandlerFor(customer);
+
+        var link = await handler.Handle(new CreateCustomerDocumentLinkQuery(customer.Id, customer.Documents.First().Id), CancellationToken.None);
+        var (key, expires, signature) = Parse(link.Value.Url);
+
+        Assert.True(signer.IsValid(key, expires, signature, customer.Id, Build.Now));
+        Assert.False(signer.IsValid(key, expires, signature, Id.New(), Build.Now));
+    }
+
+    [Fact]
+    public void A_signature_is_bound_to_ONE_viewer()
+    {
+        var signer = Signer();
+        var admin = Id.New();
+        var link = signer.Sign("dealers/abc/licence.pdf", admin, Build.Now);
+        var (key, expires, signature) = Parse(link.Url);
+
+        Assert.True(signer.IsValid(key, expires, signature, admin, Build.Now));
+        // The same link in a customer's session: refused, as if it named nothing.
+        Assert.False(signer.IsValid(key, expires, signature, Viewer, Build.Now));
+    }
+
+    [Fact]
+    public async Task The_download_checks_the_link_against_whoever_is_signed_in_on_that_request()
+    {
+        var signer = Signer();
+        var owner = Id.New();
+        var link = signer.Sign("customers/abc/licence.pdf", owner, Build.Now);
+        var token = link.Url.Split('/')[^1].Split('?')[0];
+        var (_, expires, signature) = Parse(link.Url);
+
+        Assert.IsType<Microsoft.AspNetCore.Mvc.FileStreamResult>(await Download(signer, owner, token, expires, signature));
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(await Download(signer, Id.New(), token, expires, signature));
+        Assert.IsType<Microsoft.AspNetCore.Mvc.NotFoundResult>(await Download(signer, null, token, expires, signature));
+    }
+
+    private static Task<Microsoft.AspNetCore.Mvc.ActionResult> Download(
+        HmacDocumentLinkSigner signer, Id? signedIn, string token, long expires, string signature)
+    {
+        var storage = Substitute.For<IDocumentStorage>();
+        storage.OpenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult<Stream?>(new MemoryStream([1, 2, 3])));
+        var actor = Substitute.For<ICurrentActor>();
+        actor.UserId.Returns(signedIn);
+        var clock = Substitute.For<IClock>();
+        clock.UtcNow.Returns(Build.Now);
+
+        var controller = new Khadra.WebAPI.Controllers.DocumentsController(storage, signer, actor, clock)
+        {
+            ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext { HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() },
+        };
+        return controller.Download(token, expires, signature, CancellationToken.None);
     }
 
     // ── The transport ────────────────────────────────────────────────────────────
@@ -166,7 +227,7 @@ public sealed class CustomerDocumentLinkTests : IDisposable
         // customer app no longer hands it the URL. If this ever answers 200, the second protection
         // has been dropped and a leaked link works for anyone until it expires.
         var signer = Signer();
-        var link = signer.Sign("customers/abc/licence.pdf", Build.Now);
+        var link = signer.Sign("customers/abc/licence.pdf", Viewer, Build.Now);
 
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync(new Uri(link.Url, UriKind.Relative));

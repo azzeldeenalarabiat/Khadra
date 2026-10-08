@@ -232,7 +232,7 @@ public sealed partial class RenterDocumentHandlers(
             request.ActorUserId,
             // From the validated token, never the request body. There is no field on the wire that
             // could name a different reviewer.
-            actor.Name ?? "Unknown",
+            actor.RecordedName(request.ActorUserId),
             clock.UtcNow);
         if (recorded.IsFailure)
             return recorded.Error;

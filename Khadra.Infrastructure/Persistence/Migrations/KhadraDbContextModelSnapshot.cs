@@ -89,6 +89,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("subject_label");
 
+                    b.Property<string>("SubjectLabelAr")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject_label_ar");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1450,6 +1455,63 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentRenditionHold", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<DateTimeOffset>("FirstFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_failed_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
+                    b.Property<DateTimeOffset>("LastFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_failed_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_financial_document_rendition_holds");
+
+                    b.HasIndex("DocumentId", "Language", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_financial_document_rendition_holds_document_id_language_kind");
+
+                    b.ToTable("financial_document_rendition_holds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_document_rendition_holds_attempts", "attempts >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentVoid", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2118,6 +2180,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("actor_name");
+
+                    b.Property<string>("ActorStandIn")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_stand_in");
 
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uuid")
@@ -3246,6 +3313,38 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Khadra.Infrastructure.Persistence.SignInThrottleEntry", b =>
+                {
+                    b.Property<string>("SubjectHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("subject_hash")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset?>("BlockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("blocked_until");
+
+                    b.Property<int>("Failures")
+                        .HasColumnType("integer")
+                        .HasColumnName("failures");
+
+                    b.Property<DateTimeOffset>("WindowStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("window_started_at");
+
+                    b.HasKey("SubjectHash")
+                        .HasName("pk_sign_in_throttles");
+
+                    b.HasIndex("WindowStartedAt")
+                        .HasDatabaseName("ix_sign_in_throttles_window_started_at");
+
+                    b.ToTable("sign_in_throttles", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_sign_in_throttles_failures", "failures >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.Booking", b =>
                 {
                     b.OwnsOne("Khadra.Domain.Common.GeoPoint", "DeliveryLocation", b1 =>
@@ -3858,7 +3957,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Bookings.Booking", null)
                         .WithMany("StatusHistory")
                         .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_booking_status_changes_bookings_booking_id");
                 });
@@ -3878,7 +3977,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Bookings.Booking", null)
                         .WithMany("Handovers")
                         .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_booking_handovers_bookings_booking_id");
 
@@ -3916,7 +4015,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Bookings.Booking", null)
                         .WithMany("RenterDocumentReviews")
                         .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_renter_document_reviews_bookings_booking_id");
                 });
@@ -4114,7 +4213,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Dealers.Dealer", null)
                         .WithMany("Documents")
                         .HasForeignKey("DealerId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_dealer_documents_dealers_dealer_id");
                 });
@@ -4124,7 +4223,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Dealers.Dealer", null)
                         .WithMany("Employees")
                         .HasForeignKey("DealerId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_dealer_employees_dealers_dealer_id");
                 });
@@ -4134,7 +4233,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Disputes.DisputeTicket", null)
                         .WithMany("Statements")
                         .HasForeignKey("TicketId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_dispute_statements_dispute_tickets_ticket_id");
                 });
@@ -4391,6 +4490,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_financial_document_renditions_financial_documents_document_");
                 });
 
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentRenditionHold", b =>
+                {
+                    b.HasOne("Khadra.Domain.FinancialDocuments.FinancialDocument", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_financial_document_rendition_holds_financial_documents_docu");
+                });
+
             modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentVoid", b =>
                 {
                     b.HasOne("Khadra.Domain.FinancialDocuments.FinancialDocument", null)
@@ -4596,7 +4705,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.IdentityAccess.User", null)
                         .WithMany("Documents")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_customer_documents_users_user_id");
                 });

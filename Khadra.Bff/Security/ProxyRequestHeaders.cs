@@ -21,6 +21,8 @@ internal static class ProxyRequestHeaders
         BffConstants.CustomerAppVersionHeaderName,
         // The renderer's nonce is this BFF's to choose (pre-launch item 222); a browser's would only break its own page.
         BffConstants.CspNonceHeaderName,
+        // The console's report of how long its person has been idle is this BFF's business, and nobody else's (item 129).
+        SessionActivity.IdleHeaderName,
     ];
 
     public static void RemoveBrowserSupplied(HttpRequestHeaders headers)

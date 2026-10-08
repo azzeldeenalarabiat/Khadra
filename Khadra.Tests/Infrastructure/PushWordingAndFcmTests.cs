@@ -60,6 +60,24 @@ public sealed class PushWordingAndFcmTests
     }
 
     /// <summary>
+    /// An office that left the platform is a stand-in code (pre-launch item 103): the Arabic push words it, never the
+    /// English phrase the row also carries for installed apps.
+    /// </summary>
+    [Fact]
+    public void A_rental_office_stand_in_is_worded_in_the_push_language()
+    {
+        var expired = Notification.RaiseByStandIn(
+            Id.New(), NotificationKind.YourBookingApproved, NotificationStandIn.RentalOffice, Now, Id.New(), "KH-24-0007");
+
+        var arabic = Composer(PaymentMode.None).ComposePush(expired, Language.Arabic);
+        var english = Composer(PaymentMode.None).ComposePush(expired, Language.English);
+
+        Assert.Contains("مكتب التأجير", arabic.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("The rental office", arabic.Body, StringComparison.Ordinal);
+        Assert.Contains("The rental office", english.Body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// One kind serves a deposit and a payment in full (owner, 2026-09-25), and the notification row
     /// does not record which, so neither the confirmation nor the refund may say "deposit".
     /// </summary>

@@ -2,6 +2,7 @@ using Khadra.Application.Common;
 using Khadra.Application.IdentityAccess.Login;
 using Khadra.Application.IdentityAccess.RegisterCustomer;
 using Khadra.Application.IdentityAccess.RegisterDealerOwner;
+using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Tests.Support;
 using NSubstitute;
@@ -103,6 +104,7 @@ public sealed class LoginHandlerTests
         context.UserRepository,
         context.Hasher,
         context.TokenFactory,
+        context.Throttle,
         context.Clock,
         context.UnitOfWork);
 
@@ -183,6 +185,115 @@ public sealed class LoginHandlerTests
         Assert.Equal(refreshToken.ExpiresAt, result.Value.RefreshTokenExpiresAt);
         Assert.Equal("10.0.0.5", refreshToken.CreatedByIp);
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    // ── The per-account ceiling (pre-launch item 51; owner, 2026-10-08): 8 failures in 15 minutes refuse 15 ──
+
+    private static async Task Fail(AuthHandlerTestContext context, string email, int times)
+    {
+        for (var attempt = 0; attempt < times; attempt++)
+            Assert.Equal("auth.invalid_credentials", (await Handler(context).Handle(new LoginCommand(email, "WrongPass1", Client), CancellationToken.None)).Error.Code);
+    }
+
+    [Fact]
+    public async Task The_eighth_failure_refuses_the_name_even_the_right_password_until_the_block_is_over()
+    {
+        var context = new AuthHandlerTestContext();
+        context.KnownUser(Users.Customer());
+        await Fail(context, "ali@example.com", 8);
+        var verifiesBefore = context.Hasher.VerifyCalls;
+        context.UserRepository.ClearReceivedCalls();
+
+        var refused = await Handler(context).Handle(new LoginCommand("ALI@example.com", "Passw0rd1", Client), CancellationToken.None);
+
+        // The middleware limiter's own answer, so nothing a client reads tells the two apart.
+        Assert.Equal(ErrorKind.TooManyRequests, refused.Error.Kind);
+        Assert.Equal("rate_limited", refused.Error.Code);
+        Assert.Equal("Too many requests. Try again later.", refused.Error.Message);
+        Assert.Equal(15 * 60, Assert.IsType<int>(refused.Error.Extensions![Error.RetryAfterSecondsExtension]));
+        // Refused before the password is looked at: under a block a right guess and a wrong one cost the same.
+        Assert.Equal(verifiesBefore, context.Hasher.VerifyCalls);
+        await context.UserRepository.DidNotReceive().GetByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>());
+        Assert.Empty(context.AddedRefreshTokens);
+
+        context.Clock.Advance(TimeSpan.FromMinutes(15));
+        var afterwards = await Handler(context).Handle(new LoginCommand("ali@example.com", "Passw0rd1", Client), CancellationToken.None);
+        Assert.True(afterwards.IsSuccess);
+    }
+
+    [Fact]
+    public async Task Seven_failures_still_let_the_owner_in_and_signing_in_forgets_them()
+    {
+        var context = new AuthHandlerTestContext();
+        context.KnownUser(Users.Customer());
+        await Fail(context, "ali@example.com", 7);
+
+        var result = await Handler(context).Handle(new LoginCommand("ali@example.com", "Passw0rd1", Client), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, context.Throttle.FailuresOf("ali@example.com"));
+        Assert.Equal(["ali@example.com"], context.Throttle.Resets);
+    }
+
+    /// <summary>
+    /// The refusal must not become the oracle the generic "invalid credentials" exists to avoid: a name nobody holds
+    /// is counted and refused exactly like one somebody does.
+    /// </summary>
+    [Fact]
+    public async Task A_name_nobody_holds_is_counted_and_refused_the_same_way()
+    {
+        var context = new AuthHandlerTestContext();
+        await Fail(context, "nobody@example.com", 8);
+
+        var refused = await Handler(context).Handle(new LoginCommand("nobody@example.com", "Passw0rd1", Client), CancellationToken.None);
+
+        Assert.Equal("rate_limited", refused.Error.Code);
+        Assert.Equal(8, context.Throttle.FailuresOf("nobody@example.com"));
+    }
+
+    [Fact]
+    public async Task Failures_older_than_the_window_do_not_count_towards_a_block()
+    {
+        var context = new AuthHandlerTestContext();
+        context.KnownUser(Users.Customer());
+        await Fail(context, "ali@example.com", 7);
+        context.Clock.Advance(TimeSpan.FromMinutes(15));
+        await Fail(context, "ali@example.com", 1);
+
+        var result = await Handler(context).Handle(new LoginCommand("ali@example.com", "Passw0rd1", Client), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task One_name_under_a_block_leaves_every_other_name_alone()
+    {
+        var context = new AuthHandlerTestContext();
+        context.KnownUser(Users.Customer());
+        await Fail(context, "someone-else@example.com", 8);
+
+        var result = await Handler(context).Handle(new LoginCommand("ali@example.com", "Passw0rd1", Client), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    /// <summary>
+    /// The right password on an account that may not sign in is not a guess: it is neither counted (which would let a
+    /// stranger lock nobody out but the owner) nor forgiven (which would reset a guesser's count on someone else's
+    /// suspended account).
+    /// </summary>
+    [Fact]
+    public async Task The_right_password_on_a_suspended_or_unverified_account_is_neither_counted_nor_forgiven()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer(verified: false));
+        await Fail(context, "ali@example.com", 3);
+
+        var unverified = await Handler(context).Handle(new LoginCommand("ali@example.com", "Passw0rd1", Client), CancellationToken.None);
+
+        Assert.Equal("auth.email_not_verified", unverified.Error.Code);
+        Assert.Equal(3, context.Throttle.FailuresOf("ali@example.com"));
+        Assert.Empty(context.Throttle.Resets);
     }
 }
 

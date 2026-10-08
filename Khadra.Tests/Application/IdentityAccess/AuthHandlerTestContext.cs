@@ -2,6 +2,7 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess;
 using Khadra.Application.IdentityAccess.ForgotPassword;
+using Khadra.Application.IdentityAccess.Login;
 using Khadra.Application.IdentityAccess.ResendVerification;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
@@ -23,6 +24,7 @@ internal sealed class AuthHandlerTestContext
     public IRefreshTokenRepository RefreshTokens { get; } = Substitute.For<IRefreshTokenRepository>();
     public IVerificationTokenRepository VerificationTokens { get; } = Substitute.For<IVerificationTokenRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+    public FakeSignInThrottle Throttle { get; } = new();
     public IAuthEmailComposer EmailComposer { get; } = Substitute.For<IAuthEmailComposer>();
     public IEmailSender EmailSender { get; init; } = TestEmail.AcceptingSender();
     public ICurrentActor Actor { get; } = Substitute.For<ICurrentActor>();
@@ -98,4 +100,43 @@ internal sealed class AuthHandlerTestContext
 
     private static EmailMessage Message(User user, string kind, string token) =>
         new(user.Email.Value, user.Name.Value, kind, $"{kind}:{token}", $"{kind}:{token}");
+}
+
+/// <summary>
+/// The per-account sign-in ceiling (pre-launch item 51) in memory, with the shipped policy: eight failures within
+/// fifteen minutes refuse the name for fifteen. The SQL behind the real one is proven in <c>SignInThrottleTests</c>.
+/// </summary>
+internal sealed class FakeSignInThrottle : ISignInThrottle
+{
+    private readonly Dictionary<string, (DateTimeOffset WindowStart, int Failures, DateTimeOffset? BlockedUntil)> _rows = [];
+
+    public int MaxFailures { get; init; } = 8;
+    public TimeSpan Window { get; init; } = TimeSpan.FromMinutes(15);
+    public TimeSpan Block { get; init; } = TimeSpan.FromMinutes(15);
+
+    public List<string> Resets { get; } = [];
+
+    public int FailuresOf(string email) => _rows.TryGetValue(email, out var row) ? row.Failures : 0;
+
+    public Task<TimeSpan?> BlockedForAsync(EmailAddress subject, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        Task.FromResult<TimeSpan?>(
+            _rows.TryGetValue(subject.Value, out var row) && row.BlockedUntil is { } until && until > now ? until - now : null);
+
+    public Task RecordFailureAsync(EmailAddress subject, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var row = _rows.TryGetValue(subject.Value, out var found) && found.WindowStart > now - Window
+            ? (found.WindowStart, found.Failures + 1, found.BlockedUntil)
+            : (now, 1, found.BlockedUntil);
+        if (row.Item2 >= MaxFailures)
+            row.Item3 = now + Block;
+        _rows[subject.Value] = row;
+        return Task.CompletedTask;
+    }
+
+    public Task ResetAsync(EmailAddress subject, CancellationToken cancellationToken = default)
+    {
+        _rows.Remove(subject.Value);
+        Resets.Add(subject.Value);
+        return Task.CompletedTask;
+    }
 }

@@ -66,6 +66,7 @@ public sealed partial class SettleDueBookingsHandler(
     DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork,
+    RepeatedFailureLog reported,
     ILogger<SettleDueBookingsHandler> logger)
     : IRequestHandler<SettleDueBookingsCommand, Result<SettlementReport, Error>>
 {
@@ -144,7 +145,8 @@ public sealed partial class SettleDueBookingsHandler(
                     payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
                     if (!BookingEndingRefunds.CanRecord(booking, payment))
                     {
-                        LogPaymentUnusable(logger, booking.Reference.Value);
+                        var level = reported.LevelFor($"2102:{booking.Reference.Value}");
+                        LogPaymentUnusable(logger, level, booking.Reference.Value);
                         onFailure(1);
                         return false;
                     }
@@ -195,7 +197,8 @@ public sealed partial class SettleDueBookingsHandler(
                 var payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
                 if (!BookingEndingRefunds.CanRecord(booking, payment))
                 {
-                    LogPaymentUnusable(logger, booking.Reference.Value);
+                    var level = reported.LevelFor($"2102:{booking.Reference.Value}");
+                    LogPaymentUnusable(logger, level, booking.Reference.Value);
                     onFailure(1);
                     return false;
                 }
@@ -208,7 +211,8 @@ public sealed partial class SettleDueBookingsHandler(
                 var refund = payment.RefundHeldDeposit(deposit, now);
                 if (refund.IsFailure)
                 {
-                    LogReleaseRefused(logger, booking.Reference.Value, refund.Error.Code);
+                    var level = reported.LevelFor($"2103:{booking.Reference.Value}:{refund.Error.Code}");
+                    LogReleaseRefused(logger, level, booking.Reference.Value, refund.Error.Code);
                     onFailure(1);
                     return false;
                 }
@@ -293,7 +297,8 @@ public sealed partial class SettleDueBookingsHandler(
             catch (Exception exception) when (exception is not OperationCanceledException)
 #pragma warning restore CA1031
             {
-                LogBookingFailed(logger, label, exception);
+                var level = reported.LevelFor($"2104:{label}:{exception.GetType().FullName}");
+                LogBookingFailed(logger, level, label, exception);
                 unitOfWork.DiscardChanges();
                 onFailure(1);
             }
@@ -342,19 +347,21 @@ public sealed partial class SettleDueBookingsHandler(
     private static partial void LogSettled(
         ILogger logger, int unanswered, int unpaid, int noShows, int completed, int released, int failed);
 
-    [LoggerMessage(
-        2102,
-        LogLevel.Error,
-        "Booking {Reference} is paid, but its payment is missing, not applied or not its own. Left unchanged "
-        + "rather than ended with the refund it owes unrecorded; a human must look.")]
-    private static partial void LogPaymentUnusable(ILogger logger, string reference);
+    // The three below are Error the first time this process meets them and Debug every pass after, until a restart
+    // reports them again (pre-launch item 236): a booking that fails the same way every minute is one problem, not one
+    // a minute. The pass's own 2100 line goes on counting it as deferred.
 
     [LoggerMessage(
-        2103,
-        LogLevel.Error,
-        "The deposit of booking {Reference} is due back to the customer, but its payment refused the refund ({Code}). "
-        + "Left for the next pass; a human must look.")]
-    private static partial void LogReleaseRefused(ILogger logger, string reference, string code);
+        EventId = 2102,
+        Message = "Booking {Reference} is paid, but its payment is missing, not applied or not its own. Left unchanged "
+        + "rather than ended with the refund it owes unrecorded; a human must look. Reported at Error once per process.")]
+    private static partial void LogPaymentUnusable(ILogger logger, LogLevel level, string reference);
+
+    [LoggerMessage(
+        EventId = 2103,
+        Message = "The deposit of booking {Reference} is due back to the customer, but its payment refused the refund ({Code}). "
+        + "Left for the next pass; a human must look. Reported at Error once per process.")]
+    private static partial void LogReleaseRefused(ILogger logger, LogLevel level, string reference, string code);
 
     [LoggerMessage(
         2101,
@@ -363,8 +370,8 @@ public sealed partial class SettleDueBookingsHandler(
     private static partial void LogConflict(ILogger logger, string reference);
 
     [LoggerMessage(
-        2104,
-        LogLevel.Error,
-        "Settling booking {Reference} failed; it is left for the next pass and the rest of this pass carries on.")]
-    private static partial void LogBookingFailed(ILogger logger, string reference, Exception exception);
+        EventId = 2104,
+        Message = "Settling booking {Reference} failed; it is left for the next pass and the rest of this pass carries on. "
+        + "Reported at Error once per process.")]
+    private static partial void LogBookingFailed(ILogger logger, LogLevel level, string reference, Exception exception);
 }

@@ -263,6 +263,30 @@ public sealed class AuditLogReaderTests : IDisposable
     }
 
     /// <summary>
+    /// A city's entry carries its Arabic name beside the English one (pre-launch item 176): both readers send it, and an
+    /// administrator finds the entry by either name. An entry written without one reads back without one.
+    /// </summary>
+    [Fact]
+    public async Task A_city_entry_carries_its_arabic_name_and_is_found_by_it()
+    {
+        var madaba = AuditEntry.By(
+            AdminId, "Rania Haddad", UserRole.Admin, AuditAction.LookupCreated, AuditEntityType.City, Id.New(), "Madaba", Noon,
+            newValue: """{"en":"Madaba","ar":"مادبا","offered":true}""", subjectLabelAr: "مادبا");
+        await GivenAsync(madaba, Entry(Noon.AddMinutes(1), subject: "Aqaba Coast Cars"));
+
+        await using var context = new KhadraDbContext(_options);
+        var page = await Reader(context).ListAsync(new AuditLogFilter(Search: "مادبا"), new PageRequest(1, 10));
+
+        var entry = Assert.Single(page.Items);
+        Assert.Equal("Madaba", entry.SubjectLabel);
+        Assert.Equal("مادبا", entry.SubjectLabelAr);
+        var all = await Reader(context).ListAsync(new AuditLogFilter(), new PageRequest(1, 10));
+        Assert.Null(all.Items.Single(item => item.SubjectLabel == "Aqaba Coast Cars").SubjectLabelAr);
+        var feed = await new AuditFeedReader(context).RecentAsync(10);
+        Assert.Equal("مادبا", feed.Single(item => item.SubjectLabel == "Madaba").SubjectLabelAr);
+    }
+
+    /// <summary>
     /// The System is the absence of an actor, so it needs its own filter to be reachable at all.
     ///
     /// Without it, unattended actions are the single class of entry an auditor cannot isolate — which

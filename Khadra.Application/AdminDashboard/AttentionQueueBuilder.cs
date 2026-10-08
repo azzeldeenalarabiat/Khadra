@@ -55,6 +55,9 @@ public static class AttentionQueueBuilder
 
         /// <summary>Receipts whose email has not gone — failed, or queued too long (payments Phase 7).</summary>
         public const string FinancialDocumentEmailsNotSent = "FinancialDocumentEmailsNotSent";
+
+        /// <summary>Issued documents whose PDF could not be drawn, with the reason on each (pre-launch item 197).</summary>
+        public const string FinancialDocumentPdfsNotDrawn = "FinancialDocumentPdfsNotDrawn";
     }
 
     public static class Severities
@@ -79,7 +82,8 @@ public static class AttentionQueueBuilder
         MoneyAttention? money = null,
         FinancialDocumentHoldsSummary? documentsOnHold = null,
         FinancialDocumentEmailsSummary? emailsNotSent = null,
-        PayableHoldsSummary? payablesOnHold = null)
+        PayableHoldsSummary? payablesOnHold = null,
+        FinancialDocumentPdfHoldsSummary? pdfsNotDrawn = null)
     {
         ArgumentNullException.ThrowIfNull(liveDisputes);
         ArgumentNullException.ThrowIfNull(disputeSubtitles);
@@ -136,6 +140,7 @@ public static class AttentionQueueBuilder
         AddPayablesOnHold(items, payablesOnHold ?? PayableHoldsSummary.None);
         AddDocumentsOnHold(items, documentsOnHold ?? FinancialDocumentHoldsSummary.None);
         AddEmailsNotSent(items, emailsNotSent ?? FinancialDocumentEmailsSummary.None);
+        AddPdfsNotDrawn(items, pdfsNotDrawn ?? FinancialDocumentPdfHoldsSummary.None);
 
         // Overdue work first; then whatever runs out of time soonest, because each of those is a promise
         // the platform made and can still keep; then money a human has to look at, which has no clock —
@@ -277,6 +282,29 @@ public static class AttentionQueueBuilder
             Count: emails.Count,
             SubjectIds: [.. emails.DocumentIds.Select(id => id.Value)],
             Subtitle: emails.Numbers.Count == 0 ? null : string.Join(" · ", emails.Numbers),
+            Description: null,
+            SlaStartedAt: oldest,
+            SlaDeadlineAt: null,
+            IsOverdue: false));
+    }
+
+    /// <summary>
+    /// ONE row for every issued document whose PDF could not be drawn (pre-launch item 197): the customer's page goes on
+    /// saying it is being prepared, so somebody has to look. No deadline, never merely watched; each document's page
+    /// says which language and why.
+    /// </summary>
+    private static void AddPdfsNotDrawn(List<AttentionItemDto> items, FinancialDocumentPdfHoldsSummary pdfs)
+    {
+        if (pdfs.Count == 0 || pdfs.OldestFailedAt is not { } oldest)
+            return;
+
+        items.Add(new AttentionItemDto(
+            Id: "financial-document-pdfs-not-drawn",
+            Kind: Kinds.FinancialDocumentPdfsNotDrawn,
+            Severity: Severities.Warning,
+            Count: pdfs.DocumentIds.Count,
+            SubjectIds: [.. pdfs.DocumentIds.Select(id => id.Value)],
+            Subtitle: pdfs.Numbers.Count == 0 ? null : string.Join(" · ", pdfs.Numbers),
             Description: null,
             SlaStartedAt: oldest,
             SlaDeadlineAt: null,

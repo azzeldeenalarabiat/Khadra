@@ -113,6 +113,7 @@ public sealed partial class SettlePaymentsHandler(
     {
         var stale = await payments.ListStaleLiveAsync(now.Subtract(settings.StaleAttemptGrace), cancellationToken);
         var closed = 0;
+        var asked = 0;
 
         foreach (var payment in stale)
         {
@@ -125,10 +126,20 @@ public sealed partial class SettlePaymentsHandler(
                 continue;
             }
 
+            asked++;
             var state = await provider.QueryAsync(reference, cancellationToken);
+            if (state.IsFailure && state.Error.Code == PaymentErrors.ProviderUnavailable.Code)
+            {
+                // The provider could not be ASKED (pre-launch item 236). It will not answer the next one either: stop,
+                // rather than wait out a timeout per stale checkout and log each, every tick — the refund sends below
+                // stop the same way. Every row is left exactly as it was; the next tick asks again.
+                LogStaleQueriesStopped(logger, stale.Count - asked + 1);
+                break;
+            }
+
             if (state.IsFailure)
             {
-                // The provider is unreachable. Leave the row alone: closing it on a guess is how a
+                // The provider answered and would not say. Leave the row alone: closing it on a guess is how a
                 // paid booking gets marked unpaid.
                 LogQueryFailed(logger, payment.Id.Value, state.Error.Code);
                 continue;
@@ -312,6 +323,13 @@ public sealed partial class SettlePaymentsHandler(
         "The payment provider could not be reached; {Payments} payment(s) with a refund due were left exactly as they "
         + "were and are sent on the next tick. Nothing was refused, so nothing was counted.")]
     private static partial void LogProviderUnreachable(ILogger logger, int payments);
+
+    [LoggerMessage(
+        2326,
+        LogLevel.Warning,
+        "The payment provider could not be reached; {Payments} stale checkout(s) were left open, exactly as they were, "
+        + "and are asked about on the next tick. Nothing was closed on a guess.")]
+    private static partial void LogStaleQueriesStopped(ILogger logger, int payments);
 
     [LoggerMessage(
         2324,

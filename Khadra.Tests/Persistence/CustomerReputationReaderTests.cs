@@ -205,7 +205,7 @@ public sealed class CustomerReputationReaderTests : IDisposable
             revealAt: visibleFrom,
             now: visibleFrom.AddDays(-1)).Value;
         if (hidden)
-            review.Hide("Retaliatory.");
+            review.Hide(ReviewHideReason.NotAboutThisRental);
 
         await using var context = NewContext();
         context.Reviews.Add(review);

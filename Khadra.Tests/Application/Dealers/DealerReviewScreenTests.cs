@@ -1,3 +1,4 @@
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.GetDealerForReview;
 using Khadra.Domain.Common;
@@ -19,19 +20,23 @@ public sealed class DealerReviewScreenTests
     private static readonly System.Text.Json.JsonSerializerOptions WireOptions =
         new(System.Text.Json.JsonSerializerDefaults.Web);
 
+    private static readonly Id AdminId = Id.New();
+
     private sealed class Context
     {
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
         public IDocumentLinkSigner Signer { get; } = Substitute.For<IDocumentLinkSigner>();
+        public ICurrentActor Actor { get; } = Substitute.For<ICurrentActor>();
         public TestClock Clock { get; } = new(Build.Now);
 
         public Context()
         {
             Signer
-                .Sign(Arg.Any<string>(), Arg.Any<DateTimeOffset>())
+                .Sign(Arg.Any<string>(), Arg.Any<Id>(), Arg.Any<DateTimeOffset>())
                 .Returns(call => new SignedDocumentLink(
                     $"/api/v1/documents/{call.ArgAt<string>(0)}",
-                    call.ArgAt<DateTimeOffset>(1).AddMinutes(5)));
+                    call.ArgAt<DateTimeOffset>(2).AddMinutes(5)));
+            Actor.UserId.Returns(AdminId);
         }
 
         public Dealer Given(Dealer dealer)
@@ -40,7 +45,7 @@ public sealed class DealerReviewScreenTests
             return dealer;
         }
 
-        public GetDealerForReviewHandler Handler() => new(Dealers, Signer, Clock);
+        public GetDealerForReviewHandler Handler() => new(Dealers, Signer, Actor, Clock);
 
         public Task<CSharpFunctionalExtensions.Result<DealerReviewDto, Error>> Load(Dealer dealer) =>
             Handler().Handle(new GetDealerForReviewQuery(dealer.Id), CancellationToken.None);
@@ -51,6 +56,51 @@ public sealed class DealerReviewScreenTests
         var dealer = Build.Dealer();
         Build.AttachAllDocuments(dealer);
         return dealer;
+    }
+
+    /// <summary>
+    /// Pre-launch item 113: what the office tells customers, as the office wrote it and as a customer sees it, so an
+    /// administrator can read it. A hidden section is still shown to the administrator — and said to be hidden.
+    /// </summary>
+    [Fact]
+    public async Task The_screen_carries_the_offices_own_words_and_which_of_them_are_hidden()
+    {
+        var context = new Context();
+        var dealer = Build.ApprovedDealer();
+        Assert.True(dealer.UpdatePublicProfile(
+            new LocalizedInput("مكتب عائلي في عمّان", null),
+            PublicProfile.Create(
+                new LocalizedInput("لا تدخين في السيارة", "No smoking in the car"),
+                new LocalizedInput(null, "Full cover included"),
+                LocalizedInput.Nothing,
+                LocalizedInput.Nothing,
+                LocalizedInput.Nothing,
+                ["Insurance"]).Value).IsSuccess);
+        context.Given(dealer);
+
+        var page = (await context.Load(dealer)).Value.CustomerPage;
+
+        Assert.Equal("مكتب عائلي في عمّان", page.About.Ar);
+        Assert.Equal("No smoking in the car", page.RentalConditions.En);
+        Assert.Equal("Full cover included", page.Insurance.En);
+        Assert.Equal(["Insurance"], page.HiddenSections);
+        // What a customer actually gets: the hidden section is gone for both readers, the rest is there.
+        Assert.Null(page.Visible.En.Insurance);
+        Assert.Equal("No smoking in the car", page.Visible.En.RentalConditions!.Text);
+        Assert.Equal("لا تدخين في السيارة", page.Visible.Ar.RentalConditions!.Text);
+    }
+
+    /// <summary>Each link opens in the session of the administrator who loaded the screen and nobody else's (item 14).</summary>
+    [Fact]
+    public async Task Every_link_is_minted_for_the_administrator_who_loaded_the_screen()
+    {
+        var context = new Context();
+        var dealer = context.Given(PendingWithDocuments());
+
+        await context.Load(dealer);
+
+        context.Signer.Received(dealer.Documents.Count).Sign(Arg.Any<string>(), AdminId, Arg.Any<DateTimeOffset>());
+        context.Signer.DidNotReceive().Sign(Arg.Any<string>(), Arg.Is<Id>(viewer => viewer != AdminId), Arg.Any<DateTimeOffset>());
     }
 
     [Fact]

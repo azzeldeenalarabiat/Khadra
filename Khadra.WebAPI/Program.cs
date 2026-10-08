@@ -49,7 +49,21 @@ builder.Configuration.AddEnvironmentVariables();
 
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1_048_576);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        // A body MVC could not bind — invalid JSON, a missing required property, a [StringLength] breach — is
+        // refused before any handler runs, as a ValidationProblemDetails that carried no `code` (pre-launch item
+        // 121). Every other refusal has one. Same body as before, `errors` map included, plus the code.
+        var standard = options.InvalidModelStateResponseFactory;
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var result = standard(context);
+            if (result is ObjectResult { Value: Microsoft.AspNetCore.Mvc.ProblemDetails problem })
+                problem.Extensions["code"] = "request.invalid";
+            return result;
+        };
+    });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddProblemDetails(options =>
 {

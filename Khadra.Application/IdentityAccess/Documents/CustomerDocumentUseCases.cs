@@ -179,6 +179,7 @@ public sealed class CreateCustomerDocumentLinkHandler(
         if (document is null)
             return IdentityErrors.DocumentNotFound;
 
-        return signer.Sign(document.StorageKey, clock.UtcNow);
+        // For the owner, who is the one asking: the link opens in their session and nobody else's.
+        return signer.Sign(document.StorageKey, request.UserId, clock.UtcNow);
     }
 }

@@ -25,6 +25,10 @@ public sealed class AdminActionRecorder(IAuditTrail auditTrail, ICurrentActor ac
     /// reference. For a Customer it is a REFERENCE, never a name, email or phone: the audit table is
     /// append-only and can never be erased, so identity written into it cannot be taken back out.
     /// </param>
+    /// <param name="labelAr">
+    /// The same subject's Arabic name, for a subject that has one of its own — a city, a car type (pre-launch item 176).
+    /// Snapshotted with the English label, for the same reason the label is.
+    /// </param>
     public void Record(
         AuditAction action,
         AuditEntityType entityType,
@@ -32,7 +36,8 @@ public sealed class AdminActionRecorder(IAuditTrail auditTrail, ICurrentActor ac
         string label,
         string? previousValue,
         string? newValue,
-        string? reason = null)
+        string? reason = null,
+        string? labelAr = null)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(entityType);
@@ -42,7 +47,7 @@ public sealed class AdminActionRecorder(IAuditTrail auditTrail, ICurrentActor ac
         var entry = actor.UserId is { } actorId && actor.Role is { } role
             ? AuditEntry.By(
                 actorId,
-                actor.Name ?? "Unknown admin",
+                actor.RecordedName(actorId),
                 role,
                 action,
                 entityType,
@@ -52,7 +57,8 @@ public sealed class AdminActionRecorder(IAuditTrail auditTrail, ICurrentActor ac
                 previousValue,
                 newValue,
                 reason,
-                actor.CorrelationId)
+                actor.CorrelationId,
+                labelAr)
             : AuditEntry.BySystem(
                 action,
                 entityType,
@@ -62,7 +68,8 @@ public sealed class AdminActionRecorder(IAuditTrail auditTrail, ICurrentActor ac
                 previousValue,
                 newValue,
                 reason,
-                actor.CorrelationId);
+                actor.CorrelationId,
+                labelAr);
 
         auditTrail.Record(entry);
     }

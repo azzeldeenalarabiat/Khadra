@@ -165,7 +165,7 @@ public sealed class ReviewUseCaseTests
             Id.New(), ReviewDirection.CustomerRatesDealer, CustomerId, Id.New(),
             Rating.Create(1).Value, "Unrepeatable.", bookingIsCompleted: true, revealAt: Build.Now.AddDays(14), now: Build.Now).Value;
 
-        review.Hide("Abusive language.");
+        review.Hide(ReviewHideReason.AbusiveLanguage);
 
         Assert.True(review.IsHidden);
         Assert.Equal(1, review.Rating.Value);

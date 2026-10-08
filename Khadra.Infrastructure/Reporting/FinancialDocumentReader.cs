@@ -274,6 +274,48 @@ internal sealed class FinancialDocumentReader(KhadraDbContext context) : IFinanc
             holds[0].FirstFailedAt);
     }
 
+    public async Task<IReadOnlyList<FinancialDocumentPdfHoldRecord>> OpenPdfHoldsOfAsync(Id documentId, CancellationToken cancellationToken = default) =>
+        await OpenPdfHolds()
+            .Where(hold => hold.DocumentId == documentId)
+            .OrderBy(hold => hold.FirstFailedAt)
+            .ThenBy(hold => hold.Id)
+            .Select(hold => new FinancialDocumentPdfHoldRecord(hold.Language, hold.Kind, hold.Reason, hold.Attempts, hold.FirstFailedAt, hold.LastFailedAt))
+            .ToListAsync(cancellationToken);
+
+    public async Task<FinancialDocumentPdfHoldsSummary> OpenPdfHoldsSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var holds = await OpenPdfHolds()
+            .OrderBy(hold => hold.FirstFailedAt)
+            .ThenBy(hold => hold.Id)
+            .Select(hold => new { hold.DocumentId, hold.FirstFailedAt })
+            .ToListAsync(cancellationToken);
+        if (holds.Count == 0)
+            return FinancialDocumentPdfHoldsSummary.None;
+
+        var documentIds = holds.Select(hold => hold.DocumentId).Distinct().ToList();
+        var firstThree = documentIds.Take(3).ToList();
+        var numbers = await context.FinancialDocuments
+            .AsNoTracking()
+            .Where(document => firstThree.Contains(document.Id))
+            .Select(document => new { document.Id, document.Number })
+            .ToDictionaryAsync(document => document.Id, document => document.Number, cancellationToken);
+        return new FinancialDocumentPdfHoldsSummary(
+            holds.Count,
+            documentIds,
+            [.. firstThree.Where(numbers.ContainsKey).Select(id => numbers[id])],
+            holds[0].FirstFailedAt);
+    }
+
+    /// <summary>
+    /// A PDF hold is open exactly while no rendition of its document, language and kind exists (pre-launch item 197):
+    /// drawing it, after whatever fix let it draw, closes it — there is no flag to forget to clear.
+    /// </summary>
+    private IQueryable<FinancialDocumentRenditionHold> OpenPdfHolds() =>
+        context.FinancialDocumentRenditionHolds
+            .AsNoTracking()
+            .Where(hold => !context.FinancialDocumentRenditions.Any(rendition =>
+                rendition.DocumentId == hold.DocumentId && rendition.Language == hold.Language && rendition.Kind == hold.Kind));
+
     public async Task<IReadOnlyList<FinancialDocumentDeliveryRecord>> DeliveriesOfAsync(Id documentId, CancellationToken cancellationToken = default)
     {
         var deliveries = await context.FinancialDocumentDeliveries

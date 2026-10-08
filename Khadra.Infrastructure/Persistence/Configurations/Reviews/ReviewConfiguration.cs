@@ -1,3 +1,4 @@
+using Khadra.Domain.Common;
 using Khadra.Domain.Reviews;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -50,7 +51,11 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
         entity.Property(review => review.VisibleFrom).IsRequired();
 
         entity.Property(review => review.IsHidden).IsRequired();
-        entity.Property(review => review.HiddenReason).HasMaxLength(500);
+        // A ReviewHideReason by name (item 81), in the column that has always been 500 wide: nothing wrote it before
+        // moderation existed, so there is no free text in it to read back.
+        entity.Property(review => review.HiddenReason)
+            .HasConversion(reason => reason!.Name, name => Enumeration.FromName<ReviewHideReason>(name))
+            .HasMaxLength(500);
         entity.Property(review => review.CreatedAt).IsRequired();
 
         // One review per booking per direction (spec 5.6). Enforced here rather than only in the

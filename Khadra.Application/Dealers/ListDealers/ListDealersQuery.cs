@@ -20,7 +20,7 @@ public sealed record ListDealersQuery(
     int? Page,
     int? PageSize) : IQuery<Result<PagedResult<DealerListItem>, Error>>;
 
-public sealed class ListDealersHandler(IDealerAdminReader dealers)
+public sealed class ListDealersHandler(IDealerAdminReader dealers, IClock clock)
     : IRequestHandler<ListDealersQuery, Result<PagedResult<DealerListItem>, Error>>
 {
     public async Task<Result<PagedResult<DealerListItem>, Error>> Handle(
@@ -32,6 +32,6 @@ public sealed class ListDealersHandler(IDealerAdminReader dealers)
         var page = PageRequest.From(request.Page, request.PageSize);
         var filter = new DealerListFilter(request.Status, request.SuspendedOnly, request.Search);
 
-        return await dealers.ListAsync(filter, page, cancellationToken);
+        return await dealers.ListAsync(filter, page, clock.UtcNow, cancellationToken);
     }
 }

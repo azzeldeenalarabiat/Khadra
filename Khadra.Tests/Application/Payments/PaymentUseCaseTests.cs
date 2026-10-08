@@ -914,6 +914,37 @@ public sealed class PaymentUseCaseTests
         Assert.Same(PaymentStatus.Pending, stale.Status);
     }
 
+    /// <summary>
+    /// Pre-launch item 236: an unreachable provider will not answer the next stale checkout either, so the pass stops at
+    /// the first one and says once how many it left — rather than waiting out a timeout per checkout and logging each,
+    /// every tick. A provider that ANSWERS with a refusal for one checkout does not stop the others.
+    /// </summary>
+    [Fact]
+    public async Task The_stale_checkout_pass_stops_at_the_first_unreachable_provider()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        var first = PendingFor(booking, reference: "sess_1");
+        var second = PendingFor(booking, reference: "sess_2");
+        var third = PendingFor(booking, reference: "sess_3");
+        context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([first, second, third]);
+        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([]);
+        context.Provider.QueryAsync("sess_1", Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<ProviderPaymentState, Error>(Error.Failure("provider.session_unknown", "Unknown session.")));
+        context.Provider.QueryAsync("sess_2", Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<ProviderPaymentState, Error>(PaymentErrors.ProviderUnavailable));
+
+        var report = await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Equal(0, report.Value.Closed);
+        await context.Provider.DidNotReceive().QueryAsync("sess_3", Arg.Any<CancellationToken>());
+        Assert.All(new[] { first, second, third }, payment => Assert.Same(PaymentStatus.Pending, payment.Status));
+        // One line for the one that answered and would not say, one for the outage — and none per checkout after it.
+        Assert.Single(context.SweepLog.Entries, entry => entry.Id.Id == 2312);
+        var stopped = Assert.Single(context.SweepLog.Entries, entry => entry.Id.Id == 2326);
+        Assert.Contains("2 stale checkout(s)", stopped.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task The_sweep_sends_the_refunds_the_platform_owes()
     {

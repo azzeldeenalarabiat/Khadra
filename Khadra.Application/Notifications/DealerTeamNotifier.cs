@@ -53,7 +53,7 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
 
         var actorName = await NameOfAsync(actorUserId, cancellationToken);
         notifier.RaiseMany(recipients.Select(recipient =>
-            Notification.Raise(recipient, kind, actorName, now, subjectId, subjectReference, actorUserId)));
+            ByPerson(recipient, kind, actorName, now, subjectId, subjectReference, actorUserId)));
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
             return Task.CompletedTask;
 
         notifier.RaiseMany(recipients.Select(recipient =>
-            Notification.Raise(recipient, kind, CustomerActorName, now, subjectId, subjectReference)));
+            Notification.RaiseByStandIn(recipient, kind, NotificationStandIn.Customer, now, subjectId, subjectReference)));
 
         return Task.CompletedTask;
     }
@@ -152,12 +152,15 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         if (recipientUserId.IsEmpty || recipientUserId == actorUserId)
             return;
 
-        var actorName = actorUserId is { } actor
-            ? await NameOfAsync(actor, cancellationToken)
-            : Notification.PlatformActorName;
+        if (actorUserId is not { } actor)
+        {
+            notifier.Raise(Notification.Raise(
+                recipientUserId, kind, Notification.PlatformActorName, now, subjectId, subjectReference));
+            return;
+        }
 
-        notifier.Raise(Notification.Raise(
-            recipientUserId, kind, actorName, now, subjectId, subjectReference, actorUserId));
+        var actorName = await NameOfAsync(actor, cancellationToken);
+        notifier.Raise(ByPerson(recipientUserId, kind, actorName, now, subjectId, subjectReference, actor));
     }
 
     /// <summary>
@@ -190,14 +193,11 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         if (customerUserId.IsEmpty)
             return Task.CompletedTask;
 
-        notifier.Raise(Notification.Raise(
-            customerUserId,
-            kind,
-            string.IsNullOrWhiteSpace(galleryName) ? UnknownGalleryName : galleryName.Trim(),
-            now,
-            subjectId,
-            subjectReference,
-            dueAt: dueAt));
+        // A gallery removed from the platform between the action and the notification has no name to give. The row
+        // still has to render, and "the rental office" is truer than a blank — as a code the clients word (item 103).
+        notifier.Raise(string.IsNullOrWhiteSpace(galleryName)
+            ? Notification.RaiseByStandIn(customerUserId, kind, NotificationStandIn.RentalOffice, now, subjectId, subjectReference, dueAt: dueAt)
+            : Notification.Raise(customerUserId, kind, galleryName.Trim(), now, subjectId, subjectReference, dueAt: dueAt));
 
         return Task.CompletedTask;
     }
@@ -245,23 +245,30 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
     }
 
     /// <summary>
-    /// The actor's name at the moment they acted.
+    /// The actor's name at the moment they acted, or null when their account cannot be read.
     ///
     /// A missing user is possible — soft-deleted, or a race with deactivation — and is not worth
-    /// failing an approved booking over, so it degrades to a label rather than throwing.
+    /// failing an approved booking over, so it degrades to a stand-in rather than throwing.
     /// </summary>
-    private async Task<string> NameOfAsync(Id userId, CancellationToken cancellationToken)
+    private async Task<string?> NameOfAsync(Id userId, CancellationToken cancellationToken)
     {
         var user = await users.GetByIdAsync(userId, cancellationToken);
-        return user?.Name.Value ?? UnknownActorName;
+        return user?.Name.Value;
     }
 
-    private const string UnknownActorName = "A colleague";
-
-    // Deliberately not a name. See NotifyTeamOfCustomerActionAsync.
-    private const string CustomerActorName = "A customer";
-
-    // A gallery removed from the platform between the action and the notification. The row still has
-    // to render, and "the rental office" is truer than a blank.
-    private const string UnknownGalleryName = "The rental office";
+    /// <summary>
+    /// A row naming the person who acted, or — when their name could not be read — the colleague stand-in, as a code the
+    /// screens word (pre-launch item 103) beside the English phrase every row used to carry alone.
+    /// </summary>
+    private static Notification ByPerson(
+        Id recipient,
+        NotificationKind kind,
+        string? actorName,
+        DateTimeOffset now,
+        Id? subjectId,
+        string? subjectReference,
+        Id actorUserId) =>
+        actorName is null
+            ? Notification.RaiseByStandIn(recipient, kind, NotificationStandIn.Colleague, now, subjectId, subjectReference, actorUserId)
+            : Notification.Raise(recipient, kind, actorName, now, subjectId, subjectReference, actorUserId);
 }

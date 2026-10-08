@@ -79,6 +79,7 @@ public sealed class PostgresSettlementSweepTests
             team,
             clock,
             new UnitOfWork(sweep, Substitute.For<IDomainEventDispatcher>()),
+            new RepeatedFailureLog(),
             NullLogger<SettleDueBookingsHandler>.Instance);
 
         var report = (await handler.Handle(new SettleDueBookingsCommand(), CancellationToken.None)).Value;
@@ -105,6 +106,7 @@ public sealed class PostgresSettlementSweepTests
                 new DealerTeamNotifier(new Notifier(read), new UserRepository(read)),
                 clock,
                 new UnitOfWork(read, Substitute.For<IDomainEventDispatcher>()),
+                new RepeatedFailureLog(),
                 NullLogger<SettleDueBookingsHandler>.Instance)
             .Handle(new SettleDueBookingsCommand(), CancellationToken.None)).Value;
         Assert.Equal((1, 0), (again.ExpiredUnanswered, again.Failed));

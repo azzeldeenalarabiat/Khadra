@@ -75,6 +75,7 @@ public sealed class FinancialDocumentPdfLinkHandlers(
     IFinancialDocumentRepository documents,
     IFinancialDocumentRenditionRepository renditions,
     IDocumentLinkSigner signer,
+    ICurrentActor actor,
     IClock clock)
     : IRequestHandler<GetMyFinancialDocumentPdfLinkQuery, Result<SignedDocumentLink, Error>>,
       IRequestHandler<GetAdminFinancialDocumentPdfLinkQuery, Result<SignedDocumentLink, Error>>
@@ -88,7 +89,7 @@ public sealed class FinancialDocumentPdfLinkHandlers(
 
         // A voided document's customer is given its voided copy; the unstamped original stays the administrators'.
         var kind = await documents.IsVoidedAsync(document.Id, cancellationToken) ? RenditionKind.Voided : RenditionKind.AsIssued;
-        return await LinkAsync(document.Id, PdfLanguages.Parse(request.Language)!, kind, cancellationToken);
+        return await LinkAsync(document.Id, PdfLanguages.Parse(request.Language)!, kind, request.CustomerId, cancellationToken);
     }
 
     public async Task<Result<SignedDocumentLink, Error>> Handle(GetAdminFinancialDocumentPdfLinkQuery request, CancellationToken cancellationToken)
@@ -101,15 +102,19 @@ public sealed class FinancialDocumentPdfLinkHandlers(
         if (kind == RenditionKind.Voided && !await documents.IsVoidedAsync(request.DocumentId, cancellationToken))
             return FinancialDocumentErrors.NotVoided;
 
-        return await LinkAsync(request.DocumentId, PdfLanguages.Parse(request.Language)!, kind, cancellationToken);
+        // Bound to the administrator who asked (pre-launch item 14). The route is administrators-only, so somebody is
+        // signed in; a request with nobody behind it is a programming error, not a document to hand out.
+        var viewer = actor.UserId ?? throw new InvalidOperationException("A document link is minted for the signed-in person who will open it.");
+        return await LinkAsync(request.DocumentId, PdfLanguages.Parse(request.Language)!, kind, viewer, cancellationToken);
     }
 
-    private async Task<Result<SignedDocumentLink, Error>> LinkAsync(Id documentId, Language language, RenditionKind kind, CancellationToken cancellationToken)
+    private async Task<Result<SignedDocumentLink, Error>> LinkAsync(
+        Id documentId, Language language, RenditionKind kind, Id viewer, CancellationToken cancellationToken)
     {
         var rendition = await renditions.CurrentAsync(documentId, language, RenditionFormat.Pdf, kind, cancellationToken);
         if (rendition is null)
             return FinancialDocumentErrors.PdfNotReady;
 
-        return signer.Sign(rendition.StorageKey, clock.UtcNow);
+        return signer.Sign(rendition.StorageKey, viewer, clock.UtcNow);
     }
 }

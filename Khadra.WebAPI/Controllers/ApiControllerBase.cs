@@ -75,6 +75,7 @@ public abstract class ApiControllerBase : ControllerBase
             ErrorKind.Conflict => StatusCodes.Status409Conflict,
             // A mail relay that refused the message is not the caller getting the request wrong.
             ErrorKind.Unavailable => StatusCodes.Status503ServiceUnavailable,
+            ErrorKind.TooManyRequests => StatusCodes.Status429TooManyRequests,
             _ => StatusCodes.Status422UnprocessableEntity
         };
 
@@ -98,9 +99,17 @@ public abstract class ApiControllerBase : ControllerBase
         {
             foreach (var (key, value) in error.Extensions)
             {
-                if (key is not ("code" or "traceId" or "errors"))
+                if (key is not ("code" or "traceId" or "errors" or Error.RetryAfterSecondsExtension))
                     problem.Extensions[key] = value;
             }
+        }
+        // A wait travels as the header the rate-limiting middleware sends, and nowhere else: the body of a refusal to
+        // try again stays the same shape whichever layer refused (pre-launch item 51).
+        if (error.Kind == ErrorKind.TooManyRequests &&
+            error.Extensions?.TryGetValue(Error.RetryAfterSecondsExtension, out var wait) == true &&
+            wait is int seconds)
+        {
+            Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         return new ObjectResult(problem) { StatusCode = status, ContentTypes = { "application/problem+json" } };

@@ -157,8 +157,8 @@ internal sealed class NotificationMessageComposer(
         var wording = WordingFor(notification);
         var arabic = language == Language.Arabic;
         return new PushText(
-            Fill(arabic ? wording.TitleAr : wording.TitleEn, notification, isolate: false),
-            Fill(arabic ? wording.BodyAr : wording.BodyEn, notification, isolate: arabic));
+            Fill(arabic ? wording.TitleAr : wording.TitleEn, notification, arabic, isolate: false),
+            Fill(arabic ? wording.BodyAr : wording.BodyEn, notification, arabic, isolate: arabic));
     }
 
     public EmailMessage ComposeEmail(Notification notification, User recipient)
@@ -170,10 +170,10 @@ internal sealed class NotificationMessageComposer(
         var name = recipient.Name.Value;
         var link = LinkFor(notification, recipient);
 
-        var arabicBody = Fill(wording.BodyAr, notification, isolate: true);
-        var englishBody = Fill(wording.BodyEn, notification, isolate: false);
-        var arabicTitle = Fill(wording.TitleAr, notification, isolate: false);
-        var englishTitle = Fill(wording.TitleEn, notification, isolate: false);
+        var arabicBody = Fill(wording.BodyAr, notification, arabic: true, isolate: true);
+        var englishBody = Fill(wording.BodyEn, notification, arabic: false, isolate: false);
+        var arabicTitle = Fill(wording.TitleAr, notification, arabic: true, isolate: false);
+        var englishTitle = Fill(wording.TitleEn, notification, arabic: false, isolate: false);
 
         var arabicHtml = $"""<div dir="rtl" lang="ar" style="text-align:right"><p>مرحباً {Html(name)}،</p><p>{Html(arabicBody)}</p>"""
                          + (link is null ? string.Empty : $"""<p><a href="{link.Url}">{link.Arabic}</a></p>""") + "</div>";
@@ -250,14 +250,30 @@ internal sealed class NotificationMessageComposer(
         return Texts.GetValueOrDefault(key, Fallback);
     }
 
-    private string Fill(string template, Notification notification, bool isolate)
+    private string Fill(string template, Notification notification, bool arabic, bool isolate)
     {
         string Run(string value) => isolate ? $"⁨{value}⁩" : value;
 
         return template
-            .Replace("{actor}", Run(notification.ActorName), StringComparison.Ordinal)
+            .Replace("{actor}", Run(Actor(notification, arabic)), StringComparison.Ordinal)
             .Replace("{ref}", Run(notification.SubjectReference ?? string.Empty), StringComparison.Ordinal)
             .Replace("{due}", notification.DueAt is { } due ? Run(Moment(due)) : string.Empty, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The actor in the message's language. A stand-in is worded from its code (pre-launch item 103) — the stored phrase is
+    /// English, and an Arabic push for a booking at an office that has since left the platform used to carry it; a
+    /// named actor is the name it was recorded under.
+    /// </summary>
+    private static string Actor(Notification notification, bool arabic)
+    {
+        if (notification.ActorStandIn == NotificationStandIn.RentalOffice)
+            return arabic ? "مكتب التأجير" : "The rental office";
+        if (notification.ActorStandIn == NotificationStandIn.Customer)
+            return arabic ? "أحد العملاء" : "A customer";
+        if (notification.ActorStandIn == NotificationStandIn.Colleague)
+            return arabic ? "أحد الزملاء" : "A colleague";
+        return notification.ActorName;
     }
 
     private string Moment(DateTimeOffset instant)

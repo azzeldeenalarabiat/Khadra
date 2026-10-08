@@ -194,4 +194,27 @@ public sealed class DocumentStorageConfigurationTests
     public void Plain_http_to_loopback_is_allowed(string url) =>
         Assert.IsType<SupabaseDocumentStorage>(
             Resolve(Supabase(("Documents:Supabase:Url", url))).GetRequiredService<IDocumentStorage>());
+
+    /// <summary>
+    /// A document size a dealer's submission could not carry every required document at is refused at startup, naming
+    /// the setting, rather than becoming a 413 on every application (pre-launch item 33).
+    /// </summary>
+    [Fact]
+    public void A_document_size_no_dealer_submission_could_carry_is_refused_at_startup()
+    {
+        var options = Resolve(("Documents:MaximumSizeBytes", (12 * 1024 * 1024).ToString(System.Globalization.CultureInfo.InvariantCulture)))
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<Khadra.Infrastructure.Configuration.DocumentStorageOptions>>();
+
+        var refused = Assert.Throws<Microsoft.Extensions.Options.OptionsValidationException>(() => options.Value);
+        Assert.Contains("Documents:MaximumSizeBytes", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_configured_document_size_is_accepted()
+    {
+        var options = Resolve(("Documents:MaximumSizeBytes", "8388608"))
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<Khadra.Infrastructure.Configuration.DocumentStorageOptions>>();
+
+        Assert.Equal(8388608, options.Value.MaximumSizeBytes);
+    }
 }

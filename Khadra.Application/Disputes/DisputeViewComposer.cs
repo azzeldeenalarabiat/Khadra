@@ -27,13 +27,15 @@ namespace Khadra.Application.Disputes;
 /// only what is the office's (owner decision 3).
 ///
 /// Evidence links are minted here, per request, and expire: spec 7 keeps evidence private, and a
-/// stored URL would be a credential sitting in a database.
+/// stored URL would be a credential sitting in a database. Each is bound to the signed-in person the view
+/// is composed for, so it opens in their session and nobody else's (pre-launch item 14).
 /// </summary>
 public sealed partial class DisputeViewComposer(
     IBookingRepository bookings,
     IBookingReader bookingReader,
     IDisputeAdminReader names,
     IDocumentLinkSigner signer,
+    ICurrentActor actor,
     IDisputeTicketRepository tickets,
     IAdminDashboardSettings dashboard,
     IOfficePayableRepository payables,
@@ -84,6 +86,9 @@ public sealed partial class DisputeViewComposer(
         // The stand-in is kept ONLY for shipped customer apps, which print a name as it arrives. Each
         // name travels with its flag, and a client that words the case reads the flag instead.
         string NameOf(Id id) => lookup.TryGetValue(id.Value, out var name) ? name : ClosedAccountName;
+        // Asked only when there is evidence to link. Every route that composes a dispute is behind authentication, so
+        // somebody is signed in; nobody would be a programming error, not a link to hand out.
+        Id Reader() => actor.UserId ?? throw new InvalidOperationException("An evidence link is minted for the signed-in person who will open it.");
         bool Closed(Id id) => !lookup.ContainsKey(id.Value);
 
         var statements = ticket.Statements
@@ -99,7 +104,7 @@ public sealed partial class DisputeViewComposer(
                 statement.EvidenceStorageKeys
                     .Select(key =>
                     {
-                        var link = signer.Sign(key, now);
+                        var link = signer.Sign(key, Reader(), now);
                         return new EvidenceLinkDto(Path.GetFileName(key), link.Url, link.ExpiresAt);
                     })
                     .ToList()))

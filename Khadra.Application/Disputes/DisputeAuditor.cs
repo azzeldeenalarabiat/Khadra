@@ -1,4 +1,5 @@
 using System.Globalization;
+using Khadra.Application.Auditing;
 using Khadra.Application.Common;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
@@ -43,7 +44,7 @@ public sealed class DisputeAuditor(IAuditTrail auditTrail, ICurrentActor actor, 
         var entry = actor.UserId is { } actorId && actor.Role is { } role
             ? AuditEntry.By(
                 actorId,
-                actor.Name ?? "Unknown admin",
+                actor.RecordedName(actorId),
                 role,
                 action,
                 AuditEntityType.Dispute,
@@ -69,8 +70,11 @@ public sealed class DisputeAuditor(IAuditTrail auditTrail, ICurrentActor actor, 
     }
 
     /// <summary>
-    /// The money decision in one line, for the audit log's "new value" column. Compact on purpose:
-    /// the column is capped, and the full document lives on the ticket.
+    /// The money decision, for the audit log's "new value" column, as its FIGURES rather than a sentence (pre-launch
+    /// item 50): what was held, and where it went — back to the customer, to the platform, to the office — plus any
+    /// charge on the office beyond the deposit. The console words it from <c>DisputeResolved</c> in its reader's
+    /// language. Compact on purpose: the column is capped, and the full document lives on the ticket. An entry written
+    /// before 2026-10-08 holds the English line "Resolved: of … held, refund …" and is shown as stored.
     /// </summary>
     public static string Describe(DisputeResolution resolution)
     {
@@ -78,14 +82,14 @@ public sealed class DisputeAuditor(IAuditTrail auditTrail, ICurrentActor actor, 
 
         var deposit = resolution.Deposit;
         var currency = deposit.DepositHeld.CurrencyCode;
-        var summary =
-            $"Resolved: of {Figure(deposit.DepositHeld)} {currency} held, " +
-            $"refund {Figure(deposit.RefundToCustomer)}, platform {Figure(deposit.RetainedByPlatform)}, " +
-            $"dealer {Figure(deposit.TransferredToDealer)}";
+        var held = Figure(deposit.DepositHeld);
+        var refund = Figure(deposit.RefundToCustomer);
+        var platform = Figure(deposit.RetainedByPlatform);
+        var dealer = Figure(deposit.TransferredToDealer);
 
         return resolution.DealerCharge is { } charge
-            ? $"{summary}; dealer charged {Figure(charge)} {charge.CurrencyCode}"
-            : summary;
+            ? AuditValue.Of(new { currency, held, refund, platform, dealer, charge = Figure(charge), chargeCurrency = charge.CurrencyCode })
+            : AuditValue.Of(new { currency, held, refund, platform, dealer });
     }
 
     // Every figure at the currency's full scale and in the invariant culture: this line is stored for ever

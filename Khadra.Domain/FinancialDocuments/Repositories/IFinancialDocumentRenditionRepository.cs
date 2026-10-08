@@ -23,4 +23,13 @@ public interface IFinancialDocumentRenditionRepository
     Task<IReadOnlyList<FinancialDocumentRendition>> ListForDocumentAsync(Id documentId, CancellationToken cancellationToken = default);
 
     void Add(FinancialDocumentRendition rendition);
+
+    /// <summary>The hold on one document's PDF in one language and kind, or null (pre-launch item 197).</summary>
+    Task<FinancialDocumentRenditionHold?> HoldAsync(
+        Id documentId,
+        Language language,
+        RenditionKind kind,
+        CancellationToken cancellationToken = default);
+
+    void AddHold(FinancialDocumentRenditionHold hold);
 }

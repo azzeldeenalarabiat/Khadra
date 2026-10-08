@@ -31,6 +31,10 @@ public sealed class AuditEntry : AggregateRoot, IAppendOnly
     public Id? EntityId { get; private set; }
     // What an admin would recognise in the UI: a dealer name, a booking reference, a setting key.
     public string SubjectLabel { get; private set; } = null!;
+    // The same subject's ARABIC name, snapshotted beside it where the subject has one (pre-launch item 176): a city or
+    // a car type is named in both languages, and an Arabic reader's line should not carry the English one. Null for
+    // every subject that has no Arabic name of its own, and for every entry written before 2026-10-08.
+    public string? SubjectLabelAr { get; private set; }
     public string? PreviousValue { get; private set; }
     public string? NewValue { get; private set; }
     public string? Reason { get; private set; }
@@ -56,7 +60,8 @@ public sealed class AuditEntry : AggregateRoot, IAppendOnly
         string? previousValue = null,
         string? newValue = null,
         string? reason = null,
-        string? correlationId = null)
+        string? correlationId = null,
+        string? subjectLabelAr = null)
     {
         ArgumentNullException.ThrowIfNull(actorRole);
         if (actorUserId.IsEmpty)
@@ -64,7 +69,7 @@ public sealed class AuditEntry : AggregateRoot, IAppendOnly
 
         return Build(
             actorUserId, actorName, actorRole, action, entityType, entityId, subjectLabel,
-            occurredAt, previousValue, newValue, reason, correlationId);
+            occurredAt, previousValue, newValue, reason, correlationId, subjectLabelAr);
     }
 
     // Expiries, no-show sweeps and other scheduled work. Recorded with no actor rather than
@@ -78,10 +83,11 @@ public sealed class AuditEntry : AggregateRoot, IAppendOnly
         string? previousValue = null,
         string? newValue = null,
         string? reason = null,
-        string? correlationId = null) =>
+        string? correlationId = null,
+        string? subjectLabelAr = null) =>
         Build(
             null, SystemActorName, null, action, entityType, entityId, subjectLabel,
-            occurredAt, previousValue, newValue, reason, correlationId);
+            occurredAt, previousValue, newValue, reason, correlationId, subjectLabelAr);
 
     public const string SystemActorName = "System";
 
@@ -97,7 +103,8 @@ public sealed class AuditEntry : AggregateRoot, IAppendOnly
         string? previousValue,
         string? newValue,
         string? reason,
-        string? correlationId)
+        string? correlationId,
+        string? subjectLabelAr)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(entityType);
@@ -116,6 +123,7 @@ public sealed class AuditEntry : AggregateRoot, IAppendOnly
             EntityType = entityType,
             EntityId = entityId,
             SubjectLabel = Clip(subjectLabel, MaxLabelLength)!,
+            SubjectLabelAr = Clip(subjectLabelAr, MaxLabelLength),
             PreviousValue = Clip(previousValue, MaxValueLength),
             NewValue = Clip(newValue, MaxValueLength),
             Reason = Clip(reason, MaxReasonLength),

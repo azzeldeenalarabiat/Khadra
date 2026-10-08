@@ -23,7 +23,11 @@ public sealed record NotificationItem(
     string ActorName,
     bool IsMine,
     DateTimeOffset OccurredAt,
-    DateTimeOffset? ReadAt)
+    DateTimeOffset? ReadAt,
+    // Set when ActorName is a stand-in rather than a name — Customer, Colleague, RentalOffice — so a screen words the
+    // actor in its reader's language instead of printing the English phrase (pre-launch item 103). Null for a named
+    // actor, and for every row written before 2026-10-08. Additive: a client that ignores it reads ActorName as before.
+    string? ActorStandIn = null)
 {
     public bool IsRead => ReadAt is not null;
 
@@ -41,7 +45,8 @@ public sealed record NotificationItem(
             // name that two people might share.
             notification.ActorUserId is { } actor && actor == viewer,
             notification.OccurredAt,
-            notification.ReadAt);
+            notification.ReadAt,
+            notification.ActorStandIn?.Name);
     }
 }
 

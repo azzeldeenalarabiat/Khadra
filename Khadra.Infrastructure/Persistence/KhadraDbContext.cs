@@ -48,7 +48,9 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<FinancialDocumentDelivery> FinancialDocumentDeliveries => Set<FinancialDocumentDelivery>();
     public DbSet<FinancialDocumentDeliveryAttempt> FinancialDocumentDeliveryAttempts => Set<FinancialDocumentDeliveryAttempt>();
     public DbSet<FinancialDocumentIssuanceHold> FinancialDocumentIssuanceHolds => Set<FinancialDocumentIssuanceHold>();
+    public DbSet<FinancialDocumentRenditionHold> FinancialDocumentRenditionHolds => Set<FinancialDocumentRenditionHold>();
     internal DbSet<FinancialDocumentSeries> FinancialDocumentSeries => Set<FinancialDocumentSeries>();
+    internal DbSet<SignInThrottleEntry> SignInThrottles => Set<SignInThrottleEntry>();
     public DbSet<OfficePayable> OfficePayables => Set<OfficePayable>();
     public DbSet<OfficeSettlement> OfficeSettlements => Set<OfficeSettlement>();
     public DbSet<OfficeSettlementVoid> OfficeSettlementVoids => Set<OfficeSettlementVoid>();
@@ -159,11 +161,10 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     // should fail here with a message that names the problem rather than surfacing a Postgres error.
     // The check also holds on SQLite, where the tests run and the trigger does not exist.
     //
-    // PRE-LAUNCH (see docs/pre-launch-checklist.md): the database trigger is FOR EACH ROW BEFORE
-    // DELETE OR UPDATE, and row-level triggers do not fire on TRUNCATE. Anyone holding table
-    // privileges can therefore erase the whole audit trail in one statement without tripping either
-    // guard. Deliberately deferred while this is a development database that gets reseeded; it must
-    // be closed with a FOR EACH STATEMENT ... ON TRUNCATE trigger before real audit data exists.
+    // A row trigger does not fire on TRUNCATE, so `audit_entries` also carries a FOR EACH STATEMENT
+    // guard (migration AuditTrailRefusesTruncate, pre-launch item 1), like every later append-only
+    // table. TRUNCATE never passes through SaveChanges, so the database is the only place that can
+    // refuse it.
     private void GuardAuditTrailIsAppendOnly()
     {
         // Every IAppendOnly record, not just AuditEntry. It named that one type until the document

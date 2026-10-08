@@ -7,7 +7,8 @@ namespace Khadra.Application.Disputes.ReadModels;
 public sealed record DisputeListItem(
     Guid TicketId,
     Guid BookingId,
-    string BookingReference,
+    // Null when the booking does not resolve, which cannot happen (bookings are never deleted); the console words it.
+    string? BookingReference,
     // Null when the dealership no longer resolves (it is no longer on the platform). This read model
     // reaches only the Admin console, which words the case in its reader's language; there is no
     // shipped client to keep an English stand-in for.

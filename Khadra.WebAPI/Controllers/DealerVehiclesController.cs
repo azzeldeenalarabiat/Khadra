@@ -4,6 +4,7 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Fleet.Dtos;
 using Khadra.Application.Fleet.ManageVehicles;
+using Khadra.Application.Fleet.VehicleCalendar;
 using Khadra.Application.Fleet.VehicleImages;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -42,6 +43,26 @@ public sealed class DealerVehiclesController(ICurrentActor actor) : ApiControlle
     {
         var result = await Mediator.Send(
             new GetMyVehicleQuery(actor.UserId!.Value, Id.From(vehicleId)), cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// One car's month, day by day, in the platform's calendar: which booking holds it, and the turnaround before a
+    /// rental (pre-launch item 54). The same holds the customer's search sees.
+    /// </summary>
+    [Authorize(Policy = SecurityPolicies.DealerStaff)]
+    [HttpGet("{vehicleId:guid}/calendar")]
+    [ProducesResponseType<VehicleCalendarDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> Calendar(
+        Guid vehicleId,
+        [FromQuery] int year,
+        [FromQuery] int month,
+        CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new GetVehicleCalendarQuery(actor.UserId!.Value, Id.From(vehicleId), year, month), cancellationToken);
         return FromResult(result);
     }
 

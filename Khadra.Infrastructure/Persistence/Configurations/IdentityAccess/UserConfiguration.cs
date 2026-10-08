@@ -53,7 +53,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         entity.HasMany(user => user.Documents)
             .WithOne()
             .HasForeignKey(document => document.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(User.Documents))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 

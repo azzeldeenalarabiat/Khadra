@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.IdentityAccess.Login;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
@@ -16,7 +17,8 @@ public sealed class ResetPasswordHandler(
     IAuthPolicySettings policy,
     IClock clock,
     IUnitOfWork unitOfWork,
-    AuthEmailDispatcher emails)
+    AuthEmailDispatcher emails,
+    ISignInThrottle throttle)
     : IRequestHandler<ResetPasswordCommand, UnitResult<Error>>
 {
     public async Task<UnitResult<Error>> Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
@@ -51,6 +53,10 @@ public sealed class ResetPasswordHandler(
         // Raises UserPasswordChanged: every refresh-token family of this user is revoked after commit.
         user.ChangePassword(PasswordHash.FromHash(passwordHasher.Hash(request.NewPassword)), now);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // The owner just proved the mailbox and chose a new password; failures counted against the name before that
+        // (item 51) were guesses at a password that no longer exists.
+        await throttle.ResetAsync(user.Email, cancellationToken);
 
         await emails.SendPasswordChangedAsync(user, cancellationToken);
         return UnitResult.Success<Error>();

@@ -41,6 +41,7 @@ public sealed class GetRecentActivityHandler(
                 entry.EntityType,
                 entry.SubjectLabel,
                 entry.EntityId?.Value,
-                entry.BookingReference))]);
+                entry.BookingReference,
+                entry.SubjectLabelAr))]);
     }
 }

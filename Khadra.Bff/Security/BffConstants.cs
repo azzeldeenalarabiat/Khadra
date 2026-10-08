@@ -24,6 +24,15 @@ internal static class BffConstants
     /// </summary>
     public const string CustomerAppVersionHeaderName = "X-Khadra-App-Version";
 
+    /// <summary>
+    /// The largest request body this BFF lets through to the API (pre-launch item 33). Kestrel's default is 30,000,000
+    /// bytes, below the 32 MiB the API accepts for a dealer's submission with its licence documents, so raising the
+    /// documents' size would have become a silent 413 here before the API was ever reached. Set explicitly instead,
+    /// and a test holds it at or above every limit the API declares (<c>RequestSizeLimit</c>), so the API's cannot be
+    /// raised past it unnoticed. The API still refuses anything larger than each endpoint allows.
+    /// </summary>
+    public const long MaxRequestBodyBytes = 32 * 1024 * 1024;
+
     public const string AccessTokenName = "access_token";
     public const string RefreshTokenName = "refresh_token";
     public const string AccessExpiresAtName = "expires_at";

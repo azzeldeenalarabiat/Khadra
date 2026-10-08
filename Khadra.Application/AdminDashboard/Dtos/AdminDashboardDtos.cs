@@ -131,6 +131,7 @@ public sealed record ActivityFeedDto(
 /// <param name="ActorUserId">Null when nobody acted, and the client words the actor; see <c>ActivityEntry</c>.</param>
 /// <param name="EntityId">The record acted on.</param>
 /// <param name="BookingReference">The booking the entry is about, for Booking and Dispute entries; see <c>ActivityEntry</c>.</param>
+/// <param name="SubjectLabelAr">The subject's Arabic name, for a city or a car type; see <c>ActivityEntry</c>.</param>
 public sealed record ActivityEntryDto(
     Guid Id,
     DateTimeOffset OccurredAt,
@@ -140,7 +141,8 @@ public sealed record ActivityEntryDto(
     string EntityType,
     string SubjectLabel,
     Guid? EntityId,
-    string? BookingReference);
+    string? BookingReference,
+    string? SubjectLabelAr = null);
 
 /// <summary>
 /// "Money in motion" (payments Phase 4b): what moved through the platform this Amman month, and what is

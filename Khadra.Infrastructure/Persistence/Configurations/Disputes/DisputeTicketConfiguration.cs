@@ -46,7 +46,7 @@ internal sealed class DisputeTicketConfiguration : IEntityTypeConfiguration<Disp
         entity.HasMany(ticket => ticket.Statements)
             .WithOne()
             .HasForeignKey(statement => statement.TicketId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(DisputeTicket.Statements))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 

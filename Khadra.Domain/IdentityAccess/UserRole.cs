@@ -2,6 +2,9 @@ using Khadra.Domain.Common;
 
 namespace Khadra.Domain.IdentityAccess;
 
+// ADD-ONLY (pre-launch item 19): rows store the NAME and are read back through Enumeration.FromName, which throws
+// for a name that no longer exists. Renaming or removing a member makes every row carrying it unreadable, and audit
+// rows cannot be corrected. Add members; never rename or remove one. PersistedEnumerationNamesTests holds the list.
 public sealed class UserRole : Enumeration
 {
     public static readonly UserRole Admin = new(1, "Admin");

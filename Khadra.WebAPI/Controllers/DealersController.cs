@@ -35,7 +35,7 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     /// </summary>
     [Authorize(Policy = SecurityPolicies.DealerOwner)]
     [HttpPost]
-    [RequestSizeLimit(32 * 1024 * 1024)]
+    [RequestSizeLimit(DealerSubmissionLimits.MaximumRequestBytes)]
     [ProducesResponseType<DealerProfileDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]

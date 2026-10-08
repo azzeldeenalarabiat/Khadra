@@ -271,6 +271,9 @@ public sealed class CreateBookingTests
 
         var notification = Assert.Single(context.Notified);
         Assert.Equal("A customer", notification.ActorName);
+        // And the code beside the phrase, which the screens word in their reader's language (pre-launch item 103).
+        Assert.Same(NotificationStandIn.Customer, notification.ActorStandIn);
+        Assert.Equal("Customer", NotificationItem.From(notification, Id.New()).ActorStandIn);
         Assert.Null(notification.ActorUserId);
         Assert.NotEqual(context.Customer.Name.Value, notification.ActorName);
     }

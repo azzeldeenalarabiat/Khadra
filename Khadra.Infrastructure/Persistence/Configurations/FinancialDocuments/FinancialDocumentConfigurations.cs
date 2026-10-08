@@ -198,6 +198,36 @@ internal sealed class FinancialDocumentIssuanceHoldConfiguration : IEntityTypeCo
     }
 }
 
+// A document's PDF that could not be drawn, and why (pre-launch item 197). One row per document, language and
+// kind, upserted on each failed attempt; open exactly while no rendition of that document, language and kind exists,
+// which the readers ask — so there is no resolved flag to keep in step.
+internal sealed class FinancialDocumentRenditionHoldConfiguration : IEntityTypeConfiguration<FinancialDocumentRenditionHold>
+{
+    public void Configure(EntityTypeBuilder<FinancialDocumentRenditionHold> entity)
+    {
+        ConfigureAggregate(entity, "financial_document_rendition_holds");
+
+        ConfigureId(entity.Property(hold => hold.DocumentId)).IsRequired();
+        entity.Property(hold => hold.Language)
+            .HasConversion(language => language.Name, name => Enumeration.FromName<Language>(name))
+            .HasMaxLength(2)
+            .IsRequired();
+        ConfigureEnumeration(entity.Property(hold => hold.Kind), 10);
+        ConfigureEnumeration(entity.Property(hold => hold.Reason), 30);
+        entity.Property(hold => hold.Attempts).IsRequired();
+        entity.Property(hold => hold.FirstFailedAt).IsRequired();
+        entity.Property(hold => hold.LastFailedAt).IsRequired();
+
+        entity.HasOne<FinancialDocument>()
+            .WithMany()
+            .HasForeignKey(hold => hold.DocumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasIndex(hold => new { hold.DocumentId, hold.Language, hold.Kind }).IsUnique();
+        entity.ToTable(table => table.HasCheckConstraint("ck_financial_document_rendition_holds_attempts", "attempts >= 1"));
+    }
+}
+
 // The counters behind the numbers. Not a domain aggregate: a number is taken with one atomic upsert in
 // the transaction that inserts its document, so a rolled-back issue gives its number back.
 internal sealed class FinancialDocumentSeriesConfiguration : IEntityTypeConfiguration<FinancialDocumentSeries>

@@ -21,6 +21,28 @@ public sealed record DealerDocumentUpload(
     Stream Content);
 
 /// <summary>
+/// How large one dealer submission may be: the form's fields and every required licence document together (pre-launch
+/// item 33).
+/// </summary>
+/// <remarks>
+/// One figure, named, because three places depend on it: the API's limit on the endpoint, the startup check that a
+/// configured <c>Documents:MaximumSizeBytes</c> still lets every required document through it, and the BFF in front,
+/// whose own body limit a test holds at or above it. A document size raised past what this fits used to become a silent
+/// 413 from whichever of the two refused first; now the API refuses to start, naming the setting.
+/// </remarks>
+public static class DealerSubmissionLimits
+{
+    public const long MaximumRequestBytes = 32 * 1024 * 1024;
+
+    /// <summary>What the form's own fields and the multipart framing may take beside the documents.</summary>
+    public const long FormAllowanceBytes = 1024 * 1024;
+
+    /// <summary>Whether every required document at the largest allowed size still fits one submission.</summary>
+    public static bool Fits(long maximumDocumentBytes) =>
+        maximumDocumentBytes * DealerDocumentType.Required.Count + FormAllowanceBytes <= MaximumRequestBytes;
+}
+
+/// <summary>
 /// Step two of spec 3.1: the business itself is submitted for the Admin's licence check.
 ///
 /// The dealer is created PENDING_REVIEW and cannot trade until an Admin approves it. Operating hours

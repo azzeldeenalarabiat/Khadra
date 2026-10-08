@@ -137,6 +137,8 @@ public sealed class ApiSmokeTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.True(problem.TryGetProperty("errors", out _));
         Assert.True(problem.TryGetProperty("traceId", out _));
+        // Pre-launch item 121: a body MVC could not bind carries a code like every other refusal.
+        Assert.Equal("request.invalid", problem.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -150,6 +152,7 @@ public sealed class ApiSmokeTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.True(problem.TryGetProperty("errors", out var errors));
         Assert.True(errors.TryGetProperty("Token", out _) || errors.TryGetProperty("token", out _));
+        Assert.Equal("request.invalid", problem.GetProperty("code").GetString());
     }
 
     [Fact]

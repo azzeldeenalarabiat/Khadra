@@ -189,6 +189,7 @@ public sealed class AdminFinancialDocumentQueryHandlers(
 
         var (page, voided, renditions) = await FinancialDocumentPageReader.ReadAsync(reader, record, cancellationToken);
         var emails = await reader.DeliveriesOfAsync(record.Id, cancellationToken);
+        var pdfHolds = await reader.OpenPdfHoldsOfAsync(record.Id, cancellationToken);
         return new AdminFinancialDocumentDto(
             page,
             record.CustomerId.Value,
@@ -209,7 +210,8 @@ public sealed class AdminFinancialDocumentQueryHandlers(
                 && voided is null
                 && emails.All(email => email.State != FinancialDocumentDeliveryState.Queued)
                 && emailSettings.DeliveryDisabledReason is null,
-            EmailDeliveryDisabled: emailSettings.DeliveryDisabledReason is not null);
+            EmailDeliveryDisabled: emailSettings.DeliveryDisabledReason is not null,
+            PdfHolds: [.. pdfHolds.Select(FinancialDocumentPdfHoldDto.From)]);
     }
 
     public async Task<Result<AdminBookingFinancialDocumentsDto, Error>> Handle(

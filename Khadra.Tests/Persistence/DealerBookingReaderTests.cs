@@ -357,4 +357,36 @@ public sealed class DealerBookingReaderTests : IDisposable
         write.Bookings.AddRange(bookings);
         await write.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// The fleet calendar's holds on one car (pre-launch item 54): the catalogue's predicate, from each hold's own start,
+    /// and nothing of another car's or of a request whose answer window has closed.
+    /// </summary>
+    [Fact]
+    public async Task The_calendar_reads_the_live_holds_on_one_car_from_their_hold_start()
+    {
+        var car = Id.New();
+        var start = Build.Now.AddDays(5);
+        var reserved = Theirs(start, Reserve, vehicleId: car);
+        // Asked for and never answered: its window closes before the rental would have started.
+        var unanswered = Theirs(start.AddDays(10), vehicleId: car);
+        var otherCar = Theirs(start, Reserve);
+        var now = unanswered.DecisionDeadline.AddMinutes(1);
+
+        await using (var write = new KhadraDbContext(_options))
+        {
+            write.Bookings.AddRange(reserved, unanswered, otherCar);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = new KhadraDbContext(_options);
+        var holds = await new DealerBookingReader(read).VehicleHoldsAsync(
+            _dealerId, car, Build.Now, start.AddDays(30), now);
+
+        var hold = Assert.Single(holds);
+        Assert.Equal(reserved.Id.Value, hold.BookingId);
+        Assert.Equal("Confirmed", hold.Status);
+        Assert.Equal(reserved.Period.Start - Build.TurnaroundBuffer, hold.HoldStart);
+        Assert.Equal(reserved.Period.End, hold.PeriodEnd);
+    }
 }

@@ -74,7 +74,7 @@ public sealed class CatalogueRatingsTests : IDisposable
             revealAt: visibleFrom,
             now: visibleFrom.AddDays(-1)).Value;
         if (hidden)
-            review.Hide("Abusive.");
+            review.Hide(ReviewHideReason.AbusiveLanguage);
 
         await using var context = NewContext();
         context.Reviews.Add(review);

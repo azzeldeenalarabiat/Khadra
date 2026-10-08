@@ -256,7 +256,27 @@ public sealed record AdminFinancialDocumentDto(
     IReadOnlyList<FinancialDocumentRenditionDto> Renditions,
     IReadOnlyList<FinancialDocumentEmailDto> Emails,
     bool CanEmailAgain,
-    bool EmailDeliveryDisabled);
+    bool EmailDeliveryDisabled,
+    IReadOnlyList<FinancialDocumentPdfHoldDto> PdfHolds);
+
+/// <summary>
+/// A PDF of this document that could not be drawn and has not been since (pre-launch item 197): which, why, and since
+/// when. The customer's page says only that it is being prepared.
+/// </summary>
+/// <param name="Language"><c>en</c> or <c>ar</c>.</param>
+/// <param name="Kind"><c>AsIssued</c> or <c>Voided</c>.</param>
+/// <param name="Reason"><c>SnapshotAltered</c>, <c>SnapshotUnreadable</c> or <c>DrawingFailed</c>.</param>
+public sealed record FinancialDocumentPdfHoldDto(
+    string Language,
+    string Kind,
+    string Reason,
+    int Attempts,
+    DateTimeOffset FirstFailedAt,
+    DateTimeOffset LastFailedAt)
+{
+    internal static FinancialDocumentPdfHoldDto From(FinancialDocumentPdfHoldRecord record) =>
+        new(record.Language.Name, record.Kind.Name, record.Reason.Name, record.Attempts, record.FirstFailedAt, record.LastFailedAt);
+}
 
 /// <summary>
 /// One email of a document as the administrator reads it (payments Phase 7): where it stands, who asked, where and in

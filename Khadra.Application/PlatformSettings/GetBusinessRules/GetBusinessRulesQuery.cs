@@ -56,12 +56,17 @@ public sealed record BusinessRulesDto(
 }
 
 /// <param name="Source">
-/// Configuration today. The <c>BusinessRuleSettings</c> aggregate exists for the editable version,
+/// Where the figures come from, as a CODE the console words (pre-launch item 108): <see cref="ConfigurationSource"/>
+/// today. The <c>BusinessRuleSettings</c> aggregate exists for the editable version,
 /// but it and <c>BusinessRules</c> do not carry the same fields, and two of the values here — the
 /// dealer non-delivery tier and the customer cancellation penalty — are open owner decisions
 /// (spec 2.2). An editable screen would let an administrator settle them by typing into a box.
 /// </param>
-public sealed record BusinessRulesView(BusinessRulesDto Rules, string Source, bool IsEditable);
+public sealed record BusinessRulesView(BusinessRulesDto Rules, string Source, bool IsEditable)
+{
+    /// <summary>The figures are read from the <c>BusinessRules</c> configuration section.</summary>
+    public const string ConfigurationSource = "Configuration";
+}
 
 public sealed record GetBusinessRulesQuery : IQuery<Result<BusinessRulesView, Error>>;
 
@@ -73,6 +78,6 @@ public sealed class GetBusinessRulesHandler(IBusinessRulesProvider rules)
         CancellationToken cancellationToken)
     {
         var snapshot = await rules.GetAsync(cancellationToken);
-        return new BusinessRulesView(BusinessRulesDto.From(snapshot), "Configuration", IsEditable: false);
+        return new BusinessRulesView(BusinessRulesDto.From(snapshot), BusinessRulesView.ConfigurationSource, IsEditable: false);
     }
 }

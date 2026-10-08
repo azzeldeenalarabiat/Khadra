@@ -157,6 +157,34 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<VehicleHold>> VehicleHoldsAsync(
+        Id dealerId,
+        Id vehicleId,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        var pickedUp = BookingStatus.PickedUp;
+
+        // BookingHolds.Live, the predicate the catalogue's availability and the overlap guard share: a request or an
+        // approval whose window has closed holds nothing, whatever its row still says. From the HOLD start, so the
+        // turnaround before a rental counts. A collected car is out until it is returned, so an overdue one still
+        // reaches into the window however long ago its period ended.
+        return await BookingHolds
+            .Live(context.Bookings.Where(booking => booking.DealerId == dealerId && booking.VehicleId == vehicleId), now)
+            .Where(booking => booking.HoldStart < to && (booking.Period.End > from || booking.Status == pickedUp))
+            .OrderBy(booking => booking.HoldStart)
+            .Select(booking => new VehicleHold(
+                booking.Id.Value,
+                booking.Reference.Value,
+                booking.Status.Name,
+                booking.HoldStart,
+                booking.Period.Start,
+                booking.Period.End))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<RevenueFact>> RevenueAsync(Id dealerId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
     {
         var pickedUp = BookingStatus.PickedUp;

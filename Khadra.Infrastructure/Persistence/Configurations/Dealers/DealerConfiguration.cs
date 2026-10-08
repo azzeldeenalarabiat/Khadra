@@ -169,18 +169,21 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
         entity.Navigation(dealer => dealer.Delivery).IsRequired();
 
         // Children are reached only through the aggregate, so the navigations are field-backed and
-        // the collections load with the dealer.
+        // the collections load with the dealer. ClientCascade, not Restrict (pre-launch item 121):
+        // AttachDocument replaces a document by removing the old one, and Restrict on a required child
+        // throws "the association … has been severed" the first time a tracked dealer does that. The
+        // database constraint still refuses; nothing cascades there.
         entity.HasMany(dealer => dealer.Employees)
             .WithOne()
             .HasForeignKey(employee => employee.DealerId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(Dealer.Employees))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         entity.HasMany(dealer => dealer.Documents)
             .WithOne()
             .HasForeignKey(document => document.DealerId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(Dealer.Documents))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 

@@ -1,11 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
+using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Payments;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
@@ -182,6 +184,54 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
         // A new process tries again, and says so again.
         _harness.Undrawable = [];
         Assert.Equal(2, (await _harness.RenderPassAsync()).Count(outcome => outcome.Skipped == "snapshot_altered"));
+    }
+
+    /// <summary>
+    /// Pre-launch item 197: an undrawable PDF is a durable record with its reason, read by the administrator's page and
+    /// the work queue — not a log line. Each failed start counts an attempt on the same row, and drawing it closes it.
+    /// </summary>
+    [Fact]
+    public async Task A_pdf_that_cannot_be_drawn_is_held_with_its_reason_until_it_is_drawn()
+    {
+        var (receipt, _) = await IssuedAsync();
+        string snapshot;
+        await using (var read = _harness.NewContext())
+            snapshot = await read.FinancialDocuments.AsNoTracking().Where(document => document.Id == receipt.Id).Select(document => document.Snapshot).SingleAsync();
+        await _harness.ChangeAsync(context => context.Database.ExecuteSqlAsync(
+            $"UPDATE financial_documents SET snapshot = snapshot || ' ' WHERE document_number = {receipt.Number}"));
+
+        await _harness.RenderPassAsync();
+        _harness.Undrawable = [];
+        _harness.Now = _harness.Now.AddHours(1);
+        await _harness.RenderPassAsync();
+
+        await using (var context = _harness.NewContext())
+        {
+            var reader = new FinancialDocumentReader(context);
+            var holds = await reader.OpenPdfHoldsOfAsync(receipt.Id);
+            Assert.Equal(2, holds.Count);
+            Assert.All(holds, hold =>
+            {
+                Assert.Same(RenditionHoldReason.SnapshotAltered, hold.Reason);
+                Assert.Equal(2, hold.Attempts);
+                Assert.True(hold.LastFailedAt > hold.FirstFailedAt);
+            });
+
+            var summary = await reader.OpenPdfHoldsSummaryAsync();
+            Assert.Equal(2, summary.Count);
+            Assert.Equal([receipt.Id], summary.DocumentIds);
+            Assert.Equal([receipt.Number], summary.Numbers);
+        }
+
+        // Put right (here, by restoring what was issued), the next start draws it, and the hold is over.
+        await _harness.ChangeAsync(context => context.Database.ExecuteSqlAsync(
+            $"UPDATE financial_documents SET snapshot = {snapshot} WHERE document_number = {receipt.Number}"));
+        _harness.Undrawable = [];
+        await _harness.RenderPassAsync();
+
+        await using var check = _harness.NewContext();
+        Assert.Empty(await new FinancialDocumentReader(check).OpenPdfHoldsOfAsync(receipt.Id));
+        Assert.Equal(0, (await new FinancialDocumentReader(check).OpenPdfHoldsSummaryAsync()).Count);
     }
 
     [Fact]
@@ -366,6 +416,35 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
         var rendition = (await _harness.RenditionsAsync()).Single(candidate => candidate.DocumentId == receipt.Id && candidate.Language == Language.Arabic);
         Assert.Equal(rendition.StorageKey, key);
         Assert.Equal(rendition.ContentSha256, Convert.ToHexStringLower(SHA256.HashData(_harness.Storage.Files[key])));
+    }
+
+    /// <summary>
+    /// The customer's link opens in the customer's session only, and the administrator's in the administrator's
+    /// (pre-launch item 14): neither works if it is pasted into the other's.
+    /// </summary>
+    [Fact]
+    public async Task Each_pdf_link_validates_only_for_the_person_who_asked_for_it()
+    {
+        var (receipt, _) = await IssuedAsync();
+        await _harness.RenderPassAsync();
+        var signer = Signer();
+
+        var mine = (await MineAsync(receipt.CustomerId, receipt.Id, "en", signer)).Value;
+        var admins = (await AdminAsync(receipt.Id, "en")).Value;
+
+        var (key, expires, signature) = Signed(mine);
+        Assert.True(signer.IsValid(key, expires, signature, receipt.CustomerId, _harness.Now));
+        Assert.False(signer.IsValid(key, expires, signature, AdminViewer, _harness.Now));
+        (key, expires, signature) = Signed(admins);
+        Assert.True(signer.IsValid(key, expires, signature, AdminViewer, _harness.Now));
+        Assert.False(signer.IsValid(key, expires, signature, receipt.CustomerId, _harness.Now));
+    }
+
+    private static (string Key, long Expires, string Signature) Signed(SignedDocumentLink link)
+    {
+        var uri = new Uri($"http://localhost{link.Url}", UriKind.Absolute);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        return (KeyOf(link), long.Parse(query["expires"]!, System.Globalization.CultureInfo.InvariantCulture), query["signature"]!);
     }
 
     [Fact]
@@ -606,7 +685,17 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
     }
 
     private FinancialDocumentPdfLinkHandlers Links(KhadraDbContext context, IDocumentLinkSigner signer) =>
-        new(new FinancialDocumentRepository(context), new FinancialDocumentRenditionRepository(context), signer, new TestClock(_harness.Now));
+        new(new FinancialDocumentRepository(context), new FinancialDocumentRenditionRepository(context), signer, AdminActor(), new TestClock(_harness.Now));
+
+    private static readonly Id AdminViewer = Id.New();
+
+    private static ICurrentActor AdminActor()
+    {
+        var actor = Substitute.For<ICurrentActor>();
+        actor.UserId.Returns(AdminViewer);
+        actor.Role.Returns(UserRole.Admin);
+        return actor;
+    }
 
     private static HmacDocumentLinkSigner Signer() =>
         new(Options.Create(new JwtOptions { SigningKey = new string('k', 48) }), FakeDocumentPolicy.Default);

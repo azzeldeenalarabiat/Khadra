@@ -87,7 +87,7 @@ public sealed class DisputeUseCaseTests
                 .Returns(new BookingContext(null, "Petra Wheels", false, null, "Layla Odeh", false, null, null));
             Names.NamesAsync(Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>())
                 .Returns(new Dictionary<Guid, string>());
-            Signer.Sign(Arg.Any<string>(), Arg.Any<DateTimeOffset>())
+            Signer.Sign(Arg.Any<string>(), Arg.Any<Id>(), Arg.Any<DateTimeOffset>())
                 .Returns(call => new SignedDocumentLink($"/api/v1/documents/{call.Arg<string>()}", Build.Now.AddMinutes(5)));
             // Every key has bytes behind it unless a test says otherwise.
             Storage.OpenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -116,7 +116,7 @@ public sealed class DisputeUseCaseTests
         }
 
         public DisputeViewComposer Composer() =>
-            new(Bookings, BookingReader, Names, Signer, Tickets, Dashboard, Payables, Clock, NullLogger<DisputeViewComposer>.Instance);
+            new(Bookings, BookingReader, Names, Signer, Actor, Tickets, Dashboard, Payables, Clock, NullLogger<DisputeViewComposer>.Instance);
 
         /// <summary>The booking's resolved tickets as the repository answers them, oldest first (item 169).</summary>
         public void GivenResolved(Booking booking, params DisputeTicket[] resolved) =>
@@ -189,6 +189,24 @@ public sealed class DisputeUseCaseTests
         Assert.Equal("Petra Wheels", result.Value.Booking.DealerName);
         Assert.Single(result.Value.Statements.Single().Evidence);
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// An evidence link opens in the session of the person the view was composed for and nobody else's (pre-launch
+    /// item 14): the customer who just opened the ticket here.
+    /// </summary>
+    [Fact]
+    public async Task Evidence_links_are_minted_for_the_signed_in_reader()
+    {
+        var context = new Context();
+        context.Actor.UserId.Returns(CustomerId);
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var key = $"disputes/{booking.Id.Value}/photo.jpg";
+
+        await context.Raise().Handle(new OpenDisputeCommand(CustomerId, booking.Id, "The dealer never showed up.", [key]), CancellationToken.None);
+
+        context.Signer.Received(1).Sign(key, CustomerId, Build.Now);
+        context.Signer.DidNotReceive().Sign(Arg.Any<string>(), Arg.Is<Id>(viewer => viewer != CustomerId), Arg.Any<DateTimeOffset>());
     }
 
     // ── Who hears that a dispute was opened (Fix & Polish Wave 3: C5, D10) ──────────────────────
@@ -459,7 +477,13 @@ public sealed class DisputeUseCaseTests
         var entry = Assert.Single(context.Audited);
         Assert.Same(AuditAction.DisputeResolved, entry.Action);
         Assert.Equal("Open", entry.PreviousValue);
-        Assert.Contains($"of {held} JOD held", entry.NewValue, StringComparison.Ordinal);
+        // The decision's parts, not an English sentence (pre-launch item 50): the console words them in each language.
+        var parts = Parts(entry.NewValue);
+        Assert.Equal("JOD", parts["currency"]);
+        Assert.Equal(Money.AtScale(held).ToString(System.Globalization.CultureInfo.InvariantCulture), parts["held"]);
+        Assert.Equal(Money.AtScale(held / 2).ToString(System.Globalization.CultureInfo.InvariantCulture), parts["refund"]);
+        Assert.False(parts.ContainsKey("charge"));
+        Assert.DoesNotContain("Resolved", entry.NewValue, StringComparison.Ordinal);
         Assert.Equal("Split the difference; both sides partly at fault.", entry.Reason);
         // The bare reference, never a sentence: the table can never be rewritten, so English written
         // into it stays English on every screen that reads it, in every language, for ever.
@@ -526,13 +550,38 @@ public sealed class DisputeUseCaseTests
             System.Globalization.CultureInfo.CurrentCulture = previous;
         }
 
-        var entry = Assert.Single(context.Audited);
-        Assert.Contains("platform 1.500", entry.NewValue, StringComparison.Ordinal);
-        Assert.Contains(
-            $"refund {Money.AtScale(held - 1.5m).ToString(System.Globalization.CultureInfo.InvariantCulture)}",
-            entry.NewValue,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain(",", entry.NewValue!.Split(';')[0].Replace(", ", "|", StringComparison.Ordinal), StringComparison.Ordinal);
+        var parts = Parts(Assert.Single(context.Audited).NewValue);
+        Assert.Equal("1.500", parts["platform"]);
+        Assert.Equal(Money.AtScale(held - 1.5m).ToString(System.Globalization.CultureInfo.InvariantCulture), parts["refund"]);
+        Assert.Equal("0.000", parts["dealer"]);
+    }
+
+    /// <summary>A charge on the office beyond the deposit travels as its own figure, in its own currency.</summary>
+    [Fact]
+    public async Task A_charge_on_the_office_is_one_more_part_of_the_audit_value()
+    {
+        var context = new Context();
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        var min = booking.Penalty!.MinAmount.Amount;
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, 18m, 0m, 0m, min, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+
+        var parts = Parts(Assert.Single(context.Audited).NewValue);
+        Assert.Equal(Money.AtScale(min).ToString(System.Globalization.CultureInfo.InvariantCulture), parts["charge"]);
+        Assert.Equal("JOD", parts["chargeCurrency"]);
+        Assert.Equal("18.000", parts["refund"]);
+    }
+
+    private static Dictionary<string, string> Parts(string? value)
+    {
+        Assert.NotNull(value);
+        using var document = System.Text.Json.JsonDocument.Parse(value);
+        return document.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.ToString());
     }
 
     /// <summary>The SLA panel is coloured by the work queue's own rule, at the same threshold (E2E F42).</summary>
@@ -958,10 +1007,10 @@ public sealed class DisputeUseCaseTests
             DepositDisposition.Create(Money.Jod(0m), Money.Jod(0m), Money.Jod(0m), Money.Jod(0m)).Value,
             null, null, "Already decided.", AdminId, Build.Now).Value;
 
-        var line = DisputeAuditor.Describe(resolution);
-        // At the currency's full scale, like every other amount on the platform (E2E F36).
-        Assert.Contains("of 0.000 JOD held", line, StringComparison.Ordinal);
-        Assert.Contains("refund 0.000, platform 0.000, dealer 0.000", line, StringComparison.Ordinal);
+        // At the currency's full scale, like every other amount on the platform (E2E F36), as parts (item 50).
+        Assert.Equal(
+            """{"currency":"JOD","held":"0.000","refund":"0.000","platform":"0.000","dealer":"0.000"}""",
+            DisputeAuditor.Describe(resolution));
     }
 
     [Fact]

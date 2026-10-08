@@ -39,6 +39,8 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
     // Who caused it. Null when the platform itself did (an expiry, a bootstrap).
     public Id? ActorUserId { get; private set; }
     public string ActorName { get; private set; } = null!;
+    // Set when the actor is a stand-in rather than a name (pre-launch item 103); ActorName then holds its legacy phrase.
+    public NotificationStandIn? ActorStandIn { get; private set; }
     public DateTimeOffset OccurredAt { get; private set; }
 
     /// <summary>
@@ -106,6 +108,26 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
             DueAt = dueAt,
             IsDeleted = false
         };
+    }
+
+    /// <summary>
+    /// A notification whose actor is not named (pre-launch item 103): the stand-in's code, and its legacy English phrase
+    /// as the name every installed client already prints.
+    /// </summary>
+    public static Notification RaiseByStandIn(
+        Id recipientUserId,
+        NotificationKind kind,
+        NotificationStandIn standIn,
+        DateTimeOffset occurredAt,
+        Id? subjectId = null,
+        string? subjectReference = null,
+        Id? actorUserId = null,
+        DateTimeOffset? dueAt = null)
+    {
+        ArgumentNullException.ThrowIfNull(standIn);
+        var notification = Raise(recipientUserId, kind, standIn.LegacyName, occurredAt, subjectId, subjectReference, actorUserId, dueAt);
+        notification.ActorStandIn = standIn;
+        return notification;
     }
 
     /// <summary>Idempotent: reading twice does not move the moment it was first seen.</summary>

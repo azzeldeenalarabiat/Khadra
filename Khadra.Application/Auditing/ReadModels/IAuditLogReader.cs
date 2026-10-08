@@ -42,7 +42,10 @@ public sealed record AuditLogEntry(
     // The booking the entry is about: a Booking entry's own, a Dispute entry's disputed one, null
     // otherwise. A fact beside the label, because disputes used to be labelled "Dispute on KH-…" in
     // English, and those rows can never be rewritten; see ActivityEntry.
-    string? BookingReference);
+    string? BookingReference,
+    // The subject's Arabic name, snapshotted beside SubjectLabel for a subject that has one — a city, a car type
+    // (pre-launch item 176). Null for every other subject and for entries written before 2026-10-08.
+    string? SubjectLabelAr = null);
 
 /// <summary>
 /// Which slice of the log an admin is looking at.

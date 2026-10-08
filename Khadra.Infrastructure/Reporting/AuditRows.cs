@@ -26,7 +26,8 @@ internal sealed record AuditRow(
     string? NewValue,
     string? Reason,
     string? CorrelationId,
-    BookingReference? Booking);
+    BookingReference? Booking,
+    string? SubjectLabelAr);
 
 /// <summary>
 /// The one projection the activity feed and the audit log share, so the two cannot disagree about
@@ -87,6 +88,7 @@ internal static class AuditRows
                         .Where(own => own.Id == entry.EntityId)
                         .Select(own => own.Reference)
                         .FirstOrDefault()
-                    : null));
+                    : null,
+            entry.SubjectLabelAr));
     }
 }

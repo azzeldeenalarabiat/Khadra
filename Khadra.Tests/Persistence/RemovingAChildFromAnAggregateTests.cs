@@ -1,5 +1,6 @@
 using Khadra.Application.Common;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.Shortlist;
 using Khadra.Infrastructure.Persistence;
@@ -267,6 +268,45 @@ public sealed class RemovingAChildFromAnAggregateTests : IDisposable
         Assert.NotNull(await reader.Shortlists.AsNoTracking().SingleOrDefaultAsync(list => list.Id == customerId));
     }
 
+    // ---------------------------------------------------------------- a dealer's documents
+
+    /// <summary>
+    /// Re-uploading a document type replaces the old file, on a dealer loaded from the database (pre-launch item 121).
+    /// </summary>
+    /// <remarks>
+    /// <c>AttachDocument</c> removes the old document of that type before adding the new one. Its only caller ran on a
+    /// brand-new dealer, where nothing is tracked, so the <c>Restrict</c> mapping never threw — but a re-upload after a
+    /// clarification request loads a tracked dealer, and the first save would have been a 500.
+    /// </remarks>
+    [Fact]
+    public async Task Replacing_a_dealers_document_deletes_the_old_row_rather_than_throwing()
+    {
+        Id dealerId;
+        await using (var context = NewContext())
+        {
+            var dealer = Build.Dealer();
+            Build.AttachAllDocuments(dealer);
+            context.Dealers.Add(dealer);
+            await context.SaveChangesAsync();
+            dealerId = dealer.Id;
+        }
+
+        await using (var context = NewContext())
+        {
+            var dealer = await new DealerRepository(context).GetByIdAsync(dealerId);
+            Assert.True(dealer!.AttachDocument(DealerDocumentType.CommercialRegistration, "dealers/replaced.pdf", Now).IsSuccess);
+            await UnitOfWorkOn(context).SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var registrations = await reader.Set<DealerDocument>()
+            .AsNoTracking()
+            .Where(document => document.DealerId == dealerId && document.Type == DealerDocumentType.CommercialRegistration)
+            .ToListAsync();
+        Assert.Equal("dealers/replaced.pdf", Assert.Single(registrations).StorageKey);
+        Assert.Equal(DealerDocumentType.Required.Count, await reader.Set<DealerDocument>().CountAsync(document => document.DealerId == dealerId));
+    }
+
     // ---------------------------------------------------------------- the rule itself
 
     /// <summary>
@@ -296,6 +336,41 @@ public sealed class RemovingAChildFromAnAggregateTests : IDisposable
         Assert.Equal(DeleteBehavior.ClientCascade, DeleteBehaviourOf<Vehicle>(context, nameof(Vehicle.Images)));
         Assert.Equal(DeleteBehavior.ClientCascade, DeleteBehaviourOf<CustomerShortlist>(context, "_entries"));
     }
+
+    /// <summary>
+    /// Every required child collection an aggregate owns is <c>ClientCascade</c> (pre-launch item 121), so the next
+    /// aggregate that removes a child is not a 500 waiting for its first customer.
+    /// </summary>
+    /// <remarks>
+    /// Two kinds are left alone, each for a reason a test can state. An <see cref="IAppendOnly"/> child is never removed
+    /// at all — the guard in <c>KhadraDbContext</c> refuses it — so the mapping is never reached. And
+    /// <see cref="RestrictedByDecision"/> names the collections whose mapping belongs to a context that needs the owner's
+    /// approval to change; each is one its aggregate never removes from.
+    /// </remarks>
+    [Fact]
+    public void Every_child_collection_an_aggregate_owns_deletes_its_orphans()
+    {
+        using var context = NewContext();
+
+        var restrictive = context.Model.GetEntityTypes()
+            .Where(type => typeof(AggregateRoot).IsAssignableFrom(type.ClrType))
+            .SelectMany(type => type.GetNavigations())
+            .Where(navigation => navigation.IsCollection && !navigation.IsOnDependent)
+            .Where(navigation => navigation.ForeignKey.IsRequired && !navigation.ForeignKey.IsOwnership)
+            .Where(navigation => !typeof(IAppendOnly).IsAssignableFrom(navigation.TargetEntityType.ClrType))
+            .Select(navigation => (Name: $"{navigation.DeclaringEntityType.ClrType.Name}.{navigation.Name}", navigation.ForeignKey.DeleteBehavior))
+            .Where(child => child.DeleteBehavior != DeleteBehavior.ClientCascade && !RestrictedByDecision.Contains(child.Name))
+            .Select(child => $"{child.Name} -> {child.DeleteBehavior}")
+            .ToList();
+
+        Assert.Empty(restrictive);
+    }
+
+    /// <summary>
+    /// <c>Payment.Refunds</c>: the Payments context, which is not changed without the owner (CLAUDE.md). A refund is
+    /// recorded and settled on its payment and never taken off it.
+    /// </summary>
+    private static readonly HashSet<string> RestrictedByDecision = ["Payment.Refunds"];
 
     private static DeleteBehavior DeleteBehaviourOf<TAggregate>(KhadraDbContext context, string navigation) =>
         context.Model

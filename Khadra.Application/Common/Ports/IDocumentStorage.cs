@@ -1,3 +1,5 @@
+using Khadra.Domain.Common;
+
 namespace Khadra.Application.Common.Ports;
 
 /// <summary>Where a stored file lives, and what it is. Never a URL.</summary>
@@ -70,11 +72,17 @@ public sealed record SignedDocumentLink(string Url, DateTimeOffset ExpiresAt);
 /// bytes", the other is "is this particular request allowed to have them, right now". A link that
 /// never expired would be a public URL wearing a disguise.
 /// </summary>
+/// <remarks>
+/// A link is minted FOR one signed-in person and works for nobody else (pre-launch item 14): the
+/// signature covers the viewer's user id, and the download checks it against whoever is signed in on
+/// that request. The id is not in the URL — it comes from the session — so the link's shape is what it
+/// always was, and a link copied into another person's session is answered as if it did not exist.
+/// </remarks>
 public interface IDocumentLinkSigner
 {
-    SignedDocumentLink Sign(string storageKey, DateTimeOffset now);
+    SignedDocumentLink Sign(string storageKey, Id viewer, DateTimeOffset now);
 
-    bool IsValid(string storageKey, long expiresAtUnixSeconds, string signature, DateTimeOffset now);
+    bool IsValid(string storageKey, long expiresAtUnixSeconds, string signature, Id viewer, DateTimeOffset now);
 
     /// <summary>Recovers the storage key from the opaque token in a signed link.</summary>
     bool TryDecodeToken(string token, out string storageKey);

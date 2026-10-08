@@ -28,7 +28,7 @@ public sealed class DealerReviewAuditor(IAuditTrail auditTrail, ICurrentActor ac
         var entry = actor.UserId is { } actorId && actor.Role is { } role
             ? AuditEntry.By(
                 actorId,
-                actor.Name ?? "Unknown admin",
+                actor.RecordedName(actorId),
                 role,
                 action,
                 AuditEntityType.Dealer,

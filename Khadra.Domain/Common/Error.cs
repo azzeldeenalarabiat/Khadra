@@ -11,7 +11,11 @@ public enum ErrorKind
 
     // A dependency the platform needs was not answering. Distinct from Failure because the caller
     // did nothing wrong and the same request may well succeed shortly -- 503, not 422.
-    Unavailable = 7
+    Unavailable = 7,
+
+    // The caller must wait before asking again (429). Its RetryAfterSeconds extension becomes the
+    // Retry-After header, the way the rate-limiting middleware answers.
+    TooManyRequests = 8
 }
 
 // The single error currency across Domain, Application and API. `Code` is a stable machine code
@@ -43,6 +47,20 @@ public sealed record Error(
     public static Error Failure(string code, string message) => new(code, message, ErrorKind.Failure);
 
     public static Error Unavailable(string code, string message) => new(code, message, ErrorKind.Unavailable);
+
+    /// <summary>The extension a <see cref="ErrorKind.TooManyRequests"/> error carries its wait in, in whole seconds.</summary>
+    public const string RetryAfterSecondsExtension = "retryAfterSeconds";
+
+    /// <summary>A refusal to try again before <paramref name="retryAfter"/> has passed: 429 with Retry-After.</summary>
+    public static Error TooManyRequests(string code, string message, TimeSpan retryAfter) =>
+        new(
+            code,
+            message,
+            ErrorKind.TooManyRequests,
+            Extensions: new Dictionary<string, object?>
+            {
+                [RetryAfterSecondsExtension] = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds))
+            });
 
     public override string ToString() => $"{Code}: {Message}";
 }

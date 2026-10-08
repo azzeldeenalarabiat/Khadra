@@ -167,7 +167,8 @@ public sealed class ResetPasswordHandlerTests
         context.Policy,
         context.Clock,
         context.UnitOfWork,
-        context.Emails);
+        context.Emails,
+        context.Throttle);
 
     private static VerificationToken StoredReset(AuthHandlerTestContext context, User user, out string raw)
     {
@@ -205,6 +206,37 @@ public sealed class ResetPasswordHandlerTests
         Assert.True(token.IsConsumed);
         Assert.Contains(user.DomainEvents, domainEvent => domainEvent is UserPasswordChanged);
         Assert.Equal("changed", Assert.Single(context.SentEmails()).Subject);
+    }
+
+    /// <summary>
+    /// Proving the mailbox lifts a per-account sign-in refusal (pre-launch item 51): otherwise a stranger who typed the
+    /// owner's address eight times would keep them out for the block even after they had set a new password.
+    /// </summary>
+    [Fact]
+    public async Task A_completed_reset_forgets_the_names_failed_sign_ins()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        StoredReset(context, user, out var raw);
+        for (var attempt = 0; attempt < 8; attempt++)
+            await context.Throttle.RecordFailureAsync(user.Email, Users.Now);
+
+        var result = await Handler(context).Handle(new ResetPasswordCommand(raw, "NewPass99"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(await context.Throttle.BlockedForAsync(user.Email, Users.Now));
+    }
+
+    [Fact]
+    public async Task A_refused_reset_forgets_nothing()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        StoredReset(context, user, out var raw);
+
+        await Handler(context).Handle(new ResetPasswordCommand(raw, "weak"), CancellationToken.None);
+
+        Assert.Empty(context.Throttle.Resets);
     }
 
     [Fact]

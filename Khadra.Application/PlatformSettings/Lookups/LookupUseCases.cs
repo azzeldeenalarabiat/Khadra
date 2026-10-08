@@ -171,8 +171,8 @@ public sealed class LookupHandlers(
 
         await carTypes.AddAsync(created.Value, cancellationToken);
         RecordLookup(AuditAction.LookupCreated, CarTypesKind, created.Value, previous: null, updated: Describe(created.Value));
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return LookupEntryDto.From(created.Value);
+        var saved = await SaveAsync(cancellationToken);
+        return saved.IsFailure ? saved.Error : LookupEntryDto.From(created.Value);
     }
 
     public async Task<Result<LookupEntryDto, Error>> Handle(CreateCityCommand request, CancellationToken cancellationToken)
@@ -197,8 +197,8 @@ public sealed class LookupHandlers(
 
         await cities.AddAsync(created.Value, cancellationToken);
         RecordLookup(AuditAction.LookupCreated, CitiesKind, created.Value, previous: null, updated: Describe(created.Value));
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return LookupEntryDto.From(created.Value);
+        var saved = await SaveAsync(cancellationToken);
+        return saved.IsFailure ? saved.Error : LookupEntryDto.From(created.Value);
     }
 
     public async Task<Result<LookupEntryDto, Error>> Handle(RenameLookupCommand request, CancellationToken cancellationToken)
@@ -293,13 +293,42 @@ public sealed class LookupHandlers(
             return outcome.Error;
 
         RecordLookup(action, kind, entry, previous, Describe(entry));
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return LookupEntryDto.From(entry);
+        var saved = await SaveAsync(cancellationToken);
+        return saved.IsFailure ? saved.Error : LookupEntryDto.From(entry);
     }
 
+    /// <summary>
+    /// Saves, and answers <c>lookup.name_taken</c> when an offered-name index refused the write (pre-launch item 52).
+    /// </summary>
+    /// <remarks>
+    /// The handler's own check reads before it writes, so two administrators adding the same city at once can both
+    /// pass it. The partial unique indexes <c>ux_cities_offered_*</c> and <c>ux_car_types_offered_*</c> settle that
+    /// race in the database, and the loser is told what it would have been told a moment later. The audit entry
+    /// staged with the write is discarded with it. Any other unique violation stays what it was.
+    /// </remarks>
+    private async Task<UnitResult<Error>> SaveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return UnitResult.Success<Error>();
+        }
+        catch (UniqueConstraintConflictException conflict) when (IsOfferedNameIndex(conflict.ConstraintName))
+        {
+            return PlatformSettingsErrors.LookupNameTaken;
+        }
+    }
+
+    internal static bool IsOfferedNameIndex(string? constraintName) =>
+        constraintName is not null &&
+        (constraintName.StartsWith("ux_cities_offered_", StringComparison.Ordinal) ||
+         constraintName.StartsWith("ux_car_types_offered_", StringComparison.Ordinal));
+
     /// <summary>What the entry read as, for the before/after columns on the audit screen.</summary>
+    // Parts, not an English line (pre-launch item 174): both names, and whether customers are offered it. The console
+    // words it in its reader's language; entries written before 2026-10-08 hold "Amman / عمّان · Offered" as stored.
     private static string Describe(LookupEntry entry) =>
-        $"{entry.NameEn} / {entry.NameAr} · {(entry.IsActive ? "Offered" : "Retired")}";
+        AuditValue.Of(new { en = entry.NameEn, ar = entry.NameAr, offered = entry.IsActive });
 
     private void RecordLookup(
         AuditAction action,
@@ -315,7 +344,9 @@ public sealed class LookupHandlers(
             entry.Id,
             entry.NameEn,
             previous,
-            updated);
+            updated,
+            // The Arabic name beside the English one, snapshotted together (pre-launch item 176).
+            labelAr: entry.NameAr);
 
     /// <summary>The route segment the controller uses, so the kind is never a loose string.</summary>
     public const string CarTypesKind = "car-types";

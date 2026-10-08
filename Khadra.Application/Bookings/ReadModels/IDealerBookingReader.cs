@@ -57,6 +57,18 @@ public sealed record RevenueFact(
 /// <summary>The stretch of a rental that overlaps a reporting window, for occupancy.</summary>
 public sealed record OccupancyFact(Guid VehicleId, DateTimeOffset Start, DateTimeOffset End, string Status);
 
+/// <summary>
+/// A live hold on one car (pre-launch item 54): a booking <c>BookingHolds.Live</c> says is holding it, with the moment
+/// its claim starts — the period less the turnaround buffer it froze — and its period.
+/// </summary>
+public sealed record VehicleHold(
+    Guid BookingId,
+    string Reference,
+    string Status,
+    DateTimeOffset HoldStart,
+    DateTimeOffset PeriodStart,
+    DateTimeOffset PeriodEnd);
+
 /// <summary>A status change on one of the dealer's bookings, from the booking's own history.</summary>
 /// <param name="ActorUserId">
 /// The member of staff who made an office change, or null: an office change no person signed (the
@@ -144,6 +156,18 @@ public interface IDealerBookingReader
 
     /// <summary>Vehicles this dealer's live bookings hold right now.</summary>
     Task<IReadOnlyList<Guid>> HeldVehicleIdsAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The live holds on one of the dealer's cars that reach into [<paramref name="from"/>, <paramref name="to"/>): the same
+    /// predicate as the catalogue's availability, so the fleet calendar and the customer's search cannot disagree.
+    /// </summary>
+    Task<IReadOnlyList<VehicleHold>> VehicleHoldsAsync(
+        Id dealerId,
+        Id vehicleId,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Returned and Completed bookings whose car came back inside [from, to); PickedUp ones are "in progress".</summary>
     Task<IReadOnlyList<RevenueFact>> RevenueAsync(Id dealerId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);

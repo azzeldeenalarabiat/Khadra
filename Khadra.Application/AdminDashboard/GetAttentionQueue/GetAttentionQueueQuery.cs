@@ -60,6 +60,7 @@ public sealed class GetAttentionQueueHandler(
         var payablesOnHold = await ledger.SystemHoldsSummaryAsync(cancellationToken);
         var documentsOnHold = await financialDocuments.OpenHoldsSummaryAsync(cancellationToken);
         var emailsNotSent = await financialDocuments.EmailsNotSentSummaryAsync(now.Subtract(documentEmails.StaleAfter), cancellationToken);
+        var pdfsNotDrawn = await financialDocuments.OpenPdfHoldsSummaryAsync(cancellationToken);
         var labels = await ResolveBookingLabelsAsync([.. live.Select(dispute => dispute.BookingId)], cancellationToken);
 
         // A ticket whose booking has gone gets no subtitle rather than a fabricated one. The row still
@@ -79,7 +80,8 @@ public sealed class GetAttentionQueueHandler(
             new MoneyAttention(failedRefunds, owedOrphans, openIncidents),
             documentsOnHold,
             emailsNotSent,
-            payablesOnHold);
+            payablesOnHold,
+            pdfsNotDrawn);
     }
 
     /// <summary>

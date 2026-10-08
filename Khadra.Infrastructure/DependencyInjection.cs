@@ -5,6 +5,7 @@ using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
+using Khadra.Application.Dealers.SubmitDealerProfile;
 using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.FinancialDocuments.Rendering;
@@ -14,6 +15,7 @@ using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.Shortlist.ReadModels;
+using Khadra.Application.IdentityAccess.Login;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Application.Legal.ReadModels;
 using Khadra.Domain.Common;
@@ -131,6 +133,10 @@ public static class DependencyInjection
             .Validate(options => options.RefreshFamilyDays >= options.RefreshTokenDays,
                 "Authentication:Policy:RefreshFamilyDays must be at least RefreshTokenDays.")
             .ValidateOnStart();
+        services.AddOptions<SignInThrottleOptions>()
+            .Bind(configuration.GetSection(SignInThrottleOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddOptions<EmailOptions>()
             .Bind(configuration.GetSection(EmailOptions.SectionName))
             .ValidateDataAnnotations()
@@ -154,6 +160,11 @@ public static class DependencyInjection
                 "Documents:RootPath must not be inside wwwroot; document files are never served statically.")
             .Validate(options => options.AllowedContentTypes.Count > 0,
                 "Documents:AllowedContentTypes must list at least one accepted type.")
+            // A dealer submits every required document in one request, whose size the API caps; a document size the
+            // cap cannot carry three of would refuse every application with a 413 (pre-launch item 33).
+            .Validate(options => DealerSubmissionLimits.Fits(options.MaximumSizeBytes),
+                "Documents:MaximumSizeBytes is too large for a dealer submission: every required document at that size, " +
+                "plus the form, must fit DealerSubmissionLimits.MaximumRequestBytes. Raise that limit (and the BFF's) first.")
             .ValidateOnStart();
         services.AddOptions<AdminDashboardOptions>()
             .Bind(configuration.GetSection(AdminDashboardOptions.SectionName))
@@ -457,6 +468,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentDashboardReader, PaymentDashboardReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
+        services.AddScoped<IReviewModerationReader, ReviewModerationReader>();
         services.AddScoped<IShortlistReader, ShortlistReader>();
         services.AddScoped<ICustomerReputationReader, CustomerReputationReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed
@@ -517,6 +529,7 @@ public static class DependencyInjection
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
+        services.AddScoped<ISignInThrottle, SignInThrottle>();
         services.AddSingleton<IOpaqueTokenService, OpaqueTokenService>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
         services.AddSingleton<IAuthPolicySettings, AuthPolicySettings>();

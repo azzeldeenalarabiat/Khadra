@@ -149,7 +149,8 @@ public sealed class HandoverVerifier(
                         booking.Id,
                         booking.Reference.Value,
                         booking.Status.Name,
-                        $"{type.Name} code locked after {current.FailedAttempts} wrong tries");
+                        // Parts, not "Pickup code locked after 5 wrong tries" (pre-launch item 174).
+                        AuditValue.Of(new { handover = type.Name, wrongTries = current.FailedAttempts }));
                 }
 
                 // Commit the failed attempt (and any audit entry) now; the handover is not going ahead.
@@ -235,7 +236,8 @@ public sealed class HandoverVerifier(
             booking.Id,
             booking.Reference.Value,
             previousStatus,
-            $"{booking.Status.Name} ({type.Name}, {proof.Method.Name})",
+            // Parts, not "PickedUp (Pickup, Code)" (pre-launch item 174): the console words each in its reader's language.
+            AuditValue.Of(new { status = booking.Status.Name, handover = type.Name, method = proof.Method.Name }),
             proof.Reason);
     }
 }

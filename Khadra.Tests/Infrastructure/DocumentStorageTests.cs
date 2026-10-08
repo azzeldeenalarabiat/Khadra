@@ -79,6 +79,8 @@ public sealed class DocumentStorageTests : IDisposable
             storage.SaveAsync("../wwwroot", "a.jpg", "image/jpeg", new MemoryStream([1])));
     }
 
+    private static readonly Id Viewer = Id.New();
+
     private static HmacDocumentLinkSigner Signer() =>
         new HmacDocumentLinkSigner(
             Options.Create(new JwtOptions { SigningKey = new string('k', 64) }),
@@ -90,11 +92,11 @@ public sealed class DocumentStorageTests : IDisposable
         var signer = Signer();
         var now = Users.Now;
 
-        var link = signer.Sign("customers/abc/1.jpg", now);
+        var link = signer.Sign("customers/abc/1.jpg", Viewer, now);
         var (key, expires, signature) = Parse(signer, link.Url);
 
         Assert.Equal("customers/abc/1.jpg", key);
-        Assert.True(signer.IsValid(key, expires, signature, now));
+        Assert.True(signer.IsValid(key, expires, signature, Viewer, now));
         Assert.Equal(now.AddMinutes(5), link.ExpiresAt);
     }
 
@@ -103,10 +105,10 @@ public sealed class DocumentStorageTests : IDisposable
     {
         var signer = Signer();
         var now = Users.Now;
-        var link = signer.Sign("customers/abc/1.jpg", now);
+        var link = signer.Sign("customers/abc/1.jpg", Viewer, now);
         var (key, expires, signature) = Parse(signer, link.Url);
 
-        Assert.False(signer.IsValid(key, expires, signature, now.AddMinutes(6)));
+        Assert.False(signer.IsValid(key, expires, signature, Viewer, now.AddMinutes(6)));
     }
 
     [Fact]
@@ -115,10 +117,10 @@ public sealed class DocumentStorageTests : IDisposable
         // Otherwise one valid link would be a key to every file in storage.
         var signer = Signer();
         var now = Users.Now;
-        var link = signer.Sign("customers/abc/1.jpg", now);
+        var link = signer.Sign("customers/abc/1.jpg", Viewer, now);
         var (_, expires, signature) = Parse(signer, link.Url);
 
-        Assert.False(signer.IsValid("customers/someone-else/1.jpg", expires, signature, now));
+        Assert.False(signer.IsValid("customers/someone-else/1.jpg", expires, signature, Viewer, now));
     }
 
     [Fact]
@@ -126,12 +128,12 @@ public sealed class DocumentStorageTests : IDisposable
     {
         var signer = Signer();
         var now = Users.Now;
-        var link = signer.Sign("customers/abc/1.jpg", now);
+        var link = signer.Sign("customers/abc/1.jpg", Viewer, now);
         var (key, expires, signature) = Parse(signer, link.Url);
 
-        Assert.False(signer.IsValid(key, expires + 86_400, signature, now));
-        Assert.False(signer.IsValid(key, expires, signature[..^2] + "xy", now));
-        Assert.False(signer.IsValid(key, expires, string.Empty, now));
+        Assert.False(signer.IsValid(key, expires + 86_400, signature, Viewer, now));
+        Assert.False(signer.IsValid(key, expires, signature[..^2] + "xy", Viewer, now));
+        Assert.False(signer.IsValid(key, expires, string.Empty, Viewer, now));
     }
 
     [Fact]

@@ -108,6 +108,26 @@ public sealed record FinancialDocumentHoldRecord(
     DateTimeOffset NextAttemptAt,
     string? LastError);
 
+/// <summary>A PDF that could not be drawn and still has not been (pre-launch item 197).</summary>
+public sealed record FinancialDocumentPdfHoldRecord(
+    Language Language,
+    RenditionKind Kind,
+    RenditionHoldReason Reason,
+    int Attempts,
+    DateTimeOffset FirstFailedAt,
+    DateTimeOffset LastFailedAt);
+
+/// <summary>What the work queue says about PDFs that cannot be drawn.</summary>
+/// <param name="Numbers">Up to three document numbers, the ones a human reads first.</param>
+public sealed record FinancialDocumentPdfHoldsSummary(
+    int Count,
+    IReadOnlyList<Id> DocumentIds,
+    IReadOnlyList<string> Numbers,
+    DateTimeOffset? OldestFailedAt)
+{
+    public static readonly FinancialDocumentPdfHoldsSummary None = new(0, [], [], null);
+}
+
 /// <summary>What the work queue says about documents on hold.</summary>
 /// <param name="BookingReferences">Up to three references, the ones a human reads first.</param>
 public sealed record FinancialDocumentHoldsSummary(
@@ -179,6 +199,12 @@ public interface IFinancialDocumentReader
     Task<IReadOnlyList<FinancialDocumentHoldRecord>> OpenHoldsForBookingAsync(Id bookingId, CancellationToken cancellationToken = default);
 
     Task<FinancialDocumentHoldsSummary> OpenHoldsSummaryAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>A document's PDFs that could not be drawn and have not been since (pre-launch item 197).</summary>
+    Task<IReadOnlyList<FinancialDocumentPdfHoldRecord>> OpenPdfHoldsOfAsync(Id documentId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every PDF that could not be drawn and has not been since, for the work queue.</summary>
+    Task<FinancialDocumentPdfHoldsSummary> OpenPdfHoldsSummaryAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Every email of a document, newest first, each with its attempts (payments Phase 7).</summary>
     Task<IReadOnlyList<FinancialDocumentDeliveryRecord>> DeliveriesOfAsync(Id documentId, CancellationToken cancellationToken = default);

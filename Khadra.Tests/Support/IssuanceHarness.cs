@@ -129,7 +129,16 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
             if (outcome.StorageFailed)
                 break;
             if (outcome.CannotBeDrawn)
+            {
                 Undrawable.Add(candidate);
+                // And the durable hold the service records beside it (pre-launch item 197), in a scope of its own.
+                await using var holding = NewContext();
+                await new RecordRenditionHoldHandler(
+                        new FinancialDocumentRenditionRepository(holding),
+                        new TestClock(Now),
+                        new UnitOfWork(holding, Substitute.For<IDomainEventDispatcher>()))
+                    .Handle(new RecordRenditionHoldCommand(candidate.DocumentId, candidate.Language, candidate.Kind, outcome.Skipped ?? string.Empty), CancellationToken.None);
+            }
         }
 
         if (outcomes.Count > 0 && outcomes.Count == work.Count && outcomes.All(outcome => outcome.CannotBeDrawn) && work.Count >= MaxRenditionsPerPass)

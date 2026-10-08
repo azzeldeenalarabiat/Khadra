@@ -146,6 +146,11 @@ internal sealed partial class BookingSettlementService(
             {
                 _undrawable.Add(candidate);
                 undrawable++;
+                // Durable, with its reason, for an administrator to read (pre-launch item 197): until now this was
+                // visible only in the log line the step wrote.
+                await RunAsync(
+                    new RecordRenditionHoldCommand(candidate.DocumentId, candidate.Language, candidate.Kind, outcome.Skipped ?? "drawing_failed"),
+                    cancellationToken);
             }
         }
 

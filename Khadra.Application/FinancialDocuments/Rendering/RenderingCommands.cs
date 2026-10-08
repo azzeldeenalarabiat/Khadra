@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using FluentValidation;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.Composition;
@@ -38,6 +39,64 @@ public sealed record RenditionOutcome(Id? RenditionId, string? Skipped, bool Can
     public static RenditionOutcome Undrawable(string why) => new(null, why, true, false);
 
     public static RenditionOutcome NotStored(string why) => new(null, why, false, true);
+}
+
+/// <summary>
+/// Records that one document's PDF, in one language and kind, could not be drawn, and why (pre-launch item 197) — in a
+/// scope of its own, as issuing's holds are, because the drawing scope is where it failed.
+/// </summary>
+/// <param name="Why">The draw's own answer: <c>snapshot_altered</c>, <c>snapshot_unreadable</c> or <c>drawing_failed</c>.</param>
+public sealed record RecordRenditionHoldCommand(Id DocumentId, Language Language, RenditionKind Kind, string Why) : ICommand<bool>;
+
+/// <summary>
+/// Raised only by the drawing pass, with one of its own short codes; the rule is here because every command that
+/// carries text has one. A code it does not know is recorded as a drawing failure, never refused.
+/// </summary>
+public sealed class RecordRenditionHoldCommandValidator : AbstractValidator<RecordRenditionHoldCommand>
+{
+    public RecordRenditionHoldCommandValidator()
+    {
+        RuleFor(command => command.DocumentId).Must(id => !id.IsEmpty);
+        RuleFor(command => command.Why).NotEmpty().MaximumLength(64);
+    }
+}
+
+public sealed class RecordRenditionHoldHandler(
+    IFinancialDocumentRenditionRepository renditions,
+    IClock clock,
+    IUnitOfWork unitOfWork)
+    : IRequestHandler<RecordRenditionHoldCommand, bool>
+{
+    public async Task<bool> Handle(RecordRenditionHoldCommand request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var reason = ReasonFor(request.Why);
+        var now = clock.UtcNow;
+
+        var hold = await renditions.HoldAsync(request.DocumentId, request.Language, request.Kind, cancellationToken);
+        if (hold is null)
+            renditions.AddHold(FinancialDocumentRenditionHold.Open(request.DocumentId, request.Language, request.Kind, reason, now));
+        else
+            hold.Fail(reason, now);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (UniqueConstraintConflictException)
+        {
+            // Another process recorded the same hold a moment earlier. Its row says the same thing.
+            return false;
+        }
+    }
+
+    internal static RenditionHoldReason ReasonFor(string why) => why switch
+    {
+        "snapshot_altered" => RenditionHoldReason.SnapshotAltered,
+        "snapshot_unreadable" => RenditionHoldReason.SnapshotUnreadable,
+        _ => RenditionHoldReason.DrawingFailed,
+    };
 }
 
 public sealed class ListFinancialDocumentRenditionWorkHandler(

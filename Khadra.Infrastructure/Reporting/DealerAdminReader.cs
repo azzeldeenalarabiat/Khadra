@@ -12,6 +12,7 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
     public async Task<PagedResult<DealerListItem>> ListAsync(
         DealerListFilter filter,
         PageRequest page,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
@@ -83,6 +84,8 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
                 dealer.VerificationStatus == approved && !dealer.IsSuspended,
                 dealer.SubmittedAt,
                 dealer.ReviewDueAt,
+                // Dealer.IsBreachingReviewSla, written out so it translates: awaiting a decision, and past the promise.
+                dealer.VerificationStatus == pending && now >= dealer.ReviewDueAt,
                 dealer.CreatedAt,
                 dealer.Documents.Count,
                 requiredDocuments,

@@ -81,17 +81,32 @@ public sealed class ReviewTests
     {
         var review = Leave(rating: 1, comment: "Abusive text.");
 
-        review.Hide("Contains abuse.");
+        Assert.True(review.Hide(ReviewHideReason.AbusiveLanguage).IsSuccess);
 
         Assert.True(review.IsHidden);
-        Assert.Equal("Contains abuse.", review.HiddenReason);
+        Assert.Equal(ReviewHideReason.AbusiveLanguage, review.HiddenReason);
         // The rating still counts: letting a dealer erase a bad score by reporting it would corrupt
         // the whole rating system.
         Assert.Equal(1, review.Rating.Value);
 
-        review.Unhide();
+        Assert.True(review.Unhide().IsSuccess);
         Assert.False(review.IsHidden);
         Assert.Null(review.HiddenReason);
+    }
+
+    /// <summary>
+    /// Pre-launch item 81: each hide and each restore is an audit entry, so a second click is refused rather than
+    /// recorded as a second decision.
+    /// </summary>
+    [Fact]
+    public void Hiding_a_hidden_review_or_restoring_a_visible_one_is_refused()
+    {
+        var review = Leave(rating: 2, comment: "Call me on 0790000000.");
+
+        Assert.Equal(ReviewErrors.NotHidden, review.Unhide().Error);
+        Assert.True(review.Hide(ReviewHideReason.PersonalContactDetails).IsSuccess);
+        Assert.Equal(ReviewErrors.AlreadyHidden, review.Hide(ReviewHideReason.SpamOrPromotion).Error);
+        Assert.Equal(ReviewHideReason.PersonalContactDetails, review.HiddenReason);
     }
 
     [Fact]

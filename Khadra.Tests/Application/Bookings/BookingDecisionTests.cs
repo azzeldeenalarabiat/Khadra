@@ -333,6 +333,9 @@ public sealed class BookingDecisionTests
         Assert.NotNull(row.UsedAt);
         Assert.Equal(OwnerId, row.UsedByUserId);
         context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e => e.Action == AuditAction.HandoverVerified && e.EntityId == booking.Id));
+        // Its parts, not "PickedUp (Pickup, Code)" (pre-launch item 174).
+        context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e =>
+            e.Action == AuditAction.HandoverVerified && e.NewValue == "{\"status\":\"PickedUp\",\"handover\":\"Pickup\",\"method\":\"Code\"}"));
         context.Notifier.Received().Raise(Arg.Is<Notification>(n => n.Kind == NotificationKind.YourBookingPickedUp && n.RecipientUserId == booking.CustomerId));
         Assert.Equal("Code", result.Value.Handovers.Single().Verification);
     }
@@ -546,6 +549,9 @@ public sealed class BookingDecisionTests
             await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None);
 
         context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e => e.Action == AuditAction.HandoverCodeLocked && e.EntityId == booking.Id));
+        // Which handover, and after how many tries, as parts (pre-launch item 174).
+        context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e =>
+            e.Action == AuditAction.HandoverCodeLocked && e.NewValue != null && e.NewValue.StartsWith("{\"handover\":\"Pickup\",\"wrongTries\":", StringComparison.Ordinal)));
     }
 
     [Fact]

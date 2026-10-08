@@ -2,6 +2,7 @@ using Khadra.Application.Common.Dtos;
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Dealers.CustomerPage;
 using Khadra.Application.Dealers.Dtos;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
@@ -26,6 +27,12 @@ namespace Khadra.Application.Dealers.GetDealerForReview;
 public sealed record DealerDocumentLinkDto(string Type, string ContentType, string Url, DateTimeOffset ExpiresAt);
 
 /// <summary>Everything the review screen needs to make the spec 3.1 decision.</summary>
+/// <param name="CustomerPage">
+/// What the office tells customers in its own words — the six sections, both languages, which are hidden, and what a
+/// customer actually sees (pre-launch item 113). The same projection the office's own editor reads, so an
+/// administrator and the owner can never be looking at two versions of one page. Read-only here: nothing an
+/// administrator does on this screen changes it.
+/// </param>
 public sealed record DealerReviewDto(
     DealerProfileDto Dealer,
     LocalizedTextDto Description,
@@ -33,7 +40,8 @@ public sealed record DealerReviewDto(
     double Longitude,
     IReadOnlyList<DealerDocumentLinkDto> Documents,
     IReadOnlyList<DealerReviewTimelineEntry> Timeline,
-    bool IsBreachingSla);
+    bool IsBreachingSla,
+    DealerCustomerPageDto CustomerPage);
 // EmployeeCount is deliberately NOT here. It was, counting every employee row including deactivated
 // ones, while Dealer.EmployeeCount on the same response counts only active staff -- so this screen
 // and the dealer's own profile showed two different staff numbers for one dealership. One field, one
@@ -78,7 +86,8 @@ public static class DealerReviewTimelineSteps
 
 /// <summary>
 /// Admin-only. Mints a fresh signed link per document on every load rather than storing one, so a
-/// link cannot outlive the session that legitimately produced it.
+/// link cannot outlive the session that legitimately produced it, and binds each to the administrator
+/// who loaded the screen, so it opens in their session and nobody else's (pre-launch item 14).
 /// </summary>
 public sealed record GetDealerForReviewQuery(Id DealerId) : IQuery<Result<DealerReviewDto, Error>>;
 
@@ -90,6 +99,7 @@ public sealed record GetDealerForReviewQuery(Id DealerId) : IQuery<Result<Dealer
 public sealed class GetDealerForReviewHandler(
     IDealerRepository dealers,
     IDocumentLinkSigner signer,
+    ICurrentActor actor,
     IClock clock)
     : IRequestHandler<GetDealerForReviewQuery, Result<DealerReviewDto, Error>>
 {
@@ -104,12 +114,13 @@ public sealed class GetDealerForReviewHandler(
             return DealerErrors.NotRegistered;
 
         var now = clock.UtcNow;
+        var viewer = actor.UserId ?? throw new InvalidOperationException("A document link is minted for the signed-in person who will open it.");
 
         var documents = dealer.Documents
             .OrderBy(document => document.Type.Id)
             .Select(document =>
             {
-                var link = signer.Sign(document.StorageKey, now);
+                var link = signer.Sign(document.StorageKey, viewer, now);
                 return new DealerDocumentLinkDto(
                     document.Type.Name,
                     DocumentContentTypes.ForStorageKey(document.StorageKey),
@@ -125,7 +136,8 @@ public sealed class GetDealerForReviewHandler(
             dealer.Location.Longitude,
             documents,
             BuildTimeline(dealer),
-            dealer.IsBreachingReviewSla(now));
+            dealer.IsBreachingReviewSla(now),
+            DealerCustomerPageDto.From(dealer));
     }
 
     /// <summary>

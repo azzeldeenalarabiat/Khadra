@@ -23,6 +23,7 @@ internal sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEn
         ConfigureEnumeration(entity.Property(audit => audit.EntityType), 20);
         ConfigureId(entity.Property(audit => audit.EntityId));
         entity.Property(audit => audit.SubjectLabel).HasMaxLength(AuditEntry.MaxLabelLength).IsRequired();
+        entity.Property(audit => audit.SubjectLabelAr).HasMaxLength(AuditEntry.MaxLabelLength);
         entity.Property(audit => audit.PreviousValue).HasMaxLength(AuditEntry.MaxValueLength);
         entity.Property(audit => audit.NewValue).HasMaxLength(AuditEntry.MaxValueLength);
         entity.Property(audit => audit.Reason).HasMaxLength(AuditEntry.MaxReasonLength);

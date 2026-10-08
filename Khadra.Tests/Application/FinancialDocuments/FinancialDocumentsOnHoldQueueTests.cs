@@ -52,6 +52,28 @@ public sealed class FinancialDocumentsOnHoldQueueTests
         Assert.Empty(AttentionQueueBuilder.Build([], new Dictionary<Id, string>(), [], 0.75m, 48, Now, emailsNotSent: FinancialDocumentEmailsSummary.None).Items);
     }
 
+    /// <summary>
+    /// Pre-launch item 197: a PDF that cannot be drawn is one row, counted by DOCUMENT (a receipt failing in both
+    /// languages is one document to look at), named by numbers, opening the document when there is one.
+    /// </summary>
+    [Fact]
+    public void Pdfs_that_cannot_be_drawn_are_one_row_counted_by_document()
+    {
+        var only = Id.New();
+        var pdfs = new FinancialDocumentPdfHoldsSummary(2, [only], ["PAY-2026-000021"], Now.AddHours(-2));
+
+        var queue = AttentionQueueBuilder.Build([], new Dictionary<Id, string>(), [], 0.75m, 48, Now, pdfsNotDrawn: pdfs);
+
+        var row = Assert.Single(queue.Items);
+        Assert.Equal(AttentionQueueBuilder.Kinds.FinancialDocumentPdfsNotDrawn, row.Kind);
+        Assert.Equal(AttentionQueueBuilder.Severities.Warning, row.Severity);
+        Assert.Equal(1, row.Count);
+        Assert.Equal([only.Value], row.SubjectIds);
+        Assert.Equal("PAY-2026-000021", row.Subtitle);
+        Assert.Null(row.SlaDeadlineAt);
+        Assert.Empty(AttentionQueueBuilder.Build([], new Dictionary<Id, string>(), [], 0.75m, 48, Now, pdfsNotDrawn: FinancialDocumentPdfHoldsSummary.None).Items);
+    }
+
     [Fact]
     public void Nothing_on_hold_adds_nothing() =>
         Assert.Empty(AttentionQueueBuilder.Build([], new Dictionary<Id, string>(), [], 0.75m, 48, Now, documentsOnHold: FinancialDocumentHoldsSummary.None).Items);

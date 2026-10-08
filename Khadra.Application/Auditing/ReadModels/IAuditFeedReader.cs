@@ -22,6 +22,10 @@ namespace Khadra.Application.Auditing.ReadModels;
 /// actor itself; without this it could not tell that entry from a person named System (pre-launch
 /// item 175).
 /// </param>
+/// <param name="SubjectLabelAr">
+/// The subject's Arabic name where it has one of its own — a city, a car type — snapshotted with the English label
+/// (pre-launch item 176). Null otherwise, and for entries written before 2026-10-08.
+/// </param>
 public sealed record ActivityEntry(
     Id Id,
     DateTimeOffset OccurredAt,
@@ -31,7 +35,8 @@ public sealed record ActivityEntry(
     string EntityType,
     string SubjectLabel,
     Id? EntityId,
-    string? BookingReference);
+    string? BookingReference,
+    string? SubjectLabelAr = null);
 
 public interface IAuditFeedReader
 {
