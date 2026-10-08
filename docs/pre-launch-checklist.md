@@ -13,7 +13,7 @@ being fixed, not by being forgotten.
 
 ### 1. The audit trail can be erased with TRUNCATE
 
-**Status:** open · **Raised:** 2026-09-03 · **Owner decision:** deferred deliberately
+**Status:** closed · **Raised:** 2026-09-03 · **Closed:** 2026-10-08 (Fix & Polish Wave 6) — owner approved the guard on 2026-10-08
 
 `audit_entries` is protected by `khadra_audit_entries_are_append_only`, a `FOR EACH ROW BEFORE DELETE
 OR UPDATE` trigger, plus a matching guard in `KhadraDbContext.GuardAuditTrailIsAppendOnly`. Both
@@ -39,6 +39,18 @@ about the reseed workflow, and silently making a developer's database reset fail
 to slip into an unrelated change. The seeder it refers to was deleted on 2026-09-05, so the question
 is now only "what still truncates, and what should it do instead" — which is the owner's to answer.
 When it is answered, the trigger is two lines beside the existing one.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** The owner approved the guard: migration
+`AuditTrailRefusesTruncate` adds `audit_entries_no_truncate`, `BEFORE TRUNCATE … FOR EACH STATEMENT`, calling the
+table's own `khadra_audit_entries_are_append_only()`, so the refusal reads like the other two ("audit_entries is
+append-only: TRUNCATE is not permitted"). Nothing truncates the table any more — the seeder was deleted on 2026-09-05,
+and a search of the application, the scripts and `docs/sql` finds nothing that does — so there is no workflow to give a
+way past it; a development database is reset by building a fresh one, never by emptying this table. The migration
+reads and writes no row, so it is safe on a database that already holds a trail; it drops a same-named trigger first,
+so it is safe where one was added by hand; its rollback removes only this trigger. `PostgresAuditTrailTruncateTests`
+proves on PostgreSQL that every column of every existing entry is identical before and after the migration, that
+`TRUNCATE` (with and without `CASCADE`), `UPDATE` and `DELETE` are all refused while an INSERT still works, and that the
+rollback leaves the row guard in place.
 
 ---
 
@@ -299,7 +311,7 @@ and the configured threshold. Then delete `sla.ts`.
 
 ### 14. A signed document link is not bound to the admin who minted it
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** closed · **Raised:** 2026-09-04 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `GetDealerForReviewQuery` says a signed link "cannot outlive the session that legitimately produced
 it", and the review screen tells the admin the links are "admin only". Neither is quite true.
@@ -322,6 +334,25 @@ item**: there is no signature to bind, and no storage key in the browser to leak
 use the signer and still want this fix: the admin dealer review, the customer's own paperwork, and
 dispute evidence. Do not "harmonise" the renter route back onto the signer to tidy this up — that
 would reintroduce both problems at once.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** Every signed link is now minted FOR one signed-in person:
+`IDocumentLinkSigner.Sign(storageKey, viewer, now)` signs `storageKey|expires|viewer`, and `DocumentsController`
+checks the signature against `ICurrentActor.UserId` on the way back in, answering 404 — as for a bad signature — when
+it was minted for somebody else or nobody is signed in. All four flows that mint one bind it to the person who will
+open it: the admin dealer review and the admin financial-document PDFs to the administrator who asked, a customer's own
+paperwork and their own receipts and invoices to that customer, and dispute evidence to whichever party, office staff
+member or administrator the view was composed for. The derivation label moved to `khadra:document-link:v2`, so no
+signature from before the change can be read as one after it.
+
+The second half of "To close" — an admin policy on the download — is deliberately NOT done: the same endpoint serves a
+customer their own documents and receipts, and the binding is the stronger check anyway (it refuses another
+ADMINISTRATOR's link too). Customer access is unchanged: the URL's shape is the same (`?expires=&signature=`), the
+viewer comes from the session rather than the URL, and every client fetches the link it was given over its own
+authenticated connection — the console and the website through their BFF, the app with its bearer token — so the
+person who asked is the person who opens it. The one visible effect: a link minted in the few minutes before a deploy
+stops working at the deploy, and is minted again on the next tap. Tests: `CustomerDocumentLinkTests` (one viewer, and
+the download against whoever is signed in), `DealerReviewScreenTests`, `DisputeUseCaseTests`,
+`FinancialDocumentRenditionTests`.
 
 ### 15. An upload ticket can be replayed and will overwrite the file it names
 
@@ -395,7 +426,7 @@ hold it in review when the first customer-facing admin action ships.
 
 ### 19. Renaming an AuditAction or UserRole would make historical entries unreadable
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** closed · **Raised:** 2026-09-04 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Both are persisted by NAME and materialised through `Enumeration.FromName`, which throws for a name
 that no longer exists. Rename or remove one member of `AuditAction`, `AuditEntityType` or `UserRole`
@@ -407,6 +438,12 @@ migration, not a refactor.
 
 **To close:** a domain test pinning the exact member names, and a comment on each enumeration saying
 why they cannot be renamed.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** `PersistedEnumerationNamesTests` pins every `(id, name)` of
+`AuditAction` (36), `AuditEntityType` (14) and `UserRole` (4) — and of `ReviewHideReason`, stored by name since item 81
+this wave — as an exact list, and that each is read back by the name a row stores. Adding a member means adding it to
+the list, which is the deliberate act an addition should be; renaming or removing one fails the test. Each enumeration
+carries an ADD-ONLY comment saying why and pointing at the test.
 
 ### 20. The audit log has no export
 
@@ -715,7 +752,8 @@ its check for a null address, which makes a naive test appear to prove the fix d
 
 **Still open, tracked separately:** IP-partitioned limiting cannot see a botnet and punishes an
 office behind one NAT. Per-account lockout is the control that actually protects a single account,
-and is a schema and configuration change rather than a hotfix — see item 51.
+and is a schema and configuration change rather than a hotfix — see item 51 (closed 2026-10-08: 8 failures in 15
+minutes refuse one account name for 15, from any address).
 
 **Superseded detail below, kept for the record:**
 
@@ -733,7 +771,7 @@ service that looks like the rate limiter working.
 
 ### 33. The BFF's body limit is lower than the API's, and nothing keeps them in step
 
-**Status:** open · **Raised:** 2026-09-05
+**Status:** closed · **Raised:** 2026-09-05 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `POST /api/v1/dealers` accepts 32 MiB (`[RequestSizeLimit]`) so a gallery can file three licence
 documents at the configured 8 MiB ceiling. The BFF in front of it runs on Kestrel's default
@@ -743,6 +781,15 @@ and becomes a silent 413 from the proxy, before the API is ever reached, the mom
 
 **To close:** set the BFF's `MaxRequestBodySize` explicitly from the same figure the API derives its
 limit from, so raising one raises the other.
+
+**Closed:** the figure is named once per process, and the three dependents are tied to it. The API's limit is
+`DealerSubmissionLimits.MaximumRequestBytes` (32 MiB, unchanged); the API refuses to START when a configured
+`Documents:MaximumSizeBytes` would not let every required document plus the form through it (an options validation
+naming the setting), instead of a 413 on every application; and the BFF sets Kestrel's `MaxRequestBodySize` explicitly
+to `BffConstants.MaxRequestBodyBytes` (32 MiB, up from the implicit 30,000,000), with `RequestBodyLimitTests` failing
+if any `[RequestSizeLimit]` the API declares exceeds it. The two processes do not share configuration, so "raising one
+raises the other" is a failing test rather than a shared setting. Pinned by `RequestBodyLimitTests` and
+`DocumentStorageConfigurationTests`.
 
 ### 34. The gallery application form states the document rules rather than reading them
 
@@ -775,7 +822,7 @@ record commits to first.
 
 ### 36. The vehicle form's manufacturer list is a literal
 
-**Status:** open · **Raised:** 2026-09-05
+**Status:** closed · **Raised:** 2026-09-05 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `vehicle-wizard.component.ts` holds nine manufacturers (`makes`) as a hardcoded array. It feeds a
 `<datalist>`, so it only suggests — a dealer can type any make and the value on the record is always
@@ -789,6 +836,8 @@ refuses to advance until it is answered.
 
 **To close:** either a `manufacturers` lookup an administrator curates alongside cities and car
 types, or delete the list and leave the field free text.
+
+**Closed:** deleted; the field is free text (item 104).
 
 ---
 
@@ -1033,6 +1082,8 @@ built, not after.
 
 ### 47. A first staff invitation that is never delivered looks identical to one that is
 
+**Status:** closed · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
+
 `InviteEmployeeCommand` sends the invitation after commit and discards the result, on purpose: the
 employee record is already saved and discarding it because a relay hiccuped would be the worse
 outcome. But the owner is never told. The row reads `INVITED - Has not set a password yet` whether
@@ -1048,6 +1099,16 @@ accepted" is not a persisted fact it can carry.
 **To close:** return `InviteEmployeeResult(EmployeeListItem Employee, bool InvitationEmailSent)` from
 the command, and have the Employees screen mark that row `email not sent - resend` instead of plain
 `Invited`. Four layers: command result, controller, Angular service, template.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** The four layers, with one change of shape: the answer is FLAT —
+`InvitedEmployee`, every field of `EmployeeListItem` plus `invitationEmailSent` — rather than the list item wrapped in
+a result, so a console that reads only the list item's fields reads it unchanged (`POST /api/v1/dealers/me/employees`,
+owners only; additive; the customer app never calls it). The employee is still created either way. When the relay
+refused the message the Employees screen says so in the dialog's own outcome — "The account was created — the email
+was not sent", worded like the administrator's invitation — and marks the row "Invitation email not sent — resend it"
+until a resend succeeds. That mark lives in the screen, because nothing else can know: the list is rebuilt from the
+database and one send's outcome is not stored. After a reload the row reads as any other unanswered invitation, with
+its Resend button. Test: `The_first_invitation_says_whether_its_email_went_out`.
 
 ### 48. An administrator invitation whose email fails cannot be re-sent, ever
 
@@ -1197,10 +1258,17 @@ resolved on this platform.
 JSON inside `MaxValueLength`) and let the audit screen compose the sentence from
 `AuditAction.DisputeResolved`. Do it before the first real dispute, not after.
 
+**Status:** closed · **Closed:** 2026-10-08 (Fix & Polish Wave 6). `DisputeAuditor.Describe` now stores the decision's figures as compact JSON —
+`{"currency":"JOD","held":"18.000","refund":"10.000","platform":"4.000","dealer":"4.000"}`, plus `charge` and
+`chargeCurrency` when the office was charged beyond the deposit — at the currency's full scale and in the invariant
+culture, as before. The audit screen composes the sentence from `DisputeResolved` in the reader's language, with each
+amount laid out as a stored amount. A row written before the change (none on production; possibly some on a test
+database) is shown as stored. Pinned by `DisputeUseCaseTests` and `audit-change.spec.ts`.
+
 
 ### 51. Nothing throttles failed sign-ins for one account
 
-**Status:** open · **Raised:** 2026-09-06
+**Status:** closed · **Raised:** 2026-09-06 · **Closed:** 2026-10-08 (Fix & Polish Wave 6) — policy set by the owner on 2026-10-08
 
 Item 32 closed the bypass that made the IP-based limiter ineffective, but the limiter it restored is
 still the only brake on password guessing, and it partitions by address. That has two ends it cannot
@@ -1216,9 +1284,45 @@ gets a distinct code with the remaining time. Do not extend the window on furthe
 attacker can hold an account locked indefinitely; clear the counter on a successful password reset.
 The new error code has to reach the console in both languages.
 
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`), to the owner's policy of that day, which replaces the "To close"
+above where they differ:** 8 failed sign-ins of one account name within 15 minutes, from any address, refuse that name
+for 15 minutes; a successful sign-in clears the count; the refusal is generic and says nothing about whether an account
+exists; the address-and-name rate limit stays exactly as it was, in front. The figures are configuration
+(`Authentication:SignInThrottle`: `MaxFailures`, `WindowMinutes`, `BlockMinutes`, validated at startup), never constants.
+
+How it reads, and why it differs from the older sketch:
+
+- **Keyed on the name that was TYPED**, normalised, whether or not an account holds it — as a SHA-256 hash with a
+  purpose prefix, never the address — in `sign_in_throttles` (migration `SignInThrottle`, a new table, nothing
+  rewritten). Counting only real accounts would make the refusal itself the oracle the generic "invalid credentials"
+  exists to avoid.
+- **Refused before the account is looked up or the password checked.** Under a block a right password and a wrong one
+  get the same answer, and that answer is the rate limiter's own: `429`, `code: rate_limited`, "Too many requests. Try
+  again later.", `Retry-After` with the time left. So the sketch's distinct "locked" code for a correct password is
+  deliberately NOT built: it would have told a guesser the password was right, and the owner asked for generic wording.
+  Every client already handles that 429 (console, website, app), so there is no contract change and no new code to word.
+- **A block is never extended.** Attempts during it are refused before they are counted, and the window is fixed from
+  its first failure, so once a block ends the count starts again.
+- **The right password on an account that may not sign in** (unverified, suspended) is neither counted nor forgiven.
+- **A completed password reset clears the count**, so a stranger who typed the owner's address eight times cannot keep
+  them out after they have proved the mailbox.
+- **Counted atomically**: one `INSERT … ON CONFLICT DO UPDATE`, so failures sent together are each counted (proved on
+  PostgreSQL with twelve at once). Each write commits on its own, outside the sign-in's unit of work. Rows whose window
+  and block are both over are swept on the failure path.
+
+**What it costs, and the owner should know it:** anyone who knows an address can keep that account refused by sending
+eight wrong passwords every fifteen minutes. That is the price of a per-account lock in every design; the owner can
+always get in by resetting the password, and each burst still has to pass the address limit. The website now words a
+long wait in minutes ("Try again in 15 minutes.") rather than 900 seconds; the console already did.
+
+Tests: `LoginHandlerTests` (the ceiling, the window, the reset, a name nobody holds, one name leaving others alone,
+unverified and suspended), `ResetPasswordHandlerTests`, `SignInThrottleTests` (the real upsert and sweep on SQLite),
+`PostgresSignInThrottleTests` (the race, the restart, the check constraint), `SignInThrottleProblemTests` (the wire
+shape matches the limiter's), and the website's `sign-in-wait.spec.ts`.
+
 ### 52. Lookup name uniqueness is enforced in the handler, not by an index
 
-**Status:** open · **Raised:** 2026-09-07
+**Status:** closed · **Raised:** 2026-09-07 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Item closed alongside the duplicate-name fix, but only half of it. Creating, renaming and
 reactivating a city or car type all now refuse a name another OFFERED entry already uses
@@ -1234,6 +1338,20 @@ second layer is a partial unique index on `lower(name_en) WHERE is_active` and t
 **Note before writing it:** the migration will refuse to apply while any duplicate rows are active,
 so it must not attempt to fix data itself — retire the duplicates through `/cities` and `/car-types`
 first. The development database was cleaned this way on 2026-09-06.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** Migration `OfferedLookupNamesAreUnique` adds four partial unique
+indexes — `ux_cities_offered_name_en`, `…_name_ar`, `ux_car_types_offered_name_en`, `…_name_ar` — on the handler's own
+`ComparisonKey` written in SQL (tashkeel U+064B–U+0652 and tatweel U+0640 removed, then lower-cased), `WHERE is_active`,
+so a retired entry reserves nothing, as in the handler. **Before it creates anything it checks for offered duplicates
+and, if there are any, refuses with a sentence naming them** ("Offered lookup entries share a name (cities.name_en
+Madaba = MADABA). Retire the duplicates on /cities or /car-types, then apply this migration again.") — it never fixes
+data itself, and the refusal rolls the whole migration back. **Before applying it to Staging or Production, run the
+read-only pre-check in `docs/sql/2026-10-08-fix-polish-wave6.sql`; it returns no rows when the migration will apply.**
+The handler turns a loss to one of these indexes back into `lookup.name_taken` (`LookupHandlers.SaveAsync`), so the
+loser of a race is told what it would have been told a moment later; any other unique violation is unchanged.
+Tests: `LookupNameUniquenessTests` (the handler's folding, the race, nothing else translated — the first handler tests
+the lookups have had) and `PostgresLookupNameIndexTests` (the refusal names the duplicates and leaves nothing behind;
+case, marks and tatweel collide; a retired name does not).
 
 ### 53. Value objects are re-parsed on read, and a failed parse throws
 
@@ -1357,7 +1475,7 @@ car was taken while you were deciding" from a generic conflict code. Catch it an
 
 ### 54. The fleet screen buckets vehicle holds in the browser's own calendar
 
-**Status:** open · **Raised:** 2026-09-07 (found by the Fable advisor while reviewing calendar days)
+**Status:** closed · **Raised:** 2026-09-07 (found by the Fable advisor while reviewing calendar days) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `Khadra.Dashboard/src/app/features/fleet/vehicle-detail.component.ts` turns a car's bookings into
 day cells using the browser's local calendar, and knows nothing about the turnaround gap. A dealer
@@ -1370,6 +1488,17 @@ fact the server owns, and this screen is a second source for it.
 **To close:** serve the occupancy from an availability read model that uses the same `BookingHolds`
 predicate and the same Amman calendar as everything else. The customer catalogue needs that read
 model anyway, so this closes with it. Until then the strip is approximate and does not say so.
+
+**Closed:** `GET /api/v1/dealers/me/vehicles/{id}/calendar?year=&month=` (`GetVehicleCalendarQuery`, dealer staff,
+the dealership's own car only) answers the month day by day, cut in the platform's calendar through
+`IReportingCalendar`, from `IDealerBookingReader.VehicleHoldsAsync` — composed on `BookingHolds.Live`, the predicate the
+catalogue and the overlap guard share, read from each hold's HOLD start. So a request or an approval whose window has
+closed no longer blocks a day, the turnaround before a rental is shown as the car being prepared ("Preparing /
+تجهيز"), and a collected car that is overdue back stays out until today. The console renders the server's days
+(`vehicle-calendar.presenter.ts`) and starts on the platform's current month; a failed read says so instead of drawing
+a free month. Pinned by `VehicleCalendarTests` (Amman midnights, a rental starting 01:00 Amman that UTC would have put
+a day early, turnaround, overdue), `DealerBookingReaderTests` and `vehicle-calendar.presenter.spec.ts`. The catalogue
+itself did not need a new read model: it already answers availability per search from the same predicate.
 
 ### 55. The turnaround gap is one number for the whole platform
 
@@ -2283,7 +2412,7 @@ behind reality.
 
 ### 81. Nothing can moderate a review, in either direction
 
-**Status:** open · **Raised:** 2026-09-08 · **Pre-dates this work**
+**Status:** partly closed (admin moderation, 2026-10-08, Fix & Polish Wave 6); the customer's request route is open · **Raised:** 2026-09-08 · **Pre-dates this work**
 
 `Review.Hide` and `Unhide` exist on the aggregate and no endpoint calls either. Every reader honours
 them — the public listing drops the text, and the customer reputation drops the whole rating — so the
@@ -2295,6 +2424,20 @@ hiding it is the only remedy the model has. There is no appeal path and no admin
 
 **To close:** an admin endpoint and screen to hide and unhide a review, with an audit entry, and a
 route by which a customer can ask for one to be looked at.
+
+**Admin half closed, 2026-10-08 (Fix & Polish Wave 6, `fix/polish-wave6`).** `GET /api/v1/admin/reviews` (paged;
+`hidden`, `direction`, `rating`, `search` over the comment or an exact booking reference) and
+`POST /api/v1/admin/reviews/{id}/hide` / `/restore`, administrators only, back the console's Reviews screen, which
+replaces its "not built" placeholder. Both directions are listed, with the whole comment, who wrote it about whom, the
+booking, and whether it is published yet. Hiding takes a policy reason from a fixed list (`ReviewHideReason`: personal
+contact details, abusive language, not about this rental, spam or promotion), stored by its code — the column held free
+English before and no row ever had one, because nothing could hide a review. Each decision records `ReviewHidden` /
+`ReviewRestored` in the same save, labelled with the booking reference rather than a person's name, the reason in the
+new or previous value. A second hide or restore is refused (`review.already_hidden` / `review.not_hidden`). The rating
+is never edited: hiding a customer's review of an office still removes only its words, and hiding an office's rating
+of a customer still removes it from their reputation — the screen says which before the click.
+**Still open:** the route by which a customer asks for a rating of them to be looked at. That is new customer-facing
+scope (website and app), not part of this wave.
 
 ### 82. `Review.Revise` is unreachable
 
@@ -3221,7 +3364,7 @@ the existing vocabularies. Additive, and the app already knows how to render one
 
 ### 103. Names written into the record in English, at the moment of the action
 
-**Status:** open · **Raised:** 2026-09-18
+**Status:** closed · **Raised:** 2026-09-18 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Some names are not looked up at read time but WRITTEN when something happens, and they were written
 in English: notification actor names ("A colleague", "A customer", "The rental office"), audit
@@ -3231,9 +3374,25 @@ records are history and are not rewritten, so they stay English on an Arabic scr
 **To close:** for records written from here on, store a code (or the actor's id) beside the name and
 word it at render time, as the penalty reason now does. Historical rows keep what they were given.
 
+**Closed:** 2026-10-08 (Fix & Polish Wave 6). Two kinds of record, two answers.
+- **Notifications** carry a stand-in code beside the name, `actor_stand_in` (`NotificationStandIn`: `Customer`,
+  `Colleague`, `RentalOffice`; stored by name, add-only), and `NotificationItem.actorStandIn` sends it — an additive
+  field. The English phrase is still written in `actor_name`, unchanged, because every installed customer app reads and
+  prints that field. The dealer console words `Customer` and `Colleague`, the website words `RentalOffice`, and the
+  server's own push and email word every stand-in in the message's language; a row from before the code keeps what it
+  had (the console still recognises the old customer phrase, as since Wave 3). The customer APP's in-app list still
+  prints the phrase for the rare office that has left the platform: wording the code there is an app change, left to
+  the Wave 7 app list.
+- **Audit entries, document-access entries and renter-document reviews** already store the actor's id beside the name.
+  Their English fallbacks ("Unknown admin", "Unknown") ran only for a request whose token had no name claim, which no
+  token this platform issues lacks; `ActorNames.RecordedName` now records the actor's short reference (eight hex
+  digits) there instead, which reads the same in both languages.
+Pinned by `RecordedWordsTests`, `CreateBookingTests`, `PushWordingAndFcmTests`, `notifications.presenter.spec.ts`,
+`notification-text.spec.ts` and `PersistedEnumerationNamesTests`.
+
 ### 104. The vehicle wizard offers nine car makes nobody served it
 
-**Status:** open · **Raised:** 2026-09-18 · **Found during the localization sweep**
+**Status:** closed · **Raised:** 2026-09-18 · **Found during the localization sweep** · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `Khadra.Dashboard/src/app/features/fleet/vehicle-wizard.component.ts` builds its make suggestions
 from `['Toyota', 'Hyundai', 'Kia', …]` — a list typed into the screen. Every other list on that form
@@ -3247,9 +3406,12 @@ them for that reason, with a pointer to this item. The defect is the list, not t
 **To close:** serve the makes as a lookup or an `/app-config` vocabulary, or drop the suggestions and
 let the field stand alone.
 
+**Closed:** the suggestions are dropped and the make field stands alone, as the record always took it; the scanner's
+allowlist entry for the nine names went with them. Closed with item 36.
+
 ### 105. The car form still pre-fills figures nobody chose
 
-**Status:** open · **Raised:** 2026-09-18 · **Found during the localization sweep**
+**Status:** closed · **Raised:** 2026-09-18 · **Found during the localization sweep** · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `car-form.component.ts` starts a new car at `seats: 5`, `dailyRate: 30`, `securityDeposit: 150`,
 `transmission: 'Automatic'`, `fuelType: 'Petrol'` and the current year. The vehicle WIZARD had the
@@ -3258,9 +3420,16 @@ published a real car at figures the console invented. The older form was not fix
 
 **To close:** start those fields empty, as the wizard does, and let the dealer state each one.
 
+**Closed:** a new car starts with year, seats, daily price and deposit empty and transmission and fuel on "Choose…"
+(`car-form.model.ts`, `NEW_CAR`); an empty number box is unanswered rather than 0, and Save says what is missing
+instead of sending. The form is routed only for EDITING today (adding a car is the wizard's), so the invented figures
+showed for as long as the car took to load; they no longer show at all, and an unanswered figure is never sent.
+Editing is otherwise unchanged (verified in the browser: the form seeds from the car, with "Choose…" first in both
+selects). Pinned by `car-form.model.spec.ts`. The fuel policy and unlimited mileage keep the defaults the wizard keeps.
+
 ### 106. The admin dealer list judges its review SLA by the browser's clock alone
 
-**Status:** open · **Raised:** 2026-09-18
+**Status:** closed · **Raised:** 2026-09-18 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Every other clock in the console consults the server's own flag as well as the local one, so a
 browser whose time is behind cannot show a broken promise as time remaining: the dispute queue reads
@@ -3269,6 +3438,10 @@ so `dealers-list` compares `reviewDueAt` against `Date.now()` and nothing else.
 
 **To close:** add `IsBreachingSla` to `DealerListItem` (the reader already has `now` for the queue
 counts) and pass it to `formats.sla(...)`, which takes the flag.
+
+**Closed:** `DealerListItem.IsBreachingSla` is judged in the reader, on the server's clock, exactly as
+`Dealer.IsBreachingReviewSla` (awaiting the administrator, and past the frozen deadline), and the list passes it to
+`formats.sla`. Additive on the wire; the field is optional in the console's model. Pinned by `DealerAdminReaderTests`.
 
 ### 107. A resubmitted application cannot say which decision it answered
 
@@ -3285,7 +3458,7 @@ audit log is where an administrator can see which it was.
 
 ### 108. Two console strings still come from the server in English
 
-**Status:** open · **Raised:** 2026-09-18
+**Status:** closed · **Raised:** 2026-09-18 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 - The platform settings screen prints the SOURCE of its figures ("Configuration") as the API sends
   it — a display word rather than a code, so the console cannot translate it.
@@ -3294,6 +3467,11 @@ audit log is where an administrator can see which it was.
 
 **To close:** send a code for the settings source and word it in the console; drop the "—" and let the
 reference be null, which the console already knows how to word.
+
+**Closed:** the source is a named code (`BusinessRulesView.ConfigurationSource`, still "Configuration" on the wire), and
+the settings screen words it ("the server configuration / إعدادات الخادم"), showing an unknown code as sent in a
+left-to-right run. `DisputeListItem.BookingReference` is null when the booking does not resolve, and the queue words
+it with the console's existing "Booking no longer resolves".
 
 ### 109. A resubmitted application does not record what it answered
 
@@ -3365,7 +3543,7 @@ versioning until that question has an answer — a history table nobody reads is
 
 ### 113. No Admin can read what an office tells customers
 
-**Status:** open · **Raised:** 2026-09-18
+**Status:** closed · **Raised:** 2026-09-18 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Six free-text fields, up to 2,000 characters each, written by dealers and shown to every customer.
 Nothing moderates them and no Admin screen shows them. That is the same exposure vehicle descriptions
@@ -3374,6 +3552,17 @@ a car.
 
 **To close:** a read-only panel on the admin dealer page showing the six sections and which are
 hidden. Admin console work, which is out of scope for a customer-app pass.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** `GET /api/v1/admin/dealers/{id}` carries `customerPage` —
+additive, administrators only, and the very projection the office's own editor reads (`DealerCustomerPageDto`), so the
+two can never show different pages. The admin dealer screen draws it as "What this office tells customers", read-only:
+every section the server lists, in its order and with the editor's labels, each language as the office wrote it and
+with no fallback (a missing translation is part of what is being reviewed), hidden sections included and marked
+"Hidden from customers", delivery notes written while delivery is off marked as not shown, and an unwritten section as
+"Nothing written". A section this console has no label for is counted, never guessed at. Nothing on the screen can
+change it. Moderation itself — an administrator hiding or editing an office's words — is NOT built and is not implied:
+this item asked for the reading, and the decision to act on what is read is a separate one.
+Tests: `DealerReviewScreenTests`, `customer-page-panel.presenter.spec.ts`.
 
 ### 114. The design export has no artboard for the customer page
 
@@ -3505,7 +3694,7 @@ includes them. Test: tamper the column to `About;Prices`, load, hide Insurance, 
 
 ### 119. The public-profile endpoints have no Security-layer tests
 
-**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of the customer page**
+**Status:** closed · **Raised:** 2026-09-18 · **From the architecture review of the customer page** · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `Khadra.Tests/Security` has nothing touching `me/public-profile` or `galleries/`. The application
 layer covers owner-only writing, and the reader covers what a suspended office returns, but neither
@@ -3516,9 +3705,15 @@ exercises the wire: an employee's 403 rests on the `DealerOwner` policy attribut
 anonymous `GET galleries/{id}` for a suspended office is 404 whose body contains none of the six
 sections.
 
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** `PublicProfileEndpointTests` runs the API host on the real model
+(SQLite, one connection for every scope): a member of staff's `PUT me/public-profile` is 403 `auth.forbidden`; an
+anonymous `GET galleries/{id}` for a suspended office that wrote every section in both languages is 404 with none of
+its words, in either language, and not its name; and, as the control that makes the 404 mean something, the same page
+on a trading office is 200 with its words.
+
 ### 120. Typed text collapses its own line breaks in the console
 
-**Status:** open (deferred by the owner, 2026-09-19) · **Raised:** 2026-09-18 · **From the
+**Status:** closed · **Closed:** 2026-10-08 (Fix & Polish Wave 6, in the approved scope) · was deferred by the owner, 2026-09-19 · **Raised:** 2026-09-18 · **From the
 architecture review of the customer page**
 
 `.user-text` marks text somebody typed — an office's customer page, a customer's dispute statement, a
@@ -3536,9 +3731,17 @@ under a change labelled for one of them.
 or a preview-only rule the customer page panel opts into. Either way, check how the customer app lays
 out the same text, so the preview and the page a customer reads agree.
 
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`): the opt-in rule, not the global one.** A new `.user-prose`
+(`white-space: pre-line; overflow-wrap: anywhere`) keeps a typed text's own line breaks and wraps a long unbroken run.
+It is put only on blocks that show prose — the office's customer page preview, the administrator's reading of it
+(item 113), the About rows of an application, dispute statements and reasons, decision and suspension notes, a renter
+document's review note, handover notes and unverified reasons, and an office settlement's note and void reason.
+`.user-text` itself is unchanged in this respect, because it also sits in clipped table cells and one-line labels,
+where keeping line breaks would break the layout — the reason the owner declined the global rule.
 ### 121. A malformed request body is refused without a `code`
 
-**Status:** open · **Raised:** 2026-09-19 · **Pre-existing; from the architecture review of item 117**
+**Status:** closed · **Raised:** 2026-09-19 · **Pre-existing; from the architecture review of item 117** · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Every error this API returns is meant to carry a stable `code` beside its `traceId`. Model-binding
 failures do not: invalid JSON, a missing `[JsonRequired]` property, a `[StringLength]` breach. They
@@ -3552,6 +3755,14 @@ client can tell "your body was malformed" from any other 400 by code.
 
 **To close:** one `InvalidModelStateResponseFactory` that adds `code: "request.invalid"` for every
 endpoint, keeping the `errors` map as it is. A smoke test pins the code.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`).** `Program.cs` wraps MVC's own
+`InvalidModelStateResponseFactory` and adds `code: "request.invalid"` to its body; nothing else changes — same 400,
+same `errors` map, same `traceId`. Additive for every client: the installed app falls back to the title for a code it
+has never heard of, exactly as it did for no code. The console words it (`problem.requestInvalid`) after its one-field
+wording, which says more when there is one field to name, and before MVC's English title; the website words it from the
+code. `ApiSmokeTests` pins the code on invalid JSON and on a missing required field; `problem.spec.ts` and
+`problem-text.spec.ts` the wording.
 
 ### 122. Retiring a city drops its offices out of city search, and nobody is told
 
@@ -3603,7 +3814,7 @@ against, and it is built in eight places.
 
 ### 125. A newer console could drop a section it forgot to send
 
-**Status:** open · **Raised:** 2026-09-19 · **From the architecture review of the customer page**
+**Status:** closed · **Raised:** 2026-09-19 · **From the architecture review of the customer page** · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 The stale-console protection (item 3 of the owner's 2026-09-19 approvals) covers a console OLDER than
 its server: a section it has no box for disables Save. The opposite case is not covered.
@@ -3616,6 +3827,10 @@ Left out of the approved fix because it is a different case from the one the own
 
 **To close:** a spec asserting that the fields `SECTIONS` renders are exactly the text keys
 `customerPageRequest` sends (every key but `hiddenSections`), so the two cannot drift silently.
+
+**Closed:** `customer-page.presenter.spec.ts` renders every section `SECTIONS` has a box for
+(`EDITABLE_CUSTOMER_PAGE_SECTIONS`) and asserts the request's text keys are exactly those fields, and that what is
+typed into each box, in both languages, is what is sent.
 
 ### 120. The platform writes English prose into a booking's status history
 
@@ -3639,7 +3854,7 @@ the names — `PaymentWindowElapsed`, `DealerDidNotRespond`), publish them in th
 
 ### 121. The remaining aggregate-child relationships still carry the mapping that answers 500
 
-**Status:** open · **Raised:** 2026-09-21
+**Status:** closed · **Raised:** 2026-09-21 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `DeleteBehavior.Restrict` on a required child collection is not a stricter setting, it is a broken
 one: the child's foreign key cannot be null, so removing the child from its parent's collection
@@ -3661,6 +3876,18 @@ same DDL, one migration, and the `IAppendOnly` guard in `KhadraDbContext` still 
 the append-only children — or add the assertion to `RemovingAChildFromAnAggregateTests` that every
 required child collection reachable from an aggregate is mapped `ClientCascade`, so the next one is
 caught by a failing test rather than by a customer.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`): both halves.** Seven collections moved from `Restrict` to
+`ClientCascade` — `Booking.Handovers`, `Booking.StatusHistory`, `Booking.RenterDocumentReviews`,
+`DisputeTicket.Statements`, `Dealer.Employees`, `Dealer.Documents`, `User.Documents` — in one migration,
+`AggregateChildrenDeleteTheirOrphans`, which re-creates their seven foreign keys as `NO ACTION` instead of `RESTRICT`
+(neither cascades; no row is touched). Safe because no aggregate is ever hard-deleted — soft delete is a domain flag and
+no repository calls `Remove` — so `ClientCascade` acts only on a child its aggregate takes out of the collection. The
+latent one is now proved: `Replacing_a_dealers_document_deletes_the_old_row_rather_than_throwing` re-uploads a
+document on a dealer loaded from the database. And `Every_child_collection_an_aggregate_owns_deletes_its_orphans`
+walks the model and fails on any required child collection of an aggregate that is not `ClientCascade`, with two
+stated exceptions: an `IAppendOnly` child (never removable; the guard refuses it), and `Payment.Refunds`, left as it
+was because the Payments context is not changed without the owner — a refund is never taken off its payment.
 
 ### 122. `SetPrimaryImage` marks a cover photo without moving it
 
@@ -3846,7 +4073,7 @@ inside the grace. Not on any other failure, and not more than once.
 
 ### 129. Console polling keeps an abandoned session alive past its idle timeout
 
-**Status:** handled in the client, open as a server question · **Raised:** 2026-09-22 (Fable advisor)
+**Status:** closed · **Raised:** 2026-09-22 (Fable advisor) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `DistributedCacheTicketStore.RenewAsync` writes the BFF's session ticket to Redis with
 `SlidingExpiration = SessionIdleMinutes`, and `RetrieveAsync` reads it through `cache.GetAsync` on
@@ -3866,6 +4093,25 @@ timeout. `IDistributedCache.Get` cannot be told not to slide, so it needs either
 last-seen stamp that only real navigation updates, or an endpoint the poll can use that does not
 carry the session cookie at all. Client-side politeness is the right fix for today and the wrong
 thing to depend on for ever.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`): the server enforces it.** The first option, built so that a poll
+cannot spoof activity without the page actually being used. `SessionActivity` keeps when a PERSON last used each
+session under its own Redis key (`bff:activity:{id}`, the id written into the ticket once at sign-in), with an absolute
+expiry of that moment plus `SessionIdleMinutes`; reading it never extends it. Every console call says how long its page
+has been untouched (`X-Khadra-Idle-Seconds`, from the same keystroke/click/scroll clock the polling gate uses), and the
+BFF counts the request as activity at `now − idle`. A click reports zero; a poll from an unattended console reports a
+growing idle time and moves nothing; a poll while somebody scrolls counts. Once thirty minutes pass with no activity the
+next request rejects the principal and signs the cookie out — the same path as a refused role — and the console's 401
+handling takes it to sign-in. The header is stripped before anything is proxied (`ProxyRequestHeaders`).
+
+Why a separate key and not a stamp in the ticket: writing the ticket on activity would race the access-token refresh,
+which also rewrites it, and a stale ticket written last would put back a refresh token the API had already rotated —
+replaying that revokes the whole session family. The key holds a time and nothing else.
+
+What it does NOT change: a request without the header (the customer website, whose idle timeout is fourteen days; any
+console build cached from before) counts as activity now, exactly as every request did before; a ticket issued before
+the deploy has no key and keeps the old rule until its eight-hour ceiling; the client-side polling gate stays. Tests:
+`BffSessionActivityTests`, `idle-report.interceptor.spec.ts`.
 
 ### 130. The dealer pulse watches three things, and only three
 
@@ -4367,12 +4613,20 @@ environment, and the setting is set to match.
 
 ### 155. A failed cities read makes a city search look like "Any city"
 
-**Status:** open · **Raised:** 2026-09-24 (Fable advisor review)
+**Status:** closed · **Raised:** 2026-09-24 (Fable advisor review) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 When `/api/v1/cities` fails, `LookupsService.cityName()` answers an empty string, so a city-filtered
 search is headed "Any city" and the city selects offer only "Any city", with no error shown. The
 search itself still sends the city, so results are right; only the wording misleads. **To close:**
 show the city filter as unavailable while the lookup has failed, with a test.
+
+**Closed:** `LookupsService.citiesUnavailable` is true while the read has failed, and
+`cityFilterLabel` — what the results page heads a search with — then reads "Chosen city (city names
+could not be loaded)" for a filtered search, and still "Any city" for an unfiltered one, which is true
+either way. The search card's select and the office directory's select are shown disabled with one
+entry, "City list unavailable / قائمة المدن غير متاحة", instead of "Any city" alone; the search card
+keeps and sends the city it was given. Pinned by `lookups.service.spec.ts` (the label both ways, the
+disabled select, the city still submitted) and `dealers.component.spec.ts`.
 
 ### 156. A gallery or admin cancelling a PAID booking inside the free window refunds nothing
 
@@ -4754,7 +5008,7 @@ left for later.
 
 ### 174. The audit log's Change column prints stored English on the Arabic screen
 
-**Status:** open · **Raised:** 2026-09-27 (while wording the audit subjects)
+**Status:** closed · **Raised:** 2026-09-27 (while wording the audit subjects) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `previous_value` and `new_value` are printed as stored, in the row and in its expanded detail. Most
 are enum names — "Open", "Suspended", "PendingReview", "Admin", and since payments Phase 8 a payable hold's
@@ -4766,6 +5020,17 @@ locked after 5 wrong tries") and a lookup's "Amman / عمّان · Offered". **T
 values through `statusLabel`/`enumLabel` by the entry's type; store parts rather than sentences for
 new rows (item 50 for disputes; the handover and lookup writers too); show what old rows hold in an
 `.ltr` run, as a penalty assessed before reason codes does.
+
+**Closed:** the console reads each side of a change for what it is (`core/services/audit-change.ts`), never by
+translating English it finds. A machine name is worded by the entry's record type — a dealership's, a booking's, a
+dispute's or an account's status, an administrator's role, a review's hide reason, a payable's hold reason, a capture
+incident's kind, a customer document's "Passport:Rejected" as its slot and standing. The three writers that composed
+English now store PARTS, as a compact JSON object (`AuditValue`): the handover line
+(`{"status":"PickedUp","handover":"Pickup","method":"Code"}`), the code lock (`{"handover":"Pickup","wrongTries":5}`)
+and a lookup (`{"en":"Madaba","ar":"مادبا","offered":true}`); the console composes each in both languages, plurals
+included. Everything else — a sentence written before 2026-10-08, a document number, a stored settlement amount, a
+legal version label, a name this build does not know — is shown exactly as recorded, in a left-to-right run. Nothing
+already stored was touched. Pinned by `audit-change.spec.ts`, `RecordedWordsTests` and `BookingDecisionTests`.
 
 ### 175. "System" is English on the Arabic console
 
@@ -4787,7 +5052,7 @@ name. Stored rows are untouched: `AuditEntry.SystemActorName` still writes "Syst
 
 ### 176. A city or car type is recorded in the audit trail by its English name only
 
-**Status:** open · **Raised:** 2026-09-27 · **Owner decision**
+**Status:** closed · **Raised:** 2026-09-27 · **Owner decision** (approved 2026-10-08) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `LookupUseCases` writes `NameEn` as the subject label, so the Arabic strip reads "أُضيفت المدينة
 Madaba من قِبل …". The label is a snapshot on purpose: the entry has to say what the city was called
@@ -4795,6 +5060,14 @@ when it was changed, and reading today's Arabic name would restate a renamed ent
 to item 161 (an office's name has no Arabic form). **To close, if the owner wants it:** snapshot the
 Arabic name as well for new rows and word the subject in the reader's language; old rows keep their
 English name.
+
+**Closed:** `audit_entries.subject_label_ar` (nullable, migration `ArabicAuditSubjectAndNotificationStandIn`, which
+adds the column without rewriting a row) snapshots a city's or car type's Arabic name beside the English label for
+every entry written from now on; both audit readers send it as `subjectLabelAr` (additive), the audit search matches
+it, and the audit log and the dashboard's activity strip name the subject by it for an Arabic reader. The name is
+CHOSEN by language, never translated, and an entry from before keeps its English name. The Change column words a
+lookup's two names the same way (item 174). Pinned by `RecordedWordsTests`, `AuditLogReaderTests` and
+`audit-subject.spec.ts`.
 
 ## Issued financial documents (payments Phase 5a, 2026-09-27)
 
@@ -4919,13 +5192,17 @@ own change.
 
 ### 184. Typed text in the console inherits the page's direction
 
-**Status:** open · **Raised:** 2026-09-28
+**Status:** closed · **Raised:** 2026-09-28 · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 `.user-text { unicode-bidi: isolate; }` (`Khadra.Dashboard/src/styles/_rtl.scss`) isolates text somebody
 typed but still inherits the page's direction, where its comment promises that the browser decides per
 value — that needs `plaintext` or `dir="auto"`. On an Arabic page a Latin reason beginning "§13 …" rendered
 as "… 13§"; `b252c70` fixed the void panel alone. **To close:** change the shared rule or add `dir="auto"`
 where it is used, and check every screen that uses it in both languages.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`): the shared rule.** `.user-text` is `unicode-bidi: plaintext`, so each
+value takes its direction from its own first strong character — the promise its comment always made. It still isolates
+the run from the sentence around it, as `isolate` did. Blocks that already said `dir="auto"` read the same.
 
 ### 185. Two sentences in the office console state rules that have changed
 
@@ -5083,7 +5360,7 @@ Flutter's licence page at all, for the fonts or for its packages. That is record
 
 ### 197. A PDF that cannot be drawn is visible only in the log
 
-**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 6)
+**Status:** closed · **Raised:** 2026-09-29 (architecture review of payments Phase 6) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 A document whose snapshot no longer matches its hash, cannot be read for print, or makes the renderer throw
 is logged once at Error and left alone until the API restarts; drawing is not tried again every minute. The
@@ -5092,6 +5369,22 @@ missing, with no reason on either. Issuing has holds with reasons on the work qu
 does not yet. A full pass in which nothing could be drawn stops drawing until restart and says so at Error
 — that case is covered. **To close:** a durable record of an undrawable PDF with its reason — a hold row or
 an attention-queue kind — shown to the administrator, as issuing's holds are.
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`): both — a hold row and a work-queue kind.** A new aggregate,
+`FinancialDocumentRenditionHold` (table `financial_document_rendition_holds`, migration
+`FinancialDocumentRenditionHolds`, nothing existing touched): one row per document, language and kind, with its reason
+(`SnapshotAltered`, `SnapshotUnreadable`, `DrawingFailed` — the draw's own three answers), attempts and first/last
+failure. The settlement pass records it in a scope of its own when a PDF cannot be drawn, as issuing records its holds;
+each later start that fails again counts an attempt on the same row. A hold is open exactly while no PDF of that
+document, language and kind exists, which the readers ask — so drawing it, after whatever fix lets it draw, closes it,
+and there is no flag to forget. The drawing handler itself, the delicate store-then-record path, is untouched; so is
+when drawing is tried (once per process, as before). Administrators see it in two places: one work-queue row,
+"N documents whose PDFs could not be drawn" (`FinancialDocumentPdfsNotDrawn`, counted by document, named by number,
+opening the document when there is one), and on the document's page, in its PDF section, a line per PDF saying which,
+why and since when (`pdfHolds` on `GET /api/v1/admin/financial-documents/{id}`, additive, administrators only). The
+customer's page is unchanged: it still says only that the PDF is being prepared. Tests:
+`A_pdf_that_cannot_be_drawn_is_held_with_its_reason_until_it_is_drawn`, `Pdfs_that_cannot_be_drawn_are_one_row_counted_by_document`,
+and the console's `says which PDF could not be drawn, why, and since when`.
 
 ### 198. Stored PDF files that no row points at are never removed
 
@@ -5598,12 +5891,29 @@ a real `customer-web` BFF in front of the production renderer: before, both scri
 was lost; after, there are no violations, the tap is replayed in English and Arabic, and every page type hydrates
 cleanly. Pinned by `csp-nonce.spec.ts` (including a real server render) and `BffContentSecurityPolicyNonceTests`.
 
+**Follow-up, 2026-10-08 (Wave 6): an early tap on an ICON was still lost.** With replay running, a tap on the header's
+menu button before hydration still did nothing. The root cause was not the router or the panel state (a first
+hypothesis — the initial navigation closing a just-opened panel — was disproved by a probe): a queued event is replayed
+against its original target, and hydration re-renders every `kh-icon`'s SVG through `innerHTML`, so a tap that landed
+on the old `<path>` pointed at a node no longer in the page and was dropped. Every icon-only control lost its early
+taps, the menu button first. `kh-icon` is now `pointer-events: none` (`_base.scss`): the target is the control around
+it, which hydration keeps. Verified in the production renderer with a tap before hydration, in both languages.
+
 ### 223. The renderer warns that it does not trust the forwarded headers it receives
 
-**Status:** open · **Raised:** 2026-10-05 (recorded at B12; Fix & Polish J5, with the always-on hosting of D1)
+**Status:** closed · **Raised:** 2026-10-05 (recorded at B12; Fix & Polish J5, with the always-on hosting of D1) · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 The renderer logs a `trustProxyHeaders` notice on every start. **To close:** trust the BFF explicitly, as one
 deployment, when the renderer moves onto private networking (item 140).
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`), by a narrower route than the one above.** The notice came once per
+forwarded header on every RENDER, not only at start: Angular's request sanitiser drops each `Forwarded` /
+`X-Forwarded-*` header nobody told it to trust, and warns. Nothing was lost — the renderer reads the one it needs itself
+(the visitor's address, only behind the edge secret) and takes every URL it prints from `KHADRA_PUBLIC_BASE_URL` — so
+`stripProxyHeaders` now removes them after that read and before Angular sees the request. The render is exactly what it
+was; the log is quiet (checked with a production build: zero notices with all three headers sent). Trusting the BFF
+explicitly is still item 140's, with the private network, and nothing here makes it harder. Test:
+`proxy-headers.spec.ts`.
 
 ### 224. There are no Terms of Service, no Privacy notice, and no consent at registration
 
@@ -5819,7 +6129,7 @@ request it let lapse.
 
 ### 236. A booking or a stale checkout that fails the same way every pass is logged at Error every minute
 
-**Status:** open · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's payments half) · **Partly pre-existing**
+**Status:** closed · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's payments half) · **Partly pre-existing** · **Closed:** 2026-10-08 (Fix & Polish Wave 6)
 
 Since item 233 each booking in the settlement sweep is handled on its own, so one that fails the same way every time no
 longer stops the others — but it is logged at Error once a minute for as long as it stays broken (2102 and 2103 did
@@ -5831,6 +6141,18 @@ at the next read. **To close:** report a booking's repeated failure once per pro
 `BookingSettlementService` does for a PDF it cannot draw), and stop `CloseStaleAsync` at the first
 `ProviderUnavailable`. Not "stop after K failures in a row": a few broken bookings at the head of the list would then
 starve every booking behind them, every tick. The second half is due before a real provider is connected (item 76).
+
+**Closed, 2026-10-08 (Wave 6, `fix/polish-wave6`), both halves, logging and stopping only — no money path changed.**
+`RepeatedFailureLog` (a singleton) remembers which failures this process has reported, keyed by event, booking
+reference and the failure's kind (refusal code or exception type), never by message: 2102, 2103 and 2104 are logged at
+Error the first time and at Debug every pass after, until a restart reports them again. A different failure of the
+same booking, or the same failure of another, is new. The booking is still left untouched and counted as deferred
+every pass, in the pass's own 2100 line, so nothing about what is owed changes; only the noise does. And
+`CloseStaleAsync` stops at the first `ProviderUnavailable` from `QueryAsync`, leaves every stale checkout exactly as it
+was and says once how many it left (2326, Warning) — the refund sends below already stopped that way. A provider that
+ANSWERS and will not say still costs that one checkout only (2312), so a few broken rows at the head of the list cannot
+starve the rest. Tests: `A_booking_that_fails_the_same_way_every_pass_is_an_error_once_per_process`,
+`A_different_booking_or_a_different_failure_is_a_new_error`, `The_stale_checkout_pass_stops_at_the_first_unreachable_provider`.
 
 ### 237. The session pooler admits 15 clients, and the API's pool would ask for 100
 

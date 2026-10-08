@@ -96,6 +96,10 @@ Polling stops completely when the surface is not in front of a person:
   expiration, and *every* authenticated request slides it. A 30-second poll would keep an unattended,
   visible console alive to the 8-hour cap instead of dying at the 30-minute idle timeout — a security
   property changed by accident. The first input fires trigger A through the floor.
+  Since pre-launch item 129 (Wave 6) the server enforces the timeout as well: every console call carries
+  `X-Khadra-Idle-Seconds` (`idleReportInterceptor`), and the BFF measures the thirty minutes from the
+  person's last input on its own clock (`SessionActivity`), so a poll cannot hold a session open even
+  if the gate were removed. The gate stays: an idle screen has nobody to refresh for.
 
 ## Guards
 

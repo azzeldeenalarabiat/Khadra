@@ -57,6 +57,20 @@ temporary push trace deleted, which takes three trace-only tests out of the app'
 | Website: `ng test` | 52 files, 357 tests |
 | App: `flutter analyze` / `flutter test` | no issues / 773 tests |
 
+### Wave 6 final regression on `fix/polish-wave6` (2026-10-08)
+
+Wave 6 starts at `4fb2f86`, the end of Wave 5, and carries pre-launch items 1, 14, 19, 33, 36, 47, 50, 51, 52, 54, 81,
+103, 104, 105, 106, 108, 113, 119, 120, 121, 125, 129, 155, 174, 176, 184, 197, 223 and 236, the console and website
+menus' keyboard behaviour and the early-tap fix under 222. The app is not touched (its items are Wave 7's). Measured on
+its final working tree:
+
+| Suite | Result |
+|---|---|
+| Backend: `dotnet test Khadra.slnx`, run alone, with `KHADRA_TEST_POSTGRES` set | 3,167 passed, 0 skipped (the PostgreSQL proofs run) |
+| Console: `ng test` · `npm run i18n:check` · production build | 51 files, 607 tests · 0 to fix · clean |
+| Website: `ng test` · production build | 57 files, 373 tests · clean |
+| App | not run: no file under `Khadra.Mobile/` changed |
+
 ## 2. Contract ledger — what the API serves or accepts
 
 Installed builds: 1.2.0+3 and 1.3.0+4. The tracked minimum (`MobileApp:MinimumSupportedVersion`) is not raised in
@@ -114,6 +128,16 @@ this batch (decision D6).
 | 5 | The staff invitation asks for a name, an email and a phone on single lines, checked for shape before sending (F88); a renter's document on file reads "Uploaded" on the admin profile, as on the website (F90); the website's drawer and account menu scroll inside a short screen, so My account and Sign out stay reachable (F92) | none | none: no API change |
 | 5 | `GET /api/v1/admin/dashboard/activity`: each entry carries `actorUserId`, null when nobody acted, and the console words that actor itself (pre-launch item 175) | additive | none: administrators only |
 | 5 | The customer BFF adds a per-page nonce to `script-src` on the renderer's pages and sends it to the renderer in `X-Khadra-Csp-Nonce`, so Angular's event replay runs (pre-launch item 222) | none | none: the app calls the API directly, and API responses keep their policy |
+| 6 | Sign-in (`POST /auth/login`, and the BFFs' sign-in through it) is refused for 15 minutes after 8 failed attempts on one account in 15 minutes: 429 with `code` `rate_limited`, the IP limiter's own code and generic title, and `Retry-After`; a success or a password reset clears the account's count; an unknown address is counted like a known one (pre-launch item 51) | new refusal, behavioural | installed builds already map a 429 to their rate-limited message (`api_failure.dart`), so nothing is misread; the per-IP limit is unchanged |
+| 6 | A signed document link is bound to the person it was minted for: the same link in another signed-in session answers 404 (pre-launch item 14) | behavioural | none: every link a client follows is minted for the caller in the same session |
+| 6 | Hidden reviews leave every public list and every rating; `GET/POST /api/v1/admin/reviews…` hide and restore one with a reason code, audited (pre-launch item 81) | behavioural, new endpoints | fewer reviews where one was hidden; the shape is unchanged. The new endpoints are administrators' only |
+| 6 | A model-binding 400 (malformed JSON, a wrong type) carries `code` `request.invalid` (pre-launch item 121) | additive (body) | none: the status and `errors` are unchanged |
+| 6 | `customerPage` on the administrator's dealer review; `isBreachingSla` on the administrator's dealer list; `pdfHolds` on the administrator's financial document and a `FinancialDocumentPdfsNotDrawn` attention row; `subjectLabelAr` on the audit log and the activity feed; `bookingReference` nullable on the dispute queue; the settings `source` worded as a code (items 113, 106, 197, 176, 108) | additive, value | none: administrators only |
+| 6 | Audit entries written from now on store parts, not English, in `newValue`/`previousValue` for a dispute decision, a handover, a code lock and a lookup (compact JSON), and an actor with no name claim by short reference (items 50, 174, 103) | value | none: administrators only; stored rows are untouched |
+| 6 | `actorStandIn` (`Customer`, `Colleague`, `RentalOffice`) on every notification whose actor is a stand-in; `actorName` keeps the English phrase it always had (item 103) | additive | none: named-key parsing ignores it, and the app keeps printing `actorName` |
+| 6 | The invitation answer of `POST /dealers/me/employees` gains `invitationEmailSent`; two administrators adding the same offered city or car-type name at once now both get 409 `lookup.name_taken`, which one alone always got (a database index closes the race) (items 47, 52) | additive, behavioural | none: office and administrator endpoints |
+| 6 | `GET /api/v1/dealers/me/vehicles/{id}/calendar?year=&month=`: one car's month in the platform's calendar, from the catalogue's own holds (item 54) | new endpoint | none: office endpoint |
+| 6 | The console BFF sends `X-Khadra-Idle-Seconds` handling to itself only (never forwarded) and ends a session idle for 30 minutes on its own clock; both BFFs accept bodies up to 32 MiB explicitly; the renderer strips the forwarding headers it does not trust (items 129, 33, 223) | none | none: the app calls the API directly |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -133,4 +157,5 @@ this batch (decision D6).
 | F2/F1 (W3 E7) | Mark a search result "Delivery only at these times" when `selfPickupAvailable` is false, and word a refused quote by its reason (hours, dates) rather than one sentence, as the website does. |
 | D10 (W3) | Word `YourDisputeOpened` in the notifications list ("Your dispute is open, and Khadra will decide it", as the website does). It already opens the booking, its subject. |
 | F7 (W4-8) | Ask for consent: a required checkbox on registration naming the texts in `/app-config.legal.documents`, sending `acceptedLegalVersions` and `legalLanguage`; and, for a signed-in customer with `pendingConsents` on `/auth/me` or a 403 `legal.consent_pending`, a prompt in place of the app that offers the texts, the acceptance (`POST /auth/me/legal-consents`) and sign-out, as the website does. A 409 `legal.version_not_current` reloads `/app-config` and asks again. Then the minimum rises to 1.4.0, and the server stops sparing the app (pre-launch item 238). |
+| 103 (W6) | Word a notification whose `actorStandIn` is `RentalOffice` in the reader's language ("The rental office" / «مكتب التأجير»), as the website does, instead of printing `actorName`'s English phrase. Rare: only an office that left the platform before the notification was raised. |
 | W4-9 | **Done on `fix/polish-wave4` (Staging finding, 2026-10-07)**, in the app's code and in no API: `YourDocumentRejected` is worded in Alerts, and a tap on it (its row, or its push from the foreground, the background or a closed app) opens My Documents (`notificationRoute`); the reason reads in its own direction under "Why:", with "Upload a new one". A push tap that launches a closed app is no longer lost while the session restores (`openForPush`, every kind). The Alerts row opens before its read is recorded, so a token rotation can no longer drop the tap (second device finding). It reaches phones only with the next app build. The temporary `PushTrace` that helped verify it on a phone was deleted in Wave 5 (pre-launch item 27), so a build from `fix/polish-wave5` onward has no "push trace (staging)" row. **Still for 1.4.0:** on `booking.documents_incomplete`, name the `rejectedDocumentTypes`, as the website does. |

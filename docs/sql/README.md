@@ -25,7 +25,11 @@ The regeneration before (2026-09-20) added `AddCustomerShortlist`, which brought
 `customer_shortlists` and `shortlist_entries` and made script 2 mandatory,
 `DealerPublicProfile`, and `PenaltyReasonCode`.
 
-**Regenerated on 2026-10-07 (Fix & Polish Wave 4)**: every migration through
+**Regenerated on 2026-10-08 (Fix & Polish Wave 6)**: every migration through
+`20261008122550_ArabicAuditSubjectAndNotificationStandIn`, 49 in all, adding `sign_in_throttles` and
+`financial_document_rendition_holds` (48 tables plus the history table). Re-run script 2 after it.
+
+**Regenerated before that on 2026-10-07 (Fix & Polish Wave 4)**: every migration through
 `20261007142545_NotificationDeliveryClaimToken`, 43 in all, creating 46 tables plus the history table. The copy before it had stopped at the 2026-09-24 migrations, so
 this is also the first time the payments tables, the financial documents, the payables, the legal texts and the
 consents appear in it. Re-run script 2 after it.
@@ -244,3 +248,46 @@ loosened ones. So:
 
 There is no rollback script. `LegalConsents`' `Down` refuses once anybody has consented, and `AdminDocumentAccess`'
 once an administrator has opened a document: both are evidence. Before either has happened, each `Down` runs.
+
+## 10. `2026-10-08-fix-polish-wave6.sql`
+
+Fix & Polish Wave 6's six migrations, for a database at `20261007142545_NotificationDeliveryClaimToken` (Wave 4's
+last; Wave 5 added none), generated with:
+
+```bash
+dotnet ef migrations script 20261007142545_NotificationDeliveryClaimToken 20261008122550_ArabicAuditSubjectAndNotificationStandIn \
+  --idempotent --project Khadra.Infrastructure --startup-project Khadra.WebAPI
+```
+
+and preceded by a READ-ONLY pre-check (a `SELECT`), which lists any two OFFERED cities or car types that share a name
+as the new indexes compare names. Run the check first: `OfferedLookupNamesAreUnique` refuses to apply while it returns
+a row, and the whole transaction rolls back.
+
+- **`SignInThrottle`** adds `sign_in_throttles` (a new table): one row per account with recent failed sign-ins, keyed by
+  a SHA-256 of the normalised address, never the address itself (pre-launch item 51).
+- **`AuditTrailRefusesTruncate`** adds a statement trigger refusing `TRUNCATE` on `audit_entries` (item 1). It reads
+  and rewrites no entry; the row trigger refusing UPDATE and DELETE is unchanged.
+- **`AggregateChildrenDeleteTheirOrphans`** re-creates seven child-collection foreign keys as NO ACTION instead of
+  RESTRICT (item 121). Neither cascades; no row is touched.
+- **`OfferedLookupNamesAreUnique`** adds four partial unique indexes on the offered names (item 52), after the in-script
+  check above.
+- **`FinancialDocumentRenditionHolds`** adds `financial_document_rendition_holds` (a new table): a PDF that cannot be
+  drawn, with its reason, for the administrator (item 197).
+- **`ArabicAuditSubjectAndNotificationStandIn`** adds two nullable columns, `audit_entries.subject_label_ar` (item 176)
+  and `notifications.actor_stand_in` (item 103). A nullable column without a default changes only the catalogue: no
+  existing audit entry or notification is rewritten.
+
+All six are additive for the API that is live, which never reads the new tables or columns. So:
+
+1. Run the pre-check; resolve any row it returns on the console.
+2. Run the script before deploying the Wave 6 API.
+3. **Run script 2 (`supabase-lockdown.sql`) again**: `sign_in_throttles` and `financial_document_rendition_holds` are
+   new tables in `public`.
+4. Deploy the API, both BFFs, the console and the website together.
+
+Proved on 2026-10-08 against a throwaway PostgreSQL 16: applied twice to a database migrated to Wave 4's last migration
+(both runs succeed, the second a no-op), and the resulting schema is identical to one EF migrated itself
+(`pg_dump --schema-only`). `PostgresAuditTrailTruncateTests` proves item 1's and item 176's migrations leave every
+existing audit entry as it was.
+
+There is no rollback script. Every `Down` runs; the TRUNCATE guard's `Down` removes only that trigger.
