@@ -201,7 +201,13 @@ export interface ModalField {
   readonly type: 'select' | 'text' | 'line' | 'password' | 'date';
   /** For a `date` field: the latest day that may be chosen, `yyyy-MM-dd`. */
   readonly max?: string;
-  /** For a `line` field: the on-screen keyboard to ask for, and what the browser may autofill. */
+  /**
+   * For a `line` field: the on-screen keyboard to ask for, and what the browser may autofill.
+   *
+   * `email` and `tel` also say the value is an identifier (Wave 5, F88): the input becomes an `email` or `tel`
+   * input, written left to right in either language and never auto-capitalised or spell-checked, and the dialog
+   * checks its shape before it can be sent (`fieldShapeProblem`).
+   */
   readonly inputMode?: 'text' | 'email' | 'tel' | 'numeric';
   readonly autocomplete?: string;
   /**

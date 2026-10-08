@@ -59,7 +59,15 @@ export class SiteHeaderComponent {
 
   protected toggleAccount(): void {
     this.notificationsOpen.set(false);
+    this.menuOpen.set(false);
     this.accountOpen.update((open) => !open);
+  }
+
+  /** Between a phone and a desktop both the drawer and the account menu are on screen; one opens at a time. */
+  protected toggleMenu(): void {
+    this.notificationsOpen.set(false);
+    this.accountOpen.set(false);
+    this.menuOpen.update((open) => !open);
   }
 
   /** Esc hands focus back to the button that opened the panel; a press elsewhere leaves it where it went. */
@@ -70,6 +78,11 @@ export class SiteHeaderComponent {
 
   protected closeAccount(reason: 'outside' | 'escape', trigger: HTMLElement): void {
     this.accountOpen.set(false);
+    if (reason === 'escape') trigger.focus();
+  }
+
+  protected closeMenu(reason: 'outside' | 'escape', trigger: HTMLElement): void {
+    this.menuOpen.set(false);
     if (reason === 'escape') trigger.focus();
   }
 

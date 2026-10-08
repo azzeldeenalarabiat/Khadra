@@ -52,17 +52,30 @@
               }
             </select>
           } @else if (field.type === 'line') {
-            <!-- Single line: Return submits nothing and cannot be typed into the value. -->
+            <!-- Single line: Return submits nothing and cannot be typed into the value. An address or a number
+                 (Wave 5, F88) is an identifier: its own input type, left to right in Arabic too, never
+                 auto-capitalised or spell-checked, and its shape problem is announced against the box. -->
+            @let line = lineInput(field);
+            @let shape = shapeMessage(field.name);
             <input
               class="input"
-              type="text"
+              [type]="line.type"
               [id]="'modal-field-' + $index"
+              [attr.dir]="line.dir"
+              [attr.autocapitalize]="line.autocapitalize"
+              [attr.spellcheck]="line.spellcheck"
               [attr.inputmode]="field.inputMode ?? null"
               [attr.autocomplete]="field.autocomplete ?? 'off'"
+              [attr.aria-invalid]="shape ? true : null"
+              [attr.aria-describedby]="shape ? 'modal-field-error-' + $index : null"
               [placeholder]="field.placeholder ?? ''"
               [value]="values()[field.name] ?? ''"
               (input)="setField(field.name, $event)"
+              (blur)="touch(field.name)"
             />
+            @if (shape) {
+              <div class="field-error" role="alert" [id]="'modal-field-error-' + $index">{{ shape }}</div>
+            }
           } @else if (field.type === 'date') {
             <!-- A calendar day, yyyy-MM-dd whatever the reader's language: the value the API reads as it is.
                  Seeded once, not bound to the values: a date typed through an incomplete state reports "" and,

@@ -35,6 +35,14 @@ describe('statusKey', () => {
   it('has no key for a status this build has never heard of', () => {
     expect(statusKey('PartiallyRefunded', 'dealerBooking')).toBeNull();
   });
+
+  // Wave 5, F90: every renter document is born PendingReview and nothing reviews it, so the profile read
+  // "Pending review" against every file on record. A dealership application keeps that word.
+  it("calls a renter's document on file Uploaded, as the website does, and keeps Rejected plain", () => {
+    expect(statusKey('PendingReview', 'customerDocument')).toBe('status.pendingReviewCustomerDocument');
+    expect(statusKey('Rejected', 'customerDocument')).toBe('status.rejected');
+    expect(statusKey('PendingReview')).toBe('status.pendingReview');
+  });
 });
 
 describe('spellEnumName', () => {

@@ -179,8 +179,17 @@ $md: 1023px; // tablets
   padding: var(--s-2) var(--s-4) var(--s-4);
   border-block-start: 1px solid var(--divider);
   background: var(--surface);
+  // The drawer is part of the sticky header, so scrolling the page never moves it: taller than the screen — a
+  // phone on its side, a short window — its last entries, My account and Sign out, sat below the bottom edge with
+  // no way to reach them, by finger or by Tab (Wave 5, F92). It is held to the screen under the header and scrolls
+  // itself; `dvh` follows a phone's collapsing toolbar, and the `vh` line is for a browser without it.
+  max-block-size: calc(100vh - var(--header-h));
+  max-block-size: calc(100dvh - var(--header-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   a,
   button {
+    flex-shrink: 0;
     text-align: start;
     padding: var(--s-3) var(--s-2);
     border: 0;
@@ -210,8 +219,14 @@ $md: 1023px; // tablets
   display: flex;
   flex-direction: column;
   z-index: 50;
+  // Hangs from the sticky header too, so the same cap as the drawer (F92): Sign out is its last entry.
+  max-block-size: calc(100vh - var(--header-h));
+  max-block-size: calc(100dvh - var(--header-h));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   a,
   button {
+    flex-shrink: 0;
     text-align: start;
     background: none;
     border: 0;

@@ -49,7 +49,8 @@ const FORMAT_LABELS: Readonly<Record<string, TranslationKey>> = {
   imports: [RouterLink, IconComponent],
 })
 export class CustomerProfileComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   private readonly formats = inject(FormatService);
   private readonly service = inject(AdminCustomersService);
   private readonly ui = inject(ConsoleUiService);
@@ -96,8 +97,17 @@ export class CustomerProfileComponent {
     return customer.isEmailVerified ? this.t('status.verified') : this.t('customerProfile.emailUnverified');
   });
 
-  /** A document's status, straight from the server's enum. */
-  protected readonly statusLabel = inject(I18nService).statusLabel;
+  /**
+   * A document's status, straight from the server's enum, in the words a renter's document takes (Wave 5, F90).
+   *
+   * It was worded with the plain status dictionary, whose `PendingReview` is a dealership application's "Pending
+   * review" — so every document on file read as waiting for a review that nothing on this platform performs, and the
+   * only real difference between them, a rejection, was one amber pill among many. The website calls the same status
+   * "Uploaded"; so does this screen now.
+   */
+  protected documentStatusLabel(document: CustomerDocumentSummary): string {
+    return this.i18n.statusLabel(document.status, 'customerDocument');
+  }
 
   protected readonly accountRows = computed<readonly AccountRow[]>(() => {
     const customer = this.customer();
@@ -253,10 +263,14 @@ export class CustomerProfileComponent {
     this.resource.reload();
   }
 
+  /**
+   * Red for a rejection, the one status that asks something of anyone (a new upload). A file on file is neutral, not
+   * amber: amber said "act on this", and there is nothing to act on.
+   */
   protected documentTone(document: CustomerDocumentSummary): Tone {
     if (document.status === 'Verified') return 'ok';
     if (document.status === 'Rejected') return 'bad';
-    return 'warn';
+    return 'dim';
   }
 
   /** A document type in the reader's language; one this build does not know is spelled out. */

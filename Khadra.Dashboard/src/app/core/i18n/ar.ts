@@ -4046,4 +4046,11 @@ export const AR = {
   'auditLog.actionPaymentIncidentHandled': 'عولجت حالة خصم للمراجعة',
   'auditLog.entityPaymentIncident': 'حالة خصم للمراجعة',
   'activity.paymentIncidentHandled': 'عولجت حالة الخصم على {subject} من قِبل {actor}',
+
+  // Wave 5 (F88)
+  'modalField.emailShape': 'أدخل عنوان البريد الإلكتروني كاملًا، مع @ واسم النطاق.',
+  'modalField.phoneShape': 'أدخل رقم هاتف محمول: 07XXXXXXXX، أو رقمًا دوليًا يبدأ بـ +.',
+
+  // Wave 5 (F90): the customer website's word for the same status
+  'status.pendingReviewCustomerDocument': 'مرفوع',
 } as const satisfies Record<TranslationKey, Message>;

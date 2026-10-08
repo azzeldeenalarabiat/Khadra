@@ -99,6 +99,7 @@ this batch (decision D6).
 | 4 | `rejectedByPlatform` on the office's renter documents (`GET /bookings/{id}/renter-documents`) | additive | none: office endpoint |
 | 4 | `GET /api/v1/admin/customers/{id}/documents/{documentId}` (the file, its view recorded first) and `POST …/reject` (`{ reason, uploadedAt }`; 409 `documents.changed_since_viewed` and `documents.not_viewed`, 404 `documents.not_found`); `CustomerDocumentRejected` in the audit vocabulary | new endpoints | none: administrators only |
 | 4 | The handover's fuel level reads as a whole percentage on the website and in the console (W4-10) | none | none: no API change |
+| 5 | The staff invitation asks for a name, an email and a phone on single lines, checked for shape before sending (F88); a renter's document on file reads "Uploaded" on the admin profile, as on the website (F90); the website's drawer and account menu scroll inside a short screen, so My account and Sign out stay reachable (F92) | none | none: no API change |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 

@@ -87,7 +87,7 @@
                     <div class="row row-gap-8">
                       <span class="handover-title">{{ documentLabel(document) }}</span>
                       <span class="pill" [class]="'s-' + documentTone(document)">
-                        {{ statusLabel(document.status) }}
+                        {{ documentStatusLabel(document) }}
                       </span>
                     </div>
                     <div class="page-sub">{{ documentDetail(document) }}</div>

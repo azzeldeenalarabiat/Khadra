@@ -122,15 +122,32 @@ export class DealerEmployeesComponent {
         title: this.t('dealerEmployees.inviteAStaffMember'),
         body: this.t('dealerEmployees.theyGetAnEmail'),
         confirm: this.t('dealerEmployees.sendInvitation'),
+        // `line`, not `text` (Wave 5, F88). A `text` field is a textarea, for a reason or a note: a name, an
+        // address and a number were being typed into three of them, where Return adds a newline instead of
+        // moving on and an address carrying one is refused before the domain can trim it. The admin's
+        // invitation made this change first. No autocomplete: these are someone else's details, and the
+        // browser's would be the owner's own.
         fields: [
-          { name: 'fullName', label: this.t('employeeSettings.fullName'), type: 'text', placeholder: this.t('dealerEmployees.eGAhmadZaid') },
+          {
+            name: 'fullName',
+            label: this.t('employeeSettings.fullName'),
+            type: 'line',
+            placeholder: this.t('dealerEmployees.eGAhmadZaid'),
+          },
           // `name` is the key the dialog returns the value under, read back below: a machine value,
           // never a translated word (a translated one left every Arabic invitation "missing" its email).
-          { name: 'email', label: this.t('dealerSettings.email'), type: 'text', placeholder: 'name@example.jo' },
+          {
+            name: 'email',
+            label: this.t('dealerSettings.email'),
+            type: 'line',
+            inputMode: 'email',
+            placeholder: 'name@example.jo',
+          },
           {
             name: 'phone',
             label: this.t('customerProfile.phone'),
-            type: 'text',
+            type: 'line',
+            inputMode: 'tel',
             placeholder: '07XXXXXXXX',
             hint: this.t('dealerEmployees.requiredHowYouReach'),
           },

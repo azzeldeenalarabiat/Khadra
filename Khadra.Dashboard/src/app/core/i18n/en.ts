@@ -3972,6 +3972,14 @@ export const EN = {
   'auditLog.actionPaymentIncidentHandled': 'Capture incident marked as handled',
   'auditLog.entityPaymentIncident': 'Capture incident',
   'activity.paymentIncidentHandled': '{actor} marked the capture incident on {subject} as handled',
+
+  // Wave 5 (F88): the dialog's own check of an address or a number before it is sent. Looser than the
+  // server's rule on purpose — the server decides, and says why in its own refusal.
+  'modalField.emailShape': 'Enter the whole email address, with an @ and a domain.',
+  'modalField.phoneShape': 'Enter a mobile number: 07XXXXXXXX, or an international number beginning with +.',
+
+  // Wave 5 (F90): a renter's document on file. Nothing reviews it, so it is not "pending review".
+  'status.pendingReviewCustomerDocument': 'Uploaded',
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

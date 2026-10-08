@@ -1,4 +1,6 @@
-<header class="site-header">
+<!-- The drawer closes the way the other two panels do — Esc, which hands focus back to the menu button, or a press
+     outside — and it is the header that holds both the button and the drawer (Wave 5, F92). -->
+<header class="site-header" khDismiss [khDismissWhen]="menuOpen()" (khDismiss)="closeMenu($event, menuButton)">
   <div class="container site-header__bar">
     <a class="site-header__brand" [routerLink]="i18n.link()" [attr.aria-label]="i18n.t('brand.name')">
       <img src="/brand/khadra-logo-64.png" width="40" height="40" alt="" />
@@ -67,8 +69,8 @@
         }
       }
 
-      <button type="button" class="icon-btn show-sm" [attr.aria-expanded]="menuOpen()" aria-controls="site-drawer"
-        [attr.aria-label]="i18n.t(menuOpen() ? 'nav.closeMenu' : 'nav.menu')" (click)="menuOpen.set(!menuOpen()); notificationsOpen.set(false)">
+      <button #menuButton type="button" class="icon-btn show-sm" [attr.aria-expanded]="menuOpen()" aria-controls="site-drawer"
+        [attr.aria-label]="i18n.t(menuOpen() ? 'nav.closeMenu' : 'nav.menu')" (click)="toggleMenu()">
         <kh-icon [name]="menuOpen() ? 'x' : 'list'" />
       </button>
     </div>

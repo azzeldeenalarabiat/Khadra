@@ -13,8 +13,17 @@ import { EN, TranslationKey } from './en';
  *   ("Earlier version") and `Voided`, words no other record uses.
  * - `financialDocumentEmail`: a receipt's email to its customer (payments Phase 7) — `Queued`, `Sent`,
  *   `Skipped` and `Failed`, where `Sent` means accepted by the mail provider.
+ * - `customerDocument`: a renter's licence or ID on file (Wave 5, F90). `PendingReview` is what every upload
+ *   is born as and stays, because nothing on this platform reviews one — an administrator can only reject it —
+ *   so it is "Uploaded", the customer website's word, and not a dealership application's "Pending review".
  */
-export type StatusScope = 'booking' | 'dealerBooking' | 'vehicle' | 'financialDocument' | 'financialDocumentEmail';
+export type StatusScope =
+  | 'booking'
+  | 'dealerBooking'
+  | 'vehicle'
+  | 'financialDocument'
+  | 'financialDocumentEmail'
+  | 'customerDocument';
 
 /**
  * The dictionary key for a server status name, most specific scope first.
@@ -36,7 +45,9 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
             ? [`status.${camel}FinancialDocument`, `status.${camel}`]
             : scope === 'financialDocumentEmail'
               ? [`status.${camel}FinancialDocumentEmail`, `status.${camel}`]
-              : [`status.${camel}`];
+              : scope === 'customerDocument'
+                ? [`status.${camel}CustomerDocument`, `status.${camel}`]
+                : [`status.${camel}`];
   const key = chain.find((candidate) => candidate in EN);
   return key === undefined ? null : (key as TranslationKey);
 }
