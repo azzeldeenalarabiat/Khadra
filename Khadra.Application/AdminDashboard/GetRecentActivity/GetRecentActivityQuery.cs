@@ -35,6 +35,7 @@ public sealed class GetRecentActivityHandler(
             [.. entries.Select(entry => new ActivityEntryDto(
                 entry.Id.Value,
                 entry.OccurredAt,
+                entry.ActorUserId?.Value,
                 entry.ActorName,
                 entry.Action,
                 entry.EntityType,

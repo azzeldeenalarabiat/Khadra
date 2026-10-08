@@ -55,3 +55,21 @@ export const subjectValue = (subject: AuditSubject): string =>
  * The audit trail never names a customer, because it can never be erased; the id links to the profile.
  */
 export const customerReference = (id: string): string => id.replace(/-/g, '').slice(0, 8);
+
+/** The part of either wire shape that says who acted. */
+export interface AuditActorFacts {
+  /** Null when nobody acted: the first administrator's invitation, a background job. */
+  readonly actorUserId: string | null;
+  readonly actorName: string;
+}
+
+/**
+ * Who acted, in the reader's language (pre-launch item 175).
+ *
+ * An entry nobody acted on is stored with the English name "System", and both screens printed it: in the audit log's
+ * Who column and its filter, and inside the strip's Arabic sentence ("… من قِبل System"). It is recognised by having
+ * no actor id, never by its name — a person may be called System. Everyone else is named as the entry recorded them,
+ * which is a snapshot taken when they acted.
+ */
+export const auditActorName = (entry: AuditActorFacts, t: (key: 'auditLog.systemActor') => string): string =>
+  entry.actorUserId === null ? t('auditLog.systemActor') : entry.actorName;

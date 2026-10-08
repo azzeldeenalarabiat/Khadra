@@ -128,11 +128,13 @@ public sealed record ActivityFeedDto(
     DateTimeOffset GeneratedAt,
     IReadOnlyList<ActivityEntryDto> Entries);
 
+/// <param name="ActorUserId">Null when nobody acted, and the client words the actor; see <c>ActivityEntry</c>.</param>
 /// <param name="EntityId">The record acted on.</param>
 /// <param name="BookingReference">The booking the entry is about, for Booking and Dispute entries; see <c>ActivityEntry</c>.</param>
 public sealed record ActivityEntryDto(
     Guid Id,
     DateTimeOffset OccurredAt,
+    Guid? ActorUserId,
     string ActorName,
     string Action,
     string EntityType,

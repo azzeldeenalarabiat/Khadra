@@ -2931,6 +2931,8 @@ export const EN = {
   'auditLog.noActionsRecordedYet': 'No actions have been recorded yet',
   'auditLog.automatedActor': 'Automated',
   'auditLog.automatedActorOption': '{name} — automated ({count})',
+  // Pre-launch item 175: the actor of an entry nobody acted on, worded here and never read from its stored English.
+  'auditLog.systemActor': 'System',
   'auditLog.noReasonRecordedWithAction': 'No reason was recorded with this action.',
   'security.activeSessionsCount': {
     one: '{count} active session',

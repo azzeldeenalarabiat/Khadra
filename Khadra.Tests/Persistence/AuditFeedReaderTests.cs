@@ -117,6 +117,27 @@ public sealed class AuditFeedReaderTests : IDisposable
         Assert.Equal(nameof(AuditEntityType.Dealer), approval.EntityType);
     }
 
+    /// <summary>
+    /// Pre-launch item 175. An entry nobody acted on — the first administrator's invitation — is stored with the
+    /// English name "System", and the Arabic strip printed it inside its sentence. The feed now says who acted by
+    /// id, null for nobody, the way the audit log already did, and the console words that itself.
+    /// </summary>
+    [Fact]
+    public async Task Each_entry_says_who_acted_by_id_and_nobody_as_null()
+    {
+        await GivenAsync(
+            Entry(Noon, AuditAction.DealerApproved, AuditEntityType.Dealer, "Aqaba Coast Cars"),
+            AuditEntry.BySystem(AuditAction.AdminInvited, AuditEntityType.AdminUser, Id.New(), "Hana Odeh", Noon.AddMinutes(-1)));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var feed = await new AuditFeedReader(context).RecentAsync(10);
+
+        Assert.Equal(AdminId, feed[0].ActorUserId);
+        Assert.Null(feed[1].ActorUserId);
+        Assert.Equal(AuditEntry.SystemActorName, feed[1].ActorName);
+    }
+
     [Fact]
     public async Task The_newest_entries_come_first_and_the_size_caps_the_feed()
     {

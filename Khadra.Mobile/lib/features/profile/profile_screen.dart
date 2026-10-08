@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
-import '../../core/push/push_trace.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/account_required.dart';
 import '../documents/document_providers.dart';
-import 'push_trace_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -154,16 +152,6 @@ class ProfileScreen extends ConsumerWidget {
                   label: l10n.profileLicences,
                   onTap: () => context.push(Routes.licences),
                 ),
-                // TEMPORARY, Staging builds only (W4-9): what reached this phone when a
-                // push arrived or was tapped. Never offered by a production build.
-                if (PushTrace.enabled)
-                  _Row(
-                    icon: Icons.bug_report_outlined,
-                    // rtl-audit: allow — developer diagnostics, English only, Staging only (W4-9).
-                    label: 'push trace (staging)',
-                    onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => const PushTraceScreen())),
-                  ),
               ],
             ),
 

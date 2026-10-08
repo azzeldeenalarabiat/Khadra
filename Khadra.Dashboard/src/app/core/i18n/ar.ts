@@ -2920,6 +2920,7 @@ export const AR = {
   'auditLog.noActionsRecordedYet': 'لم تُسجَّل أي إجراءات بعد',
   'auditLog.automatedActor': 'آلي',
   'auditLog.automatedActorOption': '{name} — آلي ({count})',
+  'auditLog.systemActor': 'النظام',
   'auditLog.noReasonRecordedWithAction': 'لم يُسجَّل سبب مع هذا الإجراء.',
   'security.activeSessionsCount': {
     zero: 'لا جلسات نشطة',

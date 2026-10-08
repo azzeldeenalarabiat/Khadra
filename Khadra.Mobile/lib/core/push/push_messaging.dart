@@ -6,8 +6,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'push_trace.dart';
-
 /// A push as the app sees it: two lines to show, and the data that says where it leads.
 @immutable
 class PushEvent {
@@ -64,13 +62,7 @@ const pushChannelId = 'booking_updates';
 /// on the channel above, and tapping it opens the app with the data. The function has to
 /// exist — and be a top-level entry point — for the plugin to wake the app at all.
 @pragma('vm:entry-point')
-Future<void> khadraBackgroundPush(RemoteMessage message) async {
-  // TEMPORARY, Staging only (PushTrace): that the push reached this phone while the app
-  // was not in front, and what it carried.
-  await PushTrace.recordInBackground('arrive-background',
-      data: {for (final entry in message.data.entries) entry.key: '${entry.value}'},
-      detail: 'notification=${message.notification != null}');
-}
+Future<void> khadraBackgroundPush(RemoteMessage message) async {}
 
 /// The real one: Firebase Cloud Messaging, with flutter_local_notifications for foreground pushes.
 class FirebasePushMessaging implements PushMessaging {
@@ -95,7 +87,6 @@ class FirebasePushMessaging implements PushMessaging {
       const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_notification')),
       onDidReceiveNotificationResponse: (response) {
         final data = decodePayload(response.payload);
-        PushTrace.record('tap-local', data: data, detail: data == null ? 'payload unreadable' : null);
         if (data != null) _taps.add(PushEvent(data: data));
       },
     );
@@ -111,11 +102,7 @@ class FirebasePushMessaging implements PushMessaging {
           playSound: true,
         ));
 
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      final event = _event(message);
-      PushTrace.record('tap-system', data: event.data, detail: 'notification=${message.notification != null}');
-      _taps.add(event);
-    });
+    FirebaseMessaging.onMessageOpenedApp.listen((message) => _taps.add(_event(message)));
     _ready = true;
     return true;
   }
@@ -141,13 +128,8 @@ class FirebasePushMessaging implements PushMessaging {
   }
 
   @override
-  Stream<PushEvent> get foreground => _ready
-      ? FirebaseMessaging.onMessage.map((message) {
-          final event = _event(message);
-          PushTrace.record('arrive-front', data: event.data, detail: 'notification=${message.notification != null}');
-          return event;
-        })
-      : const Stream.empty();
+  Stream<PushEvent> get foreground =>
+      _ready ? FirebaseMessaging.onMessage.map(_event) : const Stream.empty();
 
   @override
   Stream<PushEvent> get taps => _taps.stream;
@@ -156,17 +138,11 @@ class FirebasePushMessaging implements PushMessaging {
   Future<PushEvent?> launchTap() async {
     if (!_ready) return null;
     final message = await FirebaseMessaging.instance.getInitialMessage();
-    if (message != null) {
-      final event = _event(message);
-      PushTrace.record('launch-system', data: event.data, detail: 'notification=${message.notification != null}');
-      return event;
-    }
+    if (message != null) return _event(message);
     final launch = await _local.getNotificationAppLaunchDetails();
     final data = launch?.didNotificationLaunchApp == true
         ? decodePayload(launch?.notificationResponse?.payload)
         : null;
-    PushTrace.record(data == null ? 'launch-none' : 'launch-local', data: data,
-        detail: 'local-launched=${launch?.didNotificationLaunchApp == true}');
     return data == null ? null : PushEvent(data: data);
   }
 

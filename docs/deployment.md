@@ -380,7 +380,11 @@ Customer BFF environment:
 - `ReverseProxy__Clusters__web__Destinations__primary__Address` — the renderer, e.g.
   `http://khadra-web:4000/`.
 - `BffSecurity__FrontendSharedSecret` — a random secret; the same value goes to the renderer as
-  `KHADRA_EDGE_SECRET`. The BFF refuses to start in Proxy mode without it outside Development.
+  `KHADRA_EDGE_SECRET`. The BFF refuses to start in Proxy mode without it outside Development. The
+  renderer believes the per-page CSP nonce the BFF sends (`X-Khadra-Csp-Nonce`, pre-launch item 222)
+  only with this secret beside it: if the two values differ, pages still render, but the browser refuses
+  Angular's event-replay scripts again and a tap made before hydration is lost. A custom
+  `BffSecurity__ContentSecurityPolicy` must keep its own `script-src`, or a Proxy BFF refuses to start.
 - `BffSecurity__RedisConnection` — may be the console's Redis: the deployments' keys cannot collide.
 - `KnownProxies__0…` — the edge in front, as for the console.
 

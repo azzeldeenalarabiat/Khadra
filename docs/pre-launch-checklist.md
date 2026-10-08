@@ -538,7 +538,7 @@ let the customer search filter by it.
 
 ### 27. Admins cannot view a customer's identity documents
 
-**Status:** built, awaiting the Staging check (Wave 4) · **Raised:** 2026-09-04 · **See also:** item 63, which the owner has made a hard launch blocker
+**Status:** closed · **Raised:** 2026-09-04 · **Closed:** 2026-10-08 — verified on Staging and on a physical phone (owner, Wave 4 closeout); the temporary push trace deleted in Wave 5 · **See also:** item 63, which the owner has made a hard launch blocker
 
 The customer profile lists what is on file — type, state, format, size, when — and mints no signed
 URL. `CustomerDocument` scopes viewing to the customer themselves and to a dealer with an active
@@ -594,6 +594,16 @@ records each step of a push tap on the phone (keys, kind, route with ids masked;
 readable from Profile → "push trace (staging)". If a push tap still does nothing on a phone, that trace names the
 step it stops at. **To close:** verify on a phone, then delete `PushTrace`, `push_trace_screen.dart` and their call
 sites.
+
+**Closed, 2026-10-08 (Fix & Polish Wave 5, `fix/polish-wave5`).** The owner verified the whole of W4-9 on Staging and on
+a physical phone, push taps and the Alerts row alike. The trace is gone: `push_trace.dart` and `push_trace_screen.dart`
+are deleted, and so are their call sites in `main.dart`, `push_actions.dart`, `push_coordinator.dart`,
+`push_messaging.dart`, `notifications_screen.dart` and the Profile row, with the three tests that covered the trace
+alone. What the trace investigated stays: the Alerts row opens before its read is recorded, the feed watches only
+whether somebody is signed in, and `push_platform_channels_test.dart` keeps driving the real Firebase start-up with
+the maps Android sends. A Staging phone that ran the trace keeps its two preference keys (`khadra.push_trace`,
+`khadra.push_trace.background`) until the app's data is cleared; nothing reads them. Production builds never had the
+trace switched on.
 
 ### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
 
@@ -4759,7 +4769,7 @@ new rows (item 50 for disputes; the handover and lookup writers too); show what 
 
 ### 175. "System" is English on the Arabic console
 
-**Status:** open · **Raised:** 2026-09-27 · Reproduced on Staging in the E2E run (F14); planned in Wave 5 (H, with D11).
+**Status:** closed · **Raised:** 2026-09-27 · Reproduced on Staging in the E2E run (F14) · **Closed:** 2026-10-08 (Fix & Polish Wave 5)
 
 An entry recorded with no actor (the bootstrap administrator's invitation, and any recorder that
 finds no signed-in admin) carries `AuditEntry.SystemActorName`, "System", as its actor name. The
@@ -4767,6 +4777,13 @@ audit log prints it in the Who column (its role line is translated); the activit
 the sentence, "دُعي المشرف … من قِبل System". The feed cannot tell that entry from a person named
 System, because it does not carry `actorUserId`. **To close:** add `actorUserId` to the feed entry
 (additive; only the console reads it) and word the system actor from a key on both screens.
+
+**Closed, 2026-10-08 (Wave 5, `fix/polish-wave5`).** `ActivityEntry` and `ActivityEntryDto` carry `actorUserId`
+(additive, `GET /api/v1/admin/dashboard/activity`, administrators only), read through the same projection as the
+audit log. The console words an entry with no actor id from `auditLog.systemActor` ("System" / «النظام») through one
+helper, `auditActorName`, on all three places that printed the stored word: the strip's sentence, the audit log's Who
+column, and its filter. It is recognised by the missing id, never by the name, so a person called System keeps their
+name. Stored rows are untouched: `AuditEntry.SystemActorName` still writes "System", which is now only data.
 
 ### 176. A city or car type is recorded in the audit trail by its English name only
 
@@ -5561,12 +5578,25 @@ The run's full findings are F1–F58 in its report; these are the ones the check
 
 ### 222. The website's content security policy blocks Angular's event-replay script
 
-**Status:** open · **Raised:** 2026-10-05 (recorded at B12; Fix & Polish J4, Wave 5)
+**Status:** closed · **Raised:** 2026-10-05 (recorded at B12; Fix & Polish J4) · **Closed:** 2026-10-08 (Fix & Polish Wave 5)
 
 `BffSecuritySettings` serves `script-src 'self'` with no nonce, and the renderer starts `AngularNodeAppEngine` without
 one, so the inline script `provideClientHydration` adds to replay early clicks is refused. Pages still hydrate; a
 click made before hydration finishes is lost. **To close:** allow that script by hash or nonce — never
 `unsafe-inline` — and test SSR, hydration and an early click in both languages.
+
+**Closed, 2026-10-08 (Wave 5, `fix/polish-wave5`), with a per-page nonce.** A server-rendered page runs two inline
+scripts: the event-dispatch contract the build inlines into `index.html`, and the `__jsaction_bootstrap(…)` call the
+server adds, whose event types change from page to page — so a hash could not admit it. For every request it forwards
+to the renderer, the customer BFF mints a 128-bit nonce, appends `'nonce-…'` to that response's `script-src` and to
+nothing else, and sends it in `X-Khadra-Csp-Nonce` (a browser's copy is removed on every route). The renderer
+believes it only with the edge secret, and only in base64 form, and passes it in the render context: Angular prints it
+on the replay call (`CSP_NONCE`), and `provideCspNonce` puts it on the contract before serialisation. API and BFF
+responses keep the configured policy, `style-src` is untouched (a nonce there would switch off its
+`'unsafe-inline'`), and a Proxy deployment refuses to start on a policy without its own `script-src`. Verified through
+a real `customer-web` BFF in front of the production renderer: before, both scripts were refused and an early tap
+was lost; after, there are no violations, the tap is replayed in English and Arabic, and every page type hydrates
+cleanly. Pinned by `csp-nonce.spec.ts` (including a real server render) and `BffContentSecurityPolicyNonceTests`.
 
 ### 223. The renderer warns that it does not trust the forwarded headers it receives
 

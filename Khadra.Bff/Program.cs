@@ -75,6 +75,14 @@ if (proxiesFrontend && string.IsNullOrWhiteSpace(security.FrontendSharedSecret) 
         "reachable on its own address, and without the secret it cannot tell a request this BFF forwarded " +
         "from one that names its own client address.");
 }
+// The website's pages are admitted by a nonce added to script-src (pre-launch item 222). Without its own script-src, the
+// nonce would have to become a new directive that replaces default-src for scripts and drops the bundles it allows.
+if (proxiesFrontend && !ContentSecurityPolicyNonce.HasScriptSource(security.ContentSecurityPolicy))
+{
+    throw new InvalidOperationException(
+        "BffSecurity:Frontend is Proxy but BffSecurity:ContentSecurityPolicy has no script-src directive. The website's " +
+        "pages need one to carry the per-page nonce that admits Angular's event-replay script.");
+}
 
 builder.Services.AddOptions<BffSecuritySettings>()
     .Bind(securitySection)
@@ -212,6 +220,13 @@ builder.Services.AddReverseProxy()
                 transform.ProxyRequest.Headers.Remove(BffConstants.EdgeSecretHeaderName);
                 if (!string.IsNullOrEmpty(security.FrontendSharedSecret))
                     transform.ProxyRequest.Headers.TryAddWithoutValidation(BffConstants.EdgeSecretHeaderName, security.FrontendSharedSecret);
+
+                // A nonce for this response alone (pre-launch item 222): on a page, the renderer puts it on the
+                // event-replay scripts and the response's script-src names it; a file or a redirect simply carries an
+                // unused one. The browser's copy was removed with the others above.
+                var nonce = ContentSecurityPolicyNonce.NewNonce();
+                transform.HttpContext.Items[ContentSecurityPolicyNonce.ItemKey] = nonce;
+                transform.ProxyRequest.Headers.TryAddWithoutValidation(BffConstants.CspNonceHeaderName, nonce);
             }
 
             if (isAnonymousRoute)
@@ -473,8 +488,12 @@ app.Use(async (context, next) =>
         context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
         context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self), payment=()";
         // Per deployment (the website needs a map tile host the console does not). Tighten to
-        // nonce-based styles + Trusted Types once both frontends' needs are known.
-        context.Response.Headers["Content-Security-Policy"] = security.ContentSecurityPolicy;
+        // nonce-based styles + Trusted Types once both frontends' needs are known. A page the renderer
+        // rendered also names the nonce minted for it, and nothing else does (pre-launch item 222).
+        context.Response.Headers["Content-Security-Policy"] =
+            context.Items.TryGetValue(ContentSecurityPolicyNonce.ItemKey, out var nonce) && nonce is string pageNonce
+                ? ContentSecurityPolicyNonce.WithScriptNonce(security.ContentSecurityPolicy, pageNonce)
+                : security.ContentSecurityPolicy;
         context.Response.Headers.Remove("Server");
         return Task.CompletedTask;
     });

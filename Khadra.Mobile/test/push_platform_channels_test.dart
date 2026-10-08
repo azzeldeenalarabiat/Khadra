@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/providers.dart';
-import 'package:khadra_mobile/core/push/push_trace.dart';
 import 'package:khadra_mobile/core/router.dart';
 import 'package:khadra_mobile/features/documents/documents_screen.dart';
 import 'package:khadra_mobile/main.dart';
@@ -89,7 +88,6 @@ void main() {
     initialMessage = null;
     initialMessageTakes = Duration.zero;
     shown.clear();
-    PushTrace.enabled = true;
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       ..setMockMethodCallHandler(_fcm, (call) async {
         switch (call.method) {
@@ -121,7 +119,6 @@ void main() {
       messenger
         ..setMockMethodCallHandler(_fcm, null)
         ..setMockMethodCallHandler(_local, null);
-      PushTrace.enabled = false;
     });
   });
 
@@ -138,7 +135,6 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues({'khadra.entry_chosen': true});
-    await PushTrace.clear();
     final api = _Api()
       ..refreshTakes = refreshTakes
       ..documents = CustomerDocuments(
@@ -164,7 +160,7 @@ void main() {
     return api;
   }
 
-  /// Lets every queued timer run out (the trace's own "which screen is on top" check).
+  /// Lets every queued timer run out.
   Future<void> settle(WidgetTester tester) async {
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 2));
@@ -279,37 +275,6 @@ void main() {
       expect(api.markedRead, isEmpty, reason: 'The read is still in flight.');
       await settle(tester);
       await tester.pump(const Duration(seconds: 3));
-    });
-  });
-
-  group('the temporary Staging trace (PushTrace)', () {
-    testWidgets('says where a tap went, step by step, and never what was rejected or why', (tester) async {
-      await launch(tester);
-      await settle(tester);
-      await fromAndroid(_fcm, 'Messaging#onMessageOpenedApp', _rejectedDocumentMessage());
-      await settle(tester);
-
-      final trace = PushTrace.lines.join('\n');
-      expect(trace, contains('start available=true'));
-      expect(trace, contains('tap-system keys=[kind,notificationId] kind=YourDocumentRejected subject=no notification=true'));
-      expect(trace, contains('open keys=[kind,notificationId] kind=YourDocumentRejected subject=no route=/profile/documents navigate=true'));
-      expect(trace, contains('navigate push /profile/documents'));
-      expect(trace, contains('screen top=/profile/documents'));
-      for (final secret in [_reason, 'DrivingLicenceFront', '6f1c2d3e', 'fcm-token', 'access-token', 'refresh-token']) {
-        expect(trace, isNot(contains(secret)), reason: 'The trace must never hold $secret.');
-      }
-    });
-
-    test('keeps a route\'s shape and drops every id in it', () {
-      expect(PushTrace.redact('/bookings/0b0f5a3c-1111-4000-8000-000000000001'), '/bookings/:id');
-      expect(PushTrace.redact('/profile/documents'), '/profile/documents');
-      expect(PushTrace.redact(null), '(none)');
-    });
-
-    test('reduces a push to its keys, its kind and whether it had a subject', () {
-      expect(PushTrace.describe({'kind': 'YourBookingApproved', 'subjectId': 'b-1', 'subjectReference': 'KH-1'}),
-          'keys=[kind,subjectId,subjectReference] kind=YourBookingApproved subject=yes');
-      expect(PushTrace.describe({'kind': 'not a kind; DROP'}), 'keys=[kind] kind=(not a kind) subject=no');
     });
   });
 }

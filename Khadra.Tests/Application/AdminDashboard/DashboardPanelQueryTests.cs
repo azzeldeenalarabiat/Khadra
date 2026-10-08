@@ -7,6 +7,7 @@ using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Domain.Auditing;
 using Khadra.Domain.Common;
 using Khadra.Tests.Support;
 using NSubstitute;
@@ -123,10 +124,12 @@ public sealed class DashboardPanelQueryTests
     public async Task The_feed_carries_the_record_and_its_booking_beside_the_stored_label()
     {
         var ticketId = Id.New();
+        var adminId = Id.New();
         IReadOnlyList<ActivityEntry> entries =
         [
-            new(Id.New(), Now, "Azzeldeen Al-Arabiat", "DisputeResolved", "Dispute", "Dispute on KH-NY8AHLNK", ticketId, "KH-NY8AHLNK"),
-            new(Id.New(), Now.AddMinutes(-5), "Rania Haddad", "DealerApproved", "Dealer", "Aqaba Coast Cars", Id.New(), null),
+            new(Id.New(), Now, adminId, "Azzeldeen Al-Arabiat", "DisputeResolved", "Dispute", "Dispute on KH-NY8AHLNK", ticketId, "KH-NY8AHLNK"),
+            new(Id.New(), Now.AddMinutes(-5), Id.New(), "Rania Haddad", "DealerApproved", "Dealer", "Aqaba Coast Cars", Id.New(), null),
+            new(Id.New(), Now.AddMinutes(-9), null, AuditEntry.SystemActorName, "AdminInvited", "AdminUser", "Hana Odeh", Id.New(), null),
         ];
         var feed = Substitute.For<IAuditFeedReader>();
         feed.RecentAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(entries);
@@ -140,6 +143,9 @@ public sealed class DashboardPanelQueryTests
         Assert.Equal("KH-NY8AHLNK", dispute.BookingReference);
         Assert.Equal("Dispute on KH-NY8AHLNK", dispute.SubjectLabel);
         Assert.Null(result.Value.Entries[1].BookingReference);
+        // Pre-launch item 175: who acted travels as an id, so the console can word "nobody" itself.
+        Assert.Equal(adminId.Value, dispute.ActorUserId);
+        Assert.Null(result.Value.Entries[2].ActorUserId);
         // Sized by AdminDashboard:ActivityFeedSize, never by a number in the handler.
         await feed.Received(1).RecentAsync(7, Arg.Any<CancellationToken>());
     }

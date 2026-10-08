@@ -18,7 +18,7 @@ import { clockDuration, relativeTime, slaReading } from '../i18n/relative-time';
 import { enumKey, spellEnumName } from '../i18n/status-key';
 import { legalKindLabel } from '../i18n/legal-kind';
 import { KpiCard, QueueItem } from '../data/dashboard.data';
-import { auditSubject, subjectValue } from './audit-subject';
+import { auditActorName, auditSubject, subjectValue } from './audit-subject';
 
 /** Passed in rather than injected: these are pure functions, and their spec calls them directly. */
 export type Translate = (key: TranslationKey, params?: MessageParams) => string;
@@ -489,7 +489,7 @@ export function toActivityRows(
 function activityText(entry: ActivityEntry, t: Translate): string {
   const subject = auditSubject(entry);
   const params = {
-    actor: entry.actorName,
+    actor: auditActorName(entry, t),
     subject: subject.kind === 'legal' ? legalKindLabel(subject.document, t) : subjectValue(subject),
   };
   const key = LOOKUP_SENTENCES[entry.action]?.[entry.entityType] ?? ACTIVITY_SENTENCES[entry.action];

@@ -105,6 +105,9 @@ export interface AttentionQueue extends PanelResponse {
 export interface ActivityEntry {
   readonly id: string;
   readonly occurredAt: string;
+  /** Null when nobody acted; the console then words the actor itself (`auditActorName`, item 175). */
+  readonly actorUserId: string | null;
+  /** As it was recorded: "System" in English for an entry nobody acted on, so never shown for one. */
   readonly actorName: string;
   readonly action: string;
   readonly entityType: string;

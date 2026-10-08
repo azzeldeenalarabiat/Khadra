@@ -29,6 +29,7 @@ internal sealed class AuditFeedReader(KhadraDbContext context) : IAuditFeedReade
         return [.. rows.Select(row => new ActivityEntry(
             row.Id,
             row.OccurredAt,
+            row.ActorUserId,
             row.ActorName,
             row.Action,
             row.EntityType,

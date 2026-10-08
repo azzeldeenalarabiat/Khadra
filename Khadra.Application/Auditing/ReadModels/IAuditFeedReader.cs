@@ -16,9 +16,16 @@ namespace Khadra.Application.Auditing.ReadModels;
 /// sentence "Dispute on KH-…", in a table that can never be rewritten, and the console has to word
 /// those old entries in Arabic too without reading the reference back out of an English label.
 /// </param>
+/// <param name="ActorUserId">
+/// Null when nobody acted — the first administrator's invitation, a background job — as on the audit
+/// log. <paramref name="ActorName"/> is then the stored English word "System", and a client words the
+/// actor itself; without this it could not tell that entry from a person named System (pre-launch
+/// item 175).
+/// </param>
 public sealed record ActivityEntry(
     Id Id,
     DateTimeOffset OccurredAt,
+    Id? ActorUserId,
     string ActorName,
     string Action,
     string EntityType,

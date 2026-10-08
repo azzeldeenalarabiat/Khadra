@@ -381,6 +381,7 @@ describe('toActivityRows', () => {
   const entry = (over: Partial<ActivityEntry>): ActivityEntry => ({
     id: 'e1',
     occurredAt: '2026-09-27T08:00:00Z',
+    actorUserId: '0198f2c4-0000-7a10-9c3d-2e4f6a8b0c1d',
     actorName: 'Azzeldeen Al-Arabiat',
     action: 'DisputeResolved',
     entityType: 'Dispute',
@@ -412,6 +413,35 @@ describe('toActivityRows', () => {
 
     expect(raw).toContain('⁨KH-NY8AHLNK⁩');
     expect(raw).toContain('⁨Azzeldeen Al-Arabiat⁩');
+  });
+
+  // Pre-launch item 175: the first administrator's invitation is recorded with no actor and the stored
+  // English name "System", which the Arabic line printed after "من قِبل".
+  it('words an entry nobody acted on from the dictionary, never from its stored English name', () => {
+    const invited: Partial<ActivityEntry> = {
+      action: 'AdminInvited',
+      entityType: 'AdminUser',
+      subjectLabel: 'Hana Odeh',
+      bookingReference: null,
+      actorUserId: null,
+      actorName: 'System',
+    };
+
+    expect(english(invited)).toBe('System invited admin Hana Odeh');
+    expect(arabic(invited)).toBe('دُعي المشرف Hana Odeh من قِبل النظام');
+    expect(arabic(invited)).not.toContain('System');
+  });
+
+  it('keeps the recorded name of a person, even one called System', () => {
+    const invited: Partial<ActivityEntry> = {
+      action: 'AdminInvited',
+      entityType: 'AdminUser',
+      subjectLabel: 'Hana Odeh',
+      bookingReference: null,
+      actorName: 'System',
+    };
+
+    expect(arabic(invited)).toBe('دُعي المشرف Hana Odeh من قِبل System');
   });
 
   it('names a customer by the short reference, and says "customer" once', () => {

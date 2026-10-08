@@ -11,7 +11,6 @@ import '../../core/format/booking_presentation.dart';
 import '../../core/paging.dart';
 import '../../core/providers.dart';
 import '../../core/push/notification_route.dart';
-import '../../core/push/push_trace.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
@@ -210,9 +209,6 @@ class _NotificationRow extends ConsumerWidget {
     // could not accept, which has no subject at all.
     final route =
         notificationRoute(kind: item.kind, subjectId: item.subjectId);
-    PushTrace.record('alerts-tap',
-        data: {'kind': item.kind, 'subjectId': ?item.subjectId},
-        detail: 'route=${PushTrace.redact(route)}');
 
     // OPENED FIRST, and marked read without being waited for (Staging, W4-9).
     //

@@ -9,6 +9,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
 import { negotiateLanguage } from './app/core/i18n/negotiate';
 import { ServerRenderContext } from './app/core/http/server-context';
+import { cspNonceFrom } from './app/core/http/csp-nonce';
 import { PRIVATE_PAGES } from './app/app.routes.server';
 import { CLOSED_ROBOTS_TAG, indexableFrom, robotsTxt } from './app/core/seo/indexing';
 import { carsSitemap, officesSitemap, pagesSitemap, sitemapIndex } from './sitemap';
@@ -64,12 +65,25 @@ const PRIVATE = new RegExp(
  * sees the renderer — never a value the visitor chose.
  */
 function clientAddress(request: express.Request): string | null {
-  if (!edgeSecret) return null;
-  const presented = Buffer.from(request.header('x-khadra-edge') ?? '');
-  const expected = Buffer.from(edgeSecret);
-  if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) return null;
+  if (!cameThroughBff(request)) return null;
   const entries = (request.header('x-forwarded-for') ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
   return entries.at(-1) ?? null;
+}
+
+/** Whether the request carries the secret the customer BFF shares with this renderer. */
+function cameThroughBff(request: express.Request): boolean {
+  if (!edgeSecret) return false;
+  const presented = Buffer.from(request.header('x-khadra-edge') ?? '');
+  const expected = Buffer.from(edgeSecret);
+  return presented.length === expected.length && timingSafeEqual(presented, expected);
+}
+
+/**
+ * The nonce the customer BFF named in this page's `script-src` (pre-launch item 222), believed on the same proof as
+ * the client address: only the BFF writes the policy the browser enforces, so only its nonce can match it.
+ */
+function cspNonce(request: express.Request): string | null {
+  return cameThroughBff(request) ? cspNonceFrom(request.header('x-khadra-csp-nonce')) : null;
 }
 
 app.get('/', (request, response) => {
@@ -156,7 +170,12 @@ app.get(/^\/(?!ar(?:\/|$)|en(?:\/|$))[^.]*$/, (request, response) => {
 });
 
 app.use((request, response, next) => {
-  const context: ServerRenderContext = { apiBaseUrl, publicBaseUrl, clientAddress: clientAddress(request) };
+  const context: ServerRenderContext = {
+    apiBaseUrl,
+    publicBaseUrl,
+    clientAddress: clientAddress(request),
+    cspNonce: cspNonce(request),
+  };
   const isPrivate = PRIVATE.test(request.path);
 
   angularApp

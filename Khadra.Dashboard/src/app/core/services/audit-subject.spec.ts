@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AuditSubjectFacts, auditSubject, customerReference, subjectValue } from './audit-subject';
+import { AuditSubjectFacts, auditActorName, auditSubject, customerReference, subjectValue } from './audit-subject';
 
 /**
  * Which facts word an audit entry's subject.
@@ -66,5 +66,21 @@ describe('auditSubject', () => {
   it('gives a sentence the reference, or the label as recorded', () => {
     expect(subjectValue({ kind: 'dispute', reference: 'KH-NY8AHLNK' })).toBe('KH-NY8AHLNK');
     expect(subjectValue({ kind: 'label', label: 'Aqaba Coast Cars' })).toBe('Aqaba Coast Cars');
+  });
+});
+
+/** Pre-launch item 175: who acted, on the strip and in the log alike. */
+describe('auditActorName', () => {
+  const t = (key: 'auditLog.systemActor') => `«${key}»`;
+
+  it('words an entry nobody acted on from the dictionary', () => {
+    expect(auditActorName({ actorUserId: null, actorName: 'System' }, t)).toBe('«auditLog.systemActor»');
+  });
+
+  it('names a person as the entry recorded them, whatever they are called', () => {
+    expect(auditActorName({ actorUserId: '0198f2c4-0000-7a10-9c3d-2e4f6a8b0c1d', actorName: 'System' }, t)).toBe('System');
+    expect(auditActorName({ actorUserId: '0198f2c4-0000-7a10-9c3d-2e4f6a8b0c1d', actorName: 'Rania Haddad' }, t)).toBe(
+      'Rania Haddad',
+    );
   });
 });

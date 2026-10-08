@@ -12,7 +12,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { spellEnumName } from '../../core/i18n/status-key';
 import { legalKindLabel } from '../../core/i18n/legal-kind';
-import { auditSubject, subjectValue } from '../../core/services/audit-subject';
+import { auditActorName, auditSubject, subjectValue } from '../../core/services/audit-subject';
 
 /**
  * The server's audit actions (`AuditAction`), each with the key that words it.
@@ -322,6 +322,14 @@ export class AuditLogComponent {
   protected isSystem(entry: AuditLogEntry): boolean {
     return entry.actorUserId === null;
   }
+
+  /** Who acted, in the reader's language: nobody is worded from a key, never the stored English "System" (item 175). */
+  protected actorName(entry: AuditLogEntry): string {
+    return auditActorName(entry, this.t);
+  }
+
+  /** The filter's name for the entries nobody acted on, the same word the rows use. */
+  protected readonly systemActorName = computed(() => this.t('auditLog.systemActor'));
 
   protected initials(name: string): string {
     return name

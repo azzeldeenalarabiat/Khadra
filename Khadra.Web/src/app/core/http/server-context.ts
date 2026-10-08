@@ -14,6 +14,11 @@ export interface ServerRenderContext {
    * through the BFF. Passed to the API so each visitor keeps their own rate-limit partition.
    */
   readonly clientAddress: string | null;
+  /**
+   * The nonce the customer BFF named in this page's `script-src`, or null when the request did not prove it came
+   * through the BFF (pre-launch item 222). Printed on the event-replay scripts and nowhere else.
+   */
+  readonly cspNonce: string | null;
 }
 
 export function injectServerContext(): ServerRenderContext | null {

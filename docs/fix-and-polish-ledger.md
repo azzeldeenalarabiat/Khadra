@@ -45,6 +45,18 @@ runs, so the counts are those:
 | Website: `ng test` | 36 files, 258 tests |
 | App: `flutter analyze` / `flutter test` | no issues / 719 tests |
 
+### Wave 5 final regression on `fix/polish-wave5` (2026-10-08)
+
+Wave 5 starts at `e698beb`, the end of Wave 4, and carries F88, F90 and F92 and pre-launch items 175, 222 and 27 (the
+temporary push trace deleted, which takes three trace-only tests out of the app's suite). Measured on its final commit:
+
+| Suite | Result |
+|---|---|
+| Backend: `dotnet test Khadra.slnx`, run alone | 3,015 passed, 57 skipped (PostgreSQL-only) |
+| Console: `ng test` · `npm run i18n:check` | 45 files, 572 tests · 0 to fix |
+| Website: `ng test` | 52 files, 357 tests |
+| App: `flutter analyze` / `flutter test` | no issues / 773 tests |
+
 ## 2. Contract ledger — what the API serves or accepts
 
 Installed builds: 1.2.0+3 and 1.3.0+4. The tracked minimum (`MobileApp:MinimumSupportedVersion`) is not raised in
@@ -100,6 +112,8 @@ this batch (decision D6).
 | 4 | `GET /api/v1/admin/customers/{id}/documents/{documentId}` (the file, its view recorded first) and `POST …/reject` (`{ reason, uploadedAt }`; 409 `documents.changed_since_viewed` and `documents.not_viewed`, 404 `documents.not_found`); `CustomerDocumentRejected` in the audit vocabulary | new endpoints | none: administrators only |
 | 4 | The handover's fuel level reads as a whole percentage on the website and in the console (W4-10) | none | none: no API change |
 | 5 | The staff invitation asks for a name, an email and a phone on single lines, checked for shape before sending (F88); a renter's document on file reads "Uploaded" on the admin profile, as on the website (F90); the website's drawer and account menu scroll inside a short screen, so My account and Sign out stay reachable (F92) | none | none: no API change |
+| 5 | `GET /api/v1/admin/dashboard/activity`: each entry carries `actorUserId`, null when nobody acted, and the console words that actor itself (pre-launch item 175) | additive | none: administrators only |
+| 5 | The customer BFF adds a per-page nonce to `script-src` on the renderer's pages and sends it to the renderer in `X-Khadra-Csp-Nonce`, so Angular's event replay runs (pre-launch item 222) | none | none: the app calls the API directly, and API responses keep their policy |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -119,4 +133,4 @@ this batch (decision D6).
 | F2/F1 (W3 E7) | Mark a search result "Delivery only at these times" when `selfPickupAvailable` is false, and word a refused quote by its reason (hours, dates) rather than one sentence, as the website does. |
 | D10 (W3) | Word `YourDisputeOpened` in the notifications list ("Your dispute is open, and Khadra will decide it", as the website does). It already opens the booking, its subject. |
 | F7 (W4-8) | Ask for consent: a required checkbox on registration naming the texts in `/app-config.legal.documents`, sending `acceptedLegalVersions` and `legalLanguage`; and, for a signed-in customer with `pendingConsents` on `/auth/me` or a 403 `legal.consent_pending`, a prompt in place of the app that offers the texts, the acceptance (`POST /auth/me/legal-consents`) and sign-out, as the website does. A 409 `legal.version_not_current` reloads `/app-config` and asks again. Then the minimum rises to 1.4.0, and the server stops sparing the app (pre-launch item 238). |
-| W4-9 | **Done on `fix/polish-wave4` (Staging finding, 2026-10-07)**, in the app's code and in no API: `YourDocumentRejected` is worded in Alerts, and a tap on it (its row, or its push from the foreground, the background or a closed app) opens My Documents (`notificationRoute`); the reason reads in its own direction under "Why:", with "Upload a new one". A push tap that launches a closed app is no longer lost while the session restores (`openForPush`, every kind). The Alerts row opens before its read is recorded, so a token rotation can no longer drop the tap (second device finding). It reaches phones only with the next app build. **Still for 1.4.0:** on `booking.documents_incomplete`, name the `rejectedDocumentTypes`, as the website does. |
+| W4-9 | **Done on `fix/polish-wave4` (Staging finding, 2026-10-07)**, in the app's code and in no API: `YourDocumentRejected` is worded in Alerts, and a tap on it (its row, or its push from the foreground, the background or a closed app) opens My Documents (`notificationRoute`); the reason reads in its own direction under "Why:", with "Upload a new one". A push tap that launches a closed app is no longer lost while the session restores (`openForPush`, every kind). The Alerts row opens before its read is recorded, so a token rotation can no longer drop the tap (second device finding). It reaches phones only with the next app build. The temporary `PushTrace` that helped verify it on a phone was deleted in Wave 5 (pre-launch item 27), so a build from `fix/polish-wave5` onward has no "push trace (staging)" row. **Still for 1.4.0:** on `booking.documents_incomplete`, name the `rejectedDocumentTypes`, as the website does. |

@@ -55,7 +55,7 @@
             } @else {
               <option value="system" [selected]="systemOnly()">
                 {{
-                  t('auditLog.automatedActorOption', { name: actor.name, count: actor.entryCount })
+                  t('auditLog.automatedActorOption', { name: systemActorName(), count: actor.entryCount })
                 }}
               </option>
             }
@@ -185,7 +185,7 @@
                       }
                     </div>
                     <div>
-                      <div class="entity-name">{{ row.actorName }}</div>
+                      <div class="entity-name">{{ actorName(row) }}</div>
                       <!-- The role held AT THE TIME. An admin later demoted still reads as an admin
                            on the line where they acted. -->
                       <div class="entity-sub">
