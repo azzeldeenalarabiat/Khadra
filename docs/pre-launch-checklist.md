@@ -595,6 +595,21 @@ readable from Profile → "push trace (staging)". If a push tap still does nothi
 step it stops at. **To close:** verify on a phone, then delete `PushTrace`, `push_trace_screen.dart` and their call
 sites.
 
+**Third device report (2026-10-08), on 1.3.0+6:** neither tap opened My Documents, and the trace row was not in
+Profile. A build of this source cannot hide that row from a phone that talks to the Staging API: the row's only
+condition was the Staging flavor, and a build without it cannot reach that API at all. So the Dart on the phone was
+not compiled from the source carrying the row. That would also explain why neither tap fix arrived. To make that a fact to read
+rather than to argue: a compiled-in marker, `w4-9-diag-3` (`StagingDiagnostics`), shown FIRST on Profile with the
+build's application id, version, `appFlavor` and API host. It can be found in an APK before installing it
+(`unzip -p app-staging-release.apk lib/arm64-v8a/libapp.so | grep -c -a w4-9-diag-3`). Diagnostics are now on
+when the flavor OR the application id says Staging, and the strip says FLAVOR MISMATCH when they disagree.
+`MainActivity` (`PushIntentTrace`, Kotlin) records each intent Android delivers (action, extras key names, FCM
+message id present or not, `kind`) before any plugin sees it. The Alerts row records the push it makes and the screen
+on top afterwards. Verified in this container: `MainActivity.kt` compiles against the Flutter embedding of the
+engine in use, and an arm64 release `libapp.so` compiled with the Staging flavor and the plugin registrant contains
+every diagnostic. **To close, also delete:** `StagingDiagnostics`, the Profile strip, and `PushIntentTrace` with
+the `MainActivity` overrides.
+
 ### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
 
 **Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.

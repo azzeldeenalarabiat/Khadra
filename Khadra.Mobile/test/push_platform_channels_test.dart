@@ -265,6 +265,11 @@ void main() {
 
       expect(find.byType(DocumentsScreen), findsOneWidget);
       expect(api.markedRead, ['n-7']);
+      // The device diagnostics for this tap: the handler fired, the kind, the route, the push, the screen.
+      final trace = PushTrace.lines.join('\n');
+      expect(trace, contains('alerts-tap keys=[kind] kind=YourDocumentRejected subject=no route=/profile/documents'));
+      expect(trace, contains('alerts-navigate push /profile/documents'));
+      expect(trace, contains('alerts-screen top=/profile/documents'));
     });
 
     testWidgets('opens My Documents however slow the read is', (tester) async {

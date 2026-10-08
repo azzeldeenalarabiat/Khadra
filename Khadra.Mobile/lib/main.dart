@@ -8,6 +8,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'core/config/app_environment.dart';
 import 'core/config/update_requirement.dart';
+import 'core/diagnostics/staging_diagnostics.dart';
 import 'core/fonts/font_licences.dart';
 import 'core/live/live_refresh.dart';
 import 'core/providers.dart';
@@ -51,8 +52,11 @@ Future<void> main() async {
 
   final preferences = await SharedPreferences.getInstance();
   final installedVersion = await _installedVersion();
-  // TEMPORARY, Staging only: what earlier runs recorded of push taps (PushTrace).
+  // TEMPORARY, Staging only: what earlier runs recorded of push taps (PushTrace). On when the
+  // flavor OR the Android application id says Staging, so one wrong signal cannot hide it.
+  PushTrace.enabled = StagingDiagnostics.enabled;
   await PushTrace.attach();
+  PushTrace.record('launch-app', detail: StagingDiagnostics.facts().join(' '));
 
   runApp(
     ProviderScope(
@@ -79,6 +83,9 @@ Future<void> main() async {
 Future<String?> _installedVersion() async {
   try {
     final info = await PackageInfo.fromPlatform();
+    // TEMPORARY (W4-9): what Android says this build is, for the Staging diagnostics.
+    StagingDiagnostics.attach(
+        packageName: info.packageName, version: info.version, buildNumber: info.buildNumber);
     final version = info.version.trim();
     if (version.isEmpty) return null;
     final build = info.buildNumber.trim();

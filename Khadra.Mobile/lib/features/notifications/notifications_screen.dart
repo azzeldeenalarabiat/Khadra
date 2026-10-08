@@ -224,7 +224,12 @@ class _NotificationRow extends ConsumerWidget {
     if (!item.isRead) {
       unawaited(_markRead(ProviderScope.containerOf(context, listen: false)));
     }
-    if (route != null) context.push(route);
+    if (route != null) {
+      context.push(route);
+      // TEMPORARY, Staging only: the push was called, and what is on top once it lands.
+      PushTrace.record('alerts-navigate', detail: 'push ${PushTrace.redact(route)}');
+      PushTrace.recordTopScreenLater(GoRouter.of(context), 'alerts-screen');
+    }
   }
 
   Future<void> _markRead(ProviderContainer container) async {

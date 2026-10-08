@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/diagnostics/staging_diagnostics.dart';
 import '../../core/providers.dart';
-import '../../core/push/push_trace.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
@@ -35,6 +35,9 @@ class ProfileScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: Space.bottomInset),
           children: [
+            // TEMPORARY (W4-9): FIRST on the screen, signed in or not, on a Staging build
+            // only — the build marker and the way into the push trace.
+            if (StagingDiagnostics.enabled) const _StagingDiagnosticsStrip(),
             if (session.isSignedIn) ...[
               _AccountHeader(
                 name: session.user!.fullName,
@@ -156,7 +159,7 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 // TEMPORARY, Staging builds only (W4-9): what reached this phone when a
                 // push arrived or was tapped. Never offered by a production build.
-                if (PushTrace.enabled)
+                if (StagingDiagnostics.enabled)
                   _Row(
                     icon: Icons.bug_report_outlined,
                     // rtl-audit: allow — developer diagnostics, English only, Staging only (W4-9).
@@ -536,3 +539,39 @@ class _Row extends StatelessWidget {
         onTap: onTap,
       );
 }
+
+/// TEMPORARY (W4-9): the Staging build marker, at the top of Profile, and the way into the
+/// push trace. Developer text in one language on purpose; never on a production build.
+class _StagingDiagnosticsStrip extends StatelessWidget {
+  const _StagingDiagnosticsStrip();
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+        // rtl-audit: allow — developer diagnostics, English only, Staging only (W4-9).
+        textDirection: TextDirection.ltr,
+        child: Material(
+          color: StagingDiagnostics.mismatch ? KhadraColors.badTint : KhadraColors.neutral100,
+          child: InkWell(
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute<void>(builder: (_) => const PushTraceScreen())),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.sm),
+              child: Row(
+                children: [
+                  const Icon(Icons.bug_report_outlined, size: 18, color: KhadraColors.neutral700),
+                  const SizedBox(width: Space.sm),
+                  Expanded(
+                    child: Text(
+                      StagingDiagnostics.headline,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: KhadraColors.neutral700),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 18, color: KhadraColors.neutral500),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+

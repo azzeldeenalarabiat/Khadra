@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_environment.dart';
@@ -26,6 +27,10 @@ abstract final class PushTrace {
 
   static const _key = 'khadra.push_trace';
   static const _backgroundKey = 'khadra.push_trace.background';
+
+  /// Written by `MainActivity` (Kotlin) as each intent reaches the app, BEFORE FlutterFire or
+  /// the local-notification plugin sees it: one string of lines. Read here, never written.
+  static const _nativeKey = 'khadra.push_trace.native';
   static const _max = 80;
 
   static final List<String> _lines = [];
@@ -63,6 +68,19 @@ abstract final class PushTrace {
     }
   }
 
+  /// What Android delivered to the activity: the native side's own lines.
+  static Future<List<String>> nativeLines() async {
+    if (!enabled) return const [];
+    try {
+      final preferences = _preferences ?? await SharedPreferences.getInstance();
+      await preferences.reload();
+      final text = preferences.getString(_nativeKey) ?? '';
+      return text.split('\n').where((line) => line.isNotEmpty).toList();
+    } on Object catch (error) {
+      return ['native lines unreadable: ${error.runtimeType}'];
+    }
+  }
+
   /// Records one step. [data] is reduced by [describe]; [detail] must already be safe.
   static void record(String stage, {Map<String, String?>? data, String? detail}) {
     if (!enabled) return;
@@ -90,6 +108,20 @@ abstract final class PushTrace {
     }
   }
 
+  /// Records which screen is on top once a navigation has had time to land, the session
+  /// included: whether the route the app chose is what the customer actually sees.
+  static void recordTopScreenLater(GoRouter router, String stage) {
+    if (!enabled) return;
+    Timer(const Duration(milliseconds: 1500), () {
+      try {
+        final top = router.routerDelegate.currentConfiguration.last.matchedLocation;
+        record(stage, detail: 'top=${redact(top)}');
+      } on Object catch (error) {
+        record(stage, detail: 'unreadable ${error.runtimeType}');
+      }
+    });
+  }
+
   static Future<void> clear() async {
     _lines.clear();
     changes.value++;
@@ -97,6 +129,7 @@ abstract final class PushTrace {
       final preferences = _preferences ?? await SharedPreferences.getInstance();
       await preferences.remove(_key);
       await preferences.remove(_backgroundKey);
+      await preferences.remove(_nativeKey);
     } on Object {
       // Nothing to clear.
     }

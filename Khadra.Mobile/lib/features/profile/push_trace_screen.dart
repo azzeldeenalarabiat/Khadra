@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/diagnostics/staging_diagnostics.dart';
 import '../../core/push/push_trace.dart';
 import '../../core/theme/khadra_theme.dart';
 
@@ -17,6 +18,7 @@ class PushTraceScreen extends StatefulWidget {
 
 class _PushTraceScreenState extends State<PushTraceScreen> {
   List<String> _background = const [];
+  List<String> _native = const [];
 
   @override
   void initState() {
@@ -33,10 +35,20 @@ class _PushTraceScreenState extends State<PushTraceScreen> {
 
   Future<void> _reload() async {
     final background = await PushTrace.backgroundLines();
-    if (mounted) setState(() => _background = background);
+    final native = await PushTrace.nativeLines();
+    if (mounted) {
+      setState(() {
+        _background = background;
+        _native = native;
+      });
+    }
   }
 
   String get _report => [
+        '# build',
+        ...StagingDiagnostics.facts(),
+        '# android (MainActivity intents)',
+        ..._native.reversed,
         '# app',
         ...PushTrace.lines.reversed,
         '# background isolate',

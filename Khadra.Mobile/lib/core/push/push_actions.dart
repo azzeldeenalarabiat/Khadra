@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -34,18 +32,8 @@ void openForPush(
   } else {
     router.go(location);
   }
-  // TEMPORARY, Staging only (PushTrace): which screen is on top once the navigation has
-  // had time to land, the session included.
-  if (PushTrace.enabled) {
-    Timer(const Duration(milliseconds: 1500), () {
-      try {
-        final top = router.routerDelegate.currentConfiguration.last.matchedLocation;
-        PushTrace.record('screen', detail: 'top=${PushTrace.redact(top)}');
-      } on Object catch (error) {
-        PushTrace.record('screen', detail: 'unreadable ${error.runtimeType}');
-      }
-    });
-  }
+  // TEMPORARY, Staging only (PushTrace): which screen is on top once it has landed.
+  PushTrace.recordTopScreenLater(router, 'screen');
 }
 
 /// What a push that arrives while the app is in front refreshes, now rather than at the
