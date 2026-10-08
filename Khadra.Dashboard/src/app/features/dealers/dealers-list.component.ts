@@ -231,9 +231,10 @@ export class DealersListComponent {
     const now = Date.now();
     const started = Date.parse(dealer.submittedAt);
     const due = Date.parse(dealer.reviewDueAt);
-    // The list row carries no breach flag of its own, so this clock is the only answer here; the
-    // review screen, which has the server's isBreachingSla, consults both.
-    const reading = this.formats.sla(dealer.reviewDueAt, false, now);
+    // The server's own flag as well as this browser's clock, as on the review screen (pre-launch item 106): a
+    // browser whose time is behind cannot show a broken promise as time remaining. Optional on the wire, so a row
+    // from an older server reads by the clock alone, as it did.
+    const reading = this.formats.sla(dealer.reviewDueAt, dealer.isBreachingSla ?? false, now);
     const overdue = reading.passed;
     return {
       kind: 'text',

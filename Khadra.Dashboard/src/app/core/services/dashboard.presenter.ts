@@ -191,6 +191,10 @@ const kindTarget = (
     // several open the documents list.
     case 'FinancialDocumentEmailsNotSent':
       return { route: only ? `/payments/financial-documents/${only}` : '/payments/financial-documents', action: 'queue.actionOpen' };
+    // PDFs that could not be drawn (pre-launch item 197): one opens its document, where each says which and why;
+    // several open the documents list.
+    case 'FinancialDocumentPdfsNotDrawn':
+      return { route: only ? `/payments/financial-documents/${only}` : '/payments/financial-documents', action: 'queue.actionOpen' };
     default:
       return { route: '/dashboard', action: 'queue.actionOpen' };
   }
@@ -252,6 +256,7 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   if (item.kind === 'PayablesOnHold') return t('queue.payablesOnHold', { count: item.count });
   if (item.kind === 'FinancialDocumentsOnHold') return t('queue.documentsOnHold', { count: item.count });
   if (item.kind === 'FinancialDocumentEmailsNotSent') return t('queue.documentEmailsNotSent', { count: item.count });
+  if (item.kind === 'FinancialDocumentPdfsNotDrawn') return t('queue.documentPdfsNotDrawn', { count: item.count });
 
   const ageHours = Math.max(0, Math.round((now - Date.parse(item.slaStartedAt)) / 3_600_000));
   if (item.kind === 'DisputeOverdue' || item.kind === 'DisputeOpen') {
@@ -476,18 +481,19 @@ export function toActivityRows(
 ): readonly ActivityRow[] {
   return entries.map((entry) => ({
     icon: ACTIVITY_ICONS[entry.action] ?? 'info',
-    text: activityText(entry, t),
+    text: activityText(entry, t, localeTag.startsWith('ar')),
     ts: relativeTime(entry.occurredAt, now, localeTag),
   }));
 }
 
 /**
  * One entry as its sentence. The subject is a fact wherever the entry carries one (`auditSubject`),
- * so a dispute recorded as "Dispute on KH-…" reads in Arabic too. An action this build has no
+ * so a dispute recorded as "Dispute on KH-…" reads in Arabic too, and a city is named by the Arabic name it was
+ * recorded with when the reader reads Arabic (item 176). An action this build has no
  * sentence for still reads: its name spelled out, which beats an empty line.
  */
-function activityText(entry: ActivityEntry, t: Translate): string {
-  const subject = auditSubject(entry);
+function activityText(entry: ActivityEntry, t: Translate, arabic: boolean): string {
+  const subject = auditSubject(entry, arabic);
   const params = {
     actor: auditActorName(entry, t),
     subject: subject.kind === 'legal' ? legalKindLabel(subject.document, t) : subjectValue(subject),

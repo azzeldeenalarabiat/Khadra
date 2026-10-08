@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { negotiateLanguage } from './app/core/i18n/negotiate';
 import { ServerRenderContext } from './app/core/http/server-context';
 import { cspNonceFrom } from './app/core/http/csp-nonce';
+import { stripProxyHeaders } from './app/core/http/proxy-headers';
 import { PRIVATE_PAGES } from './app/app.routes.server';
 import { CLOSED_ROBOTS_TAG, indexableFrom, robotsTxt } from './app/core/seo/indexing';
 import { carsSitemap, officesSitemap, pagesSitemap, sitemapIndex } from './sitemap';
@@ -177,6 +178,8 @@ app.use((request, response, next) => {
     cspNonce: cspNonce(request),
   };
   const isPrivate = PRIVATE.test(request.path);
+  // Read above, needed nowhere else: Angular would only drop them and warn for each (pre-launch item 223).
+  stripProxyHeaders(request.headers);
 
   angularApp
     .handle(request, context)

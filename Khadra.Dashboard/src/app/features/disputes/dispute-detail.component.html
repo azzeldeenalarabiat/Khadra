@@ -131,13 +131,13 @@
                     </span>
                     <span class="page-sub push">{{ when(s.createdAt) }}</span>
                   </div>
-                  <div class="queue-desc user-text">{{ s.body }}</div>
+                  <div class="queue-desc user-text user-prose">{{ s.body }}</div>
                 </div>
               </div>
             } @empty {
               <!-- Unreachable while Open() writes the first statement, but a ticket with no
                    statement at all must not render an empty panel with no explanation. -->
-              <div class="page-sub user-text">{{ d.reason }}</div>
+              <div class="page-sub user-text user-prose">{{ d.reason }}</div>
             }
           </div>
         </section>

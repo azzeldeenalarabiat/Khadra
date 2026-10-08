@@ -119,6 +119,25 @@ describe('problemMessage', () => {
     expect(problemMessage(named, 'ar', t)).toBe('«problem.invalidEmail»');
   });
 
+  // Pre-launch item 121: a body the API could not bind now says so by code, in both languages — after
+  // the field wording, which says more when there is exactly one field to name.
+  it('words a request the API could not read, and still prefers the one field it named', () => {
+    const unreadable = refusal(400, {
+      code: 'request.invalid',
+      title: 'One or more validation errors occurred.',
+      errors: { $: ["'{' is an invalid start of a property name."] },
+    });
+    expect(problemMessage(unreadable, 'ar', t)).toBe('«problem.requestInvalid»');
+    expect(problemMessage(unreadable, 'en', t)).toBe('«problem.requestInvalid»');
+
+    const oneField = refusal(400, {
+      code: 'request.invalid',
+      title: 'One or more validation errors occurred.',
+      errors: { Email: ['The Email field is not a valid e-mail address.'] },
+    });
+    expect(problemMessage(oneField, 'ar', t)).toBe('«problem.invalidEmail»');
+  });
+
   it("shows the server's own sentence to an English reader when it has no code", () => {
     const unmapped = refusal(409, { code: 'booking.not_live', title: 'Booking is not live.' });
     expect(problemMessage(unmapped, 'en', t)).toBe('Booking is not live.');

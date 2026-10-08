@@ -18,9 +18,25 @@ export class LookupsService {
   readonly activeCities = computed(() => sortByOrder((this.cities.value() ?? []).filter((city) => city.isActive)));
   readonly activeCarTypes = computed(() => sortByOrder((this.carTypes.value() ?? []).filter((type) => type.isActive)));
 
+  /**
+   * The city list could not be loaded (pre-launch item 155). A search still sends the city it was given, so its
+   * results stay right; what must not happen is a filtered search being headed "Any city", or a select offering
+   * "Any city" as though it were the only choice. While this holds, every city filter says it cannot be shown.
+   */
+  readonly citiesUnavailable = computed(() => this.cities.error() != null);
+
   cityName(id: string | null | undefined): string {
     if (!id) return '';
     return lookupName(this.cities.value()?.find((city) => city.id === id), this.i18n.isArabic());
+  }
+
+  /**
+   * What a city filter reads as: the city's name, "Any city" when there is no filter, and — while the list has
+   * failed — that the chosen city cannot be named, never "Any city" for a search that IS filtered by one.
+   */
+  cityFilterLabel(id: string | null | undefined): string {
+    if (id && this.citiesUnavailable()) return this.i18n.t('search.cityUnavailable');
+    return this.cityName(id) || this.i18n.t('search.anyCity');
   }
 
   carTypeName(id: string | null | undefined): string {

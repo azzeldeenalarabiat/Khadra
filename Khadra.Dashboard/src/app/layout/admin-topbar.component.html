@@ -34,6 +34,7 @@
 
     <div class="user-menu">
       <button
+        #trigger
         type="button"
         class="user-chip"
         [attr.aria-expanded]="open()"
@@ -46,7 +47,7 @@
       </button>
 
       @if (open()) {
-        <div class="user-menu-panel" role="menu">
+        <div class="user-menu-panel" role="menu" khMenuKeys (khMenuLeave)="close()">
           <div class="user-menu-head">
             <div class="sidebar-user-name user-text">{{ name() }}</div>
             <div class="sidebar-user-role ltr">{{ email() }}</div>

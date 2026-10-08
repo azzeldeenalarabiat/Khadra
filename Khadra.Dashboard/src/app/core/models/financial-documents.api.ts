@@ -167,6 +167,24 @@ export interface AdminFinancialDocument {
    * idempotency is verified. Its emails wait in the queue and nothing is sent.
    */
   readonly emailDeliveryDisabled?: boolean;
+  /**
+   * PDFs of it that could not be drawn and have not been since, with why (pre-launch item 197). Absent from a server
+   * that predates it, which recorded none.
+   */
+  readonly pdfHolds?: readonly FinancialDocumentPdfHold[];
+}
+
+/** A PDF that could not be drawn: which language and kind, why, and since when (pre-launch item 197). */
+export interface FinancialDocumentPdfHold {
+  /** `en` or `ar`. */
+  readonly language: string;
+  /** `AsIssued` or `Voided`. */
+  readonly kind: string;
+  /** `SnapshotAltered`, `SnapshotUnreadable` or `DrawingFailed`. */
+  readonly reason: string;
+  readonly attempts: number;
+  readonly firstFailedAt: string;
+  readonly lastFailedAt: string;
 }
 
 /**

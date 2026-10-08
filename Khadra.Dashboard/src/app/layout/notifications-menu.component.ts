@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   HostListener,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
@@ -22,6 +24,7 @@ import {
 } from '../core/services/notifications.presenter';
 import { I18nService } from '../core/i18n/i18n.service';
 import { IconComponent } from '../shared/icon/icon.component';
+import { MenuKeysDirective } from '../shared/menu-keys/menu-keys.directive';
 
 /**
  * The bell beside the account chip, and the panel it opens.
@@ -47,7 +50,7 @@ import { IconComponent } from '../shared/icon/icon.component';
   selector: 'kh-notifications',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './notifications-menu.component.html',
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, MenuKeysDirective],
 })
 export class NotificationsMenuComponent {
   protected readonly t = inject(I18nService).t;
@@ -58,6 +61,7 @@ export class NotificationsMenuComponent {
   private readonly router = inject(Router);
 
   protected readonly open = signal(false);
+  private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
 
   private readonly isAdmin = computed(() => this.session.user()?.role === 'Admin');
   /** The dealer console this reader works in, so a row opens inside it (E2E F79). */
@@ -145,6 +149,9 @@ export class NotificationsMenuComponent {
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
-    if (this.open()) this.open.set(false);
+    if (!this.open()) return;
+    this.open.set(false);
+    // Back to the button that opened it, as a menu button does: focus left inside a closed panel is lost.
+    this.trigger()?.nativeElement.focus();
   }
 }

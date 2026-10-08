@@ -30,7 +30,9 @@ export const KNOWN_KINDS: ReadonlySet<string> = new Set([
 
 /** One notification's sentence, the same on the full page and in the header's panel. */
 export function notificationText(i18n: I18nService, item: NotificationItem): string {
-  const actor = item.actorName || i18n.t('notification.someone');
+  // An office that left the platform is a code, worded here (pre-launch item 103); every other row names its office.
+  const actor =
+    item.actorStandIn === 'RentalOffice' ? i18n.t('notification.someone') : item.actorName || i18n.t('notification.someone');
   return KNOWN_KINDS.has(item.kind)
     ? i18n.t(`notification.${item.kind}` as TranslationKey, { actor })
     : i18n.t('notification.unknown', { actor });

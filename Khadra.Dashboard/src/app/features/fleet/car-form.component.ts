@@ -12,7 +12,8 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { FleetService } from '../../core/services/fleet.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
-import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fleet.api';
+import { Vehicle, toVehicleRequest } from '../../core/models/fleet.api';
+import { CarFormValue, NEW_CAR, completeCarRequest, numberOrNull } from './car-form.model';
 import { LookupEntry, LookupsService } from '../../core/services/lookups.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
@@ -109,26 +110,9 @@ export class CarFormComponent {
   /** The platform's model-year bounds. This input had none at all, so it took anything. */
   protected readonly yearRange = loaded(this.lookups.modelYears);
 
-  // The form's own state. Seeded from the server when editing, defaulted when adding.
-  protected readonly form = signal<VehicleRequest>({
-    carTypeId: '',
-    make: '',
-    model: '',
-    year: new Date().getFullYear(),
-    color: null,
-    seats: 5,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    description: { ar: null, en: null },
-    plateNumber: '',
-    dailyRate: 30,
-    securityDeposit: 150,
-    isDeliveryEligible: false,
-    mileageUnlimited: true,
-    mileageDailyLimitKm: null,
-    mileageExcessFeePerKm: null,
-    fuelPolicy: 'FullToFull',
-  });
+  // The form's own state. Seeded from the server when editing; when adding, every fact about the car starts
+  // unanswered (pre-launch item 105) — see `NEW_CAR`.
+  protected readonly form = signal<CarFormValue>(NEW_CAR);
 
   constructor() {
     effect(() => this.service.editing.set(this.vehicleId()));
@@ -157,7 +141,7 @@ export class CarFormComponent {
     return null;
   });
 
-  protected set<K extends keyof VehicleRequest>(key: K, value: VehicleRequest[K]): void {
+  protected set<K extends keyof CarFormValue>(key: K, value: CarFormValue[K]): void {
     this.form.update((current) => ({ ...current, [key]: value }));
   }
 
@@ -209,6 +193,11 @@ export class CarFormComponent {
     return Number((event.target as HTMLInputElement).value);
   }
 
+  /** A box the dealer must fill: empty is unanswered, never 0. */
+  protected answer(event: Event): number | null {
+    return numberOrNull((event.target as HTMLInputElement).value);
+  }
+
   protected checked(event: Event): boolean {
     return (event.target as HTMLInputElement).checked;
   }
@@ -255,11 +244,15 @@ export class CarFormComponent {
       this.problem.set({ kind: 'noType' });
       return;
     }
+    const body = completeCarRequest(this.form());
+    if (!body) {
+      this.problem.set({ kind: 'unanswered' });
+      return;
+    }
     this.saving.set(true);
     this.problem.set(null);
 
     try {
-      const body = this.form();
       const id = this.vehicleId();
       const saved = id ? await this.service.update(id, body) : await this.service.add(body);
 
@@ -334,6 +327,8 @@ export class CarFormComponent {
 type FormProblem =
   /** The form stopped before asking: no vehicle type is chosen. */
   | { readonly kind: 'noType' }
+  /** The form stopped before asking: a fact about the car is still unanswered (item 105). */
+  | { readonly kind: 'unanswered' }
   /** A refused request, with what it said. */
   | { readonly kind: 'request'; readonly snapshot: ProblemSnapshot };
 
@@ -344,6 +339,7 @@ function describe(
   language: Language,
 ): string {
   if (problem.kind === 'noType') return t('carForm.chooseAVehicleType');
+  if (problem.kind === 'unanswered') return t('carForm.answerEveryFact');
   const p = problem.snapshot;
   if (p.code === 'dealer.not_approved') return t('carForm.yourDealershipIsNot');
   if (p.code === 'vehicle.plate_taken') return t('carForm.aCarWithThat');

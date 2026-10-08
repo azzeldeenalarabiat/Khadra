@@ -35,6 +35,13 @@ describe('problemText', () => {
     expect(problemText(refusal, t, 'ar', null)).toBe(EN['problem.unknown']);
   });
 
+  // Pre-launch item 121: a body the API could not bind carries a code now, worded in either language.
+  it('words a request the API could not read', () => {
+    expect(problemText(problem({ code: 'request.invalid', title: 'One or more validation errors occurred.' }), t, 'ar', null)).toBe(
+      EN['problem.requestInvalid'],
+    );
+  });
+
   it('reads an unreachable server and a throttle as such', () => {
     expect(problemText(problem({ status: 0 }), t, 'en', null)).toBe(EN['state.unavailable.title']);
     expect(problemText(problem({ status: 503 }), t, 'en', null)).toBe(EN['state.unavailable.title']);

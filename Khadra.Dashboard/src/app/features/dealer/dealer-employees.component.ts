@@ -98,6 +98,14 @@ export class DealerEmployeesComponent {
     return this.t('dealerStaff.yourStaffListCould');
   });
 
+  /**
+   * Invitations this screen sent whose email the mail service refused (pre-launch item 47). Held here
+   * because nothing else can know: the list is rebuilt from the database, which does not record one
+   * send's outcome. Cleared by a successful resend; gone on reload, when the row reads as any other
+   * unanswered invitation, with its Resend button.
+   */
+  protected readonly unsent = signal<ReadonlySet<string>>(new Set());
+
   protected tone(e: Employee): Tone {
     return e.status === 'Active' ? 'ok' : e.status === 'Invited' ? 'warn' : 'dim';
   }
@@ -170,7 +178,7 @@ export class DealerEmployeesComponent {
         const email = (values['email'] ?? '').trim();
         const phone = (values['phone'] ?? '').trim();
         if (!fullName || !email || !phone) throw invalid(this.t('dealerStaff.nameEmailAndPhone'));
-        await this.service.invite({
+        const invited = await this.service.invite({
           fullName,
           email,
           phone,
@@ -178,6 +186,16 @@ export class DealerEmployeesComponent {
         });
         this.resource.reload();
         this.service.refreshMe();
+        // What HAPPENED (pre-launch item 47). The account exists either way — it is committed before
+        // the email is attempted — but "Invitation sent" over a relay that refused the message sends
+        // the owner away to wait for an email nobody posted. The row says so too, until it is resent.
+        if (invited.invitationEmailSent) return;
+        this.unsent.update((ids) => new Set(ids).add(invited.employeeId));
+        return {
+          title: this.t('dealerEmployees.invitationNotEmailed'),
+          body: this.t('dealerEmployees.accountCreatedEmailFailed', { email: invited.email }),
+          tone: 'warn',
+        };
       },
       { title: this.t('dealerEmployees.invitationSent'), body: this.t('dealerEmployees.theyWillFindThe') },
     );
@@ -186,7 +204,15 @@ export class DealerEmployeesComponent {
   protected async resend(e: Employee): Promise<void> {
     await this.run(
       e.employeeId,
-      () => this.service.resendInvitation(e.employeeId),
+      async () => {
+        await this.service.resendInvitation(e.employeeId);
+        // The resend reports a refused message as a failure, so reaching here means it went out.
+        this.unsent.update((ids) => {
+          const next = new Set(ids);
+          next.delete(e.employeeId);
+          return next;
+        });
+      },
       this.t('dealerStaff.invitationResent'),
       this.t('dealerEmployees.freshLinkOnItsWay', { email: e.email }),
     );

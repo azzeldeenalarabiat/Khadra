@@ -56,7 +56,7 @@
               <kh-icon name="caret-down" />
             </button>
             @if (accountOpen()) {
-              <div class="menu__panel" id="account-menu" role="menu">
+              <div class="menu__panel" id="account-menu" role="menu" khMenuKeys (khMenuLeave)="accountOpen.set(false)">
                 <a role="menuitem" [routerLink]="i18n.link('profile')">{{ i18n.t('nav.account') }}</a>
                 <a role="menuitem" [routerLink]="i18n.link('bookings')">{{ i18n.t('nav.bookings') }}</a>
                 <a role="menuitem" [routerLink]="i18n.link('invoices')">{{ i18n.t('nav.invoices') }}</a>

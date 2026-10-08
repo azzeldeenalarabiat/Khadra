@@ -25,6 +25,8 @@ import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
 import { spellEnumName } from '../../core/i18n/status-key';
 import { writtenIn } from '../../core/i18n/bilingual-content';
+import { Language } from '../../core/i18n/language';
+import { customerPagePanel } from './customer-page-panel.presenter';
 
 /**
  * What each `DealerDocumentType` is called on this screen. The server sends the type's NAME
@@ -92,6 +94,16 @@ export class DealerReviewComponent {
   }
 
   protected readonly dealer = computed(() => this.review()?.dealer ?? null);
+
+  /** What the office tells customers, for reading (pre-launch item 113). Null until the review has loaded. */
+  protected readonly customerPage = computed(() => {
+    const page = this.review()?.customerPage;
+    return page ? customerPagePanel(page, this.t) : null;
+  });
+
+  protected languageName(language: Language): string {
+    return this.i18n.languageName(language);
+  }
 
   /**
    * The city's own NAME, resolved from the curated lookup the applicant chose from.

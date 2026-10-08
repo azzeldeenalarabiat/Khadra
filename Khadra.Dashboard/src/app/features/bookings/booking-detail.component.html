@@ -337,7 +337,7 @@
                     <div class="banner s-warn">
                       {{ t('handover.unverifiedAdmin') }}
                       @if (h.unverifiedReason) {
-                        <div class="queue-desc user-text">{{ h.unverifiedReason }}</div>
+                        <div class="queue-desc user-text user-prose">{{ h.unverifiedReason }}</div>
                       }
                     </div>
                   } @else if (h.verification === 'Code') {
@@ -349,7 +349,7 @@
                     </div>
                   }
                   @if (h.notes) {
-                    <div class="queue-desc user-text">{{ h.notes }}</div>
+                    <div class="queue-desc user-text user-prose">{{ h.notes }}</div>
                   }
                 </div>
               }

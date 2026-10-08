@@ -45,6 +45,11 @@ const HEARTBEAT_MS = 5_000;
  * SLIDING expiration, and every authenticated request slides it. A thirty-second poll would keep an
  * unattended console alive to the eight-hour cap instead of letting it die at the thirty-minute idle
  * timeout, which is a security property changed by accident. Ten is comfortably under thirty.
+ *
+ * Since pre-launch item 129 the BFF no longer depends on this: every call carries `idleSeconds()`
+ * (`idleReportInterceptor`), and the BFF measures its idle timeout from the person's last input, not
+ * from the last request. Stopping the polls is still right — an idle screen has nobody to show
+ * anything to.
  */
 const IDLE_MS = 10 * 60_000;
 
@@ -147,6 +152,14 @@ export class LiveRefreshService {
   /** Every live surface, as on a reconnect: the channel was down, so anything may have changed. */
   touchAll(): void {
     for (const surface of this.surfaces.values()) this.refresh(surface, 'quiet', true);
+  }
+
+  /**
+   * Whole seconds since the last keystroke, click or scroll in this page (or since it loaded). Sent
+   * to the BFF on every call so it can tell a person from a poll (pre-launch item 129).
+   */
+  idleSeconds(): number {
+    return Math.max(0, Math.floor((now() - this.lastInput) / 1000));
   }
 
   private isIdle(): boolean {

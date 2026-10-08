@@ -30,9 +30,18 @@ export interface AuditSubjectFacts {
   readonly entityId: string | null;
   readonly bookingReference: string | null;
   readonly subjectLabel: string;
+  /**
+   * The subject's Arabic name, snapshotted beside the English label where the subject has one of its own — a city, a
+   * car type (pre-launch item 176). Absent on entries written before 2026-10-08, which keep their English name.
+   */
+  readonly subjectLabelAr?: string | null;
 }
 
-export function auditSubject(entry: AuditSubjectFacts): AuditSubject {
+/**
+ * @param arabic Whether the reader reads Arabic: a subject that recorded an Arabic name of its own is named by it then,
+ * and by the English one otherwise. A recorded name is never translated; it is chosen.
+ */
+export function auditSubject(entry: AuditSubjectFacts, arabic = false): AuditSubject {
   const reference = entry.bookingReference;
   if (entry.entityType === 'Dispute' && reference) return { kind: 'dispute', reference };
   if (entry.entityType === 'Booking' && reference) return { kind: 'booking', reference };
@@ -40,6 +49,7 @@ export function auditSubject(entry: AuditSubjectFacts): AuditSubject {
   if (entry.entityType === 'Customer' && entry.entityId) {
     return { kind: 'customer', reference: customerReference(entry.entityId) };
   }
+  if (arabic && entry.subjectLabelAr) return { kind: 'label', label: entry.subjectLabelAr };
   // Also where a fact is missing, which the server rules out: the label as it was stored beats a
   // reading of it.
   return { kind: 'label', label: entry.subjectLabel };

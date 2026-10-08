@@ -16,6 +16,7 @@ import { I18nService } from './core/i18n/i18n.service';
 import { TranslatedTitleStrategy } from './core/i18n/translated-title.strategy';
 import { PlatformConfigService } from './core/services/platform-config.service';
 import { consentGateInterceptor } from './core/services/consent-gate.interceptor';
+import { idleReportInterceptor } from './core/services/idle-report.interceptor';
 import { sessionExpiredInterceptor } from './core/services/session-expired.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -42,7 +43,9 @@ export const appConfig: ApplicationConfig = {
       withFetch(),
       withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }),
       // A refusal for a pending consent raises the prompt (Wave 4, W4-8); see ConsentGateService.
-      withInterceptors([sessionExpiredInterceptor, consentGateInterceptor]),
+      // Every call says how long its person has been idle, so the BFF's idle timeout cannot be held
+      // open by background polling (pre-launch item 129); see idleReportInterceptor.
+      withInterceptors([idleReportInterceptor, sessionExpiredInterceptor, consentGateInterceptor]),
     ),
   ],
 };

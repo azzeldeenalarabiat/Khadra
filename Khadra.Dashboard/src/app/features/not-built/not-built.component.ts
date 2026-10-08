@@ -64,12 +64,6 @@ const FALLBACK: Missing = {
  * is not built" tells the next person what to do, where "coming soon" tells them nothing.
  */
 const SCREENS: Readonly<Record<string, Missing>> = {
-  reviews: {
-    titleKey: 'nav.reviews',
-    icon: 'star',
-    purposeKey: 'notBuilt.reviews.purpose',
-    blockedKey: 'notBuilt.reviews.blocked',
-  },
   notifications: {
     titleKey: 'nav.notifications',
     icon: 'bell',

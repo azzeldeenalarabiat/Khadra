@@ -392,11 +392,22 @@ export interface PdfSectionView {
   readonly renditions: readonly PdfRenditionView[];
   /** The server's word that a PDF the customer will be offered is still being drawn. */
   readonly preparing: boolean;
+  /** PDFs that could not be drawn, each with why and since when (pre-launch item 197). */
+  readonly holds: readonly PdfHoldView[];
   /**
    * Voided (owner, 2026-09-29): its customer is given the voided copies, stamped VOID and naming the correction;
    * the original as issued, unstamped, stays the administrators'.
    */
   readonly voided: boolean;
+}
+
+/** One PDF that could not be drawn: which, why, since when. */
+export interface PdfHoldView {
+  readonly key: string;
+  /** "Arabic · as issued — the stored record no longer matches what was issued". */
+  readonly title: string;
+  /** "Since 3 Oct 09:00 · 2 attempts". */
+  readonly detail: string;
 }
 
 interface PdfLanguageWords {
@@ -481,6 +492,17 @@ export function pdfSection(page: AdminFinancialDocument, words: DocumentWords, f
     })),
     preparing: page.document.pdf?.preparing === true,
     voided,
+    holds: (page.pdfHolds ?? [])
+      .filter((hold) => Object.hasOwn(PDF_LANGUAGES, hold.language) && PDF_KINDS.includes(hold.kind))
+      .map((hold) => ({
+        key: `${hold.kind}:${hold.language}`,
+        title: t('financialDocuments.pdfHoldTitle', {
+          language: t(PDF_LANGUAGES[hold.language].name),
+          kind: words.enumLabel('renditionKind', hold.kind),
+          reason: words.enumLabel('renditionHoldReason', hold.reason),
+        }),
+        detail: t('financialDocuments.pdfHoldDetail', { since: format.when(hold.firstFailedAt), count: hold.attempts }),
+      })),
   };
 }
 

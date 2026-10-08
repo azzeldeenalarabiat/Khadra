@@ -32,6 +32,8 @@ export interface AuditLogEntry {
   readonly correlationId: string | null;
   /** The booking the entry is about: a Booking entry's own, a Dispute entry's disputed one, else null. */
   readonly bookingReference: string | null;
+  /** A city's or car type's Arabic name, recorded with the English label (item 176). Absent on older entries. */
+  readonly subjectLabelAr?: string | null;
 }
 
 /**

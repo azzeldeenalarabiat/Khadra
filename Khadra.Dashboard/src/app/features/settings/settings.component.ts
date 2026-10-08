@@ -60,7 +60,14 @@ export class SettingsComponent {
 
   private readonly view = loaded(this.resource);
 
-  protected readonly source = computed(() => this.view()?.source ?? '');
+  /**
+   * Where the figures come from: a code the server sends, worded here (pre-launch item 108). A source this build has no
+   * words for is shown as sent, in its own left-to-right run.
+   */
+  protected readonly sourceWorded = computed(() => this.view()?.source === 'Configuration');
+  protected readonly source = computed(() =>
+    this.sourceWorded() ? this.t('platformSettings.sourceConfiguration') : (this.view()?.source ?? ''),
+  );
 
   protected readonly failure = computed(() => {
     const error = this.resource.error();

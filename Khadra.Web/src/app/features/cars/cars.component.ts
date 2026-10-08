@@ -114,7 +114,7 @@ export class CarsComponent {
     });
   });
 
-  protected readonly cityLabel = computed(() => this.lookups.cityName(this.search().city) || this.i18n.t('search.anyCity'));
+  protected readonly cityLabel = computed(() => this.lookups.cityFilterLabel(this.search().city));
 
   /** Dates travel to a car's page, so the price there is for the period the customer already chose. */
   protected readonly carry = computed(() => {

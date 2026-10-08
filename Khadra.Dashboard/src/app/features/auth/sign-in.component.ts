@@ -145,9 +145,10 @@ function describe(failure: SignInFailure): Notice {
 }
 
 /**
- * The server does not currently send Retry-After on a 429, so the honest fallback is vague rather
- * than a number invented in the browser: someone who hit the limit fourteen minutes ago would be
- * told to wait another fifteen. If the header appears, this says exactly how long.
+ * The wait comes from the server's Retry-After — the address limit's seconds, or what is left of a
+ * per-account refusal after too many failed sign-ins (pre-launch item 51), up to fifteen minutes.
+ * Without the header the honest fallback is vague rather than a number invented in the browser:
+ * someone who hit the limit fourteen minutes ago would be told to wait another fifteen.
  */
 function retryMessage(
   retryAfterSeconds: number | null,

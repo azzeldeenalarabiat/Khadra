@@ -1,3 +1,4 @@
+import { CustomerPageView } from './dealer-console.api';
 import { LocalizedText } from './localized.api';
 
 /**
@@ -29,6 +30,8 @@ export interface DealerListItem {
   readonly canTrade: boolean;
   readonly submittedAt: string;
   readonly reviewDueAt: string;
+  /** The server's word, on its own clock, that the review promise is already broken (item 106). */
+  readonly isBreachingSla?: boolean;
   readonly createdAt: string;
   readonly documentCount: number;
   /** What documentCount is out of. From the server, so the column cannot quote a stale total. */
@@ -153,4 +156,9 @@ export interface DealerReview {
   readonly documents: readonly DealerDocumentLink[];
   readonly timeline: readonly DealerReviewTimelineEntry[];
   readonly isBreachingSla: boolean;
+  /**
+   * What the office tells customers in its own words (pre-launch item 113): the same projection its own editor
+   * reads. Read-only here.
+   */
+  readonly customerPage: CustomerPageView;
 }

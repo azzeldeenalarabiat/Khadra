@@ -218,9 +218,10 @@
                 </td>
                 <td class="td">
                   @if (hasChange(row)) {
-                    <span class="mono">{{ row.previousValue ?? '—' }}</span>
+                    @let change = changes().get(row.id);
+                    <span [class.mono]="isRecorded(change?.previous)" [class.ltr]="isRecorded(change?.previous)">{{ changeText(change?.previous) }}</span>
                     <kh-icon name="arrow-line-up-right" class="kpi-icon" />
-                    <span class="mono">{{ row.newValue ?? '—' }}</span>
+                    <span [class.mono]="isRecorded(change?.next)" [class.ltr]="isRecorded(change?.next)">{{ changeText(change?.next) }}</span>
                   } @else {
                     <span class="td-sub">—</span>
                   }
@@ -247,13 +248,18 @@
                         </div>
                       </div>
                       @if (hasChange(row)) {
+                        @let detail = changes().get(row.id);
                         <div class="kv">
                           <div class="kv-key">{{ t('auditLog.previousValue') }}</div>
-                          <div class="kv-val">{{ row.previousValue ?? '—' }}</div>
+                          <div class="kv-val">
+                            <span [class.mono]="isRecorded(detail?.previous)" [class.ltr]="isRecorded(detail?.previous)">{{ changeText(detail?.previous) }}</span>
+                          </div>
                         </div>
                         <div class="kv">
                           <div class="kv-key">{{ t('auditLog.newValue') }}</div>
-                          <div class="kv-val">{{ row.newValue ?? '—' }}</div>
+                          <div class="kv-val">
+                            <span [class.mono]="isRecorded(detail?.next)" [class.ltr]="isRecorded(detail?.next)">{{ changeText(detail?.next) }}</span>
+                          </div>
                         </div>
                       }
                       <div class="kv">

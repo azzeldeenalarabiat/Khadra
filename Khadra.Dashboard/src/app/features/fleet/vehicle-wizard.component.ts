@@ -172,17 +172,9 @@ export class VehicleWizardComponent {
     });
   }
 
-  protected readonly makes = [
-    'Toyota',
-    'Hyundai',
-    'Kia',
-    'Nissan',
-    'Mitsubishi',
-    'Chevrolet',
-    'Honda',
-    'Mercedes-Benz',
-    'BMW',
-  ];
+  // No list of makes (pre-launch items 36 and 104): nine typed into this screen read as a vocabulary the platform
+  // curates, which it does not, and went quietly wrong for every other make. The dealer states the make, as the record
+  // always took it.
   /** The API's names, in the order offered. Shown through `transmissionLabel` / `fuelTypeLabel`. */
   protected readonly transmissions = Object.keys(TRANSMISSION_LABELS);
   protected readonly fuelTypes = Object.keys(FUEL_TYPE_LABELS);

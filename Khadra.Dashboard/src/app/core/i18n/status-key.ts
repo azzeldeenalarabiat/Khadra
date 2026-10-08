@@ -58,6 +58,7 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
  * - `party`: `BookingParty` — who acted, who a penalty is attributed to (Customer, Dealer, System,
  *   Unattributed, Admin).
  * - `handoverType`: `HandoverType` — Pickup, Return.
+ * - `handoverVerification`: `HandoverVerification` — how a handover was confirmed: Code, Unverified, NotRequired.
  * - `penaltyReason`: `PenaltyReason` — the stable code for a system-written penalty sentence.
  * - The Payments context (payments Phase 4b): a payment's status and purpose, a refund's status, the
  *   refund progress of a payment, Khadra's commission state, what became of a provider event, the
@@ -80,6 +81,7 @@ export type EnumFamily =
   | 'payableBlock'
   | 'party'
   | 'handoverType'
+  | 'handoverVerification'
   | 'penaltyReason'
   | 'paymentStatus'
   | 'paymentPurpose'
@@ -93,7 +95,11 @@ export type EnumFamily =
   | 'financialDocumentCause'
   | 'financialDocumentHoldReason'
   | 'financialDocumentEmailWait'
-  | 'financialDocumentEmailOutcome';
+  | 'financialDocumentEmailOutcome'
+  | 'reviewDirection'
+  | 'reviewHideReason'
+  | 'renditionKind'
+  | 'renditionHoldReason';
 
 /** The dictionary key for a server enum name within its family, or null when this build has none. */
 export function enumKey(family: EnumFamily, name: string): TranslationKey | null {

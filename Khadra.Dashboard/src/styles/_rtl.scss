@@ -54,9 +54,12 @@
 }
 
 /* Text somebody typed — a dealership name, a note, a rejection reason — may be in either language
-   whatever the console is set to, so let the browser decide per value rather than inheriting. */
+   whatever the console is set to, so let the browser decide per value rather than inheriting.
+   `plaintext`, not `isolate` (pre-launch item 184): `isolate` fenced the run off but still gave it the PAGE's
+   direction, so on an Arabic page a Latin reason beginning "§13 …" read "… 13§". `plaintext` takes each value's
+   direction from its own first strong character, which is what this comment always promised. */
 .user-text {
-  unicode-bidi: isolate;
+  unicode-bidi: plaintext;
 }
 
 /* ── Icons ────────────────────────────────────────────────────────────────────────────────────

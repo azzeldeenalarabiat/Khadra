@@ -153,10 +153,6 @@ export const EN = {
   'notBuilt.fallback.purpose': 'This screen is part of the design but has no data behind it yet.',
   'notBuilt.fallback.blocked': 'The context that would supply it has not been built.',
 
-  'notBuilt.reviews.purpose':
-    'Ratings customers leave for dealers and dealers leave for customers, and the moderation queue for them.',
-  'notBuilt.reviews.blocked':
-    'The Review aggregate exists in the domain but has no table, no repository and no data. Until it does, a dealer with no reviews reads "No reviews yet" rather than showing a rating nobody gave.',
   'notBuilt.notifications.purpose':
     'A feed of what needs an administrator: overdue reviews, breached SLAs, failed jobs.',
   'notBuilt.notifications.blocked':
@@ -496,6 +492,18 @@ export const EN = {
   'dealerReview.requestClarification': 'Request clarification',
   'dealerReview.suspendDealer': 'Suspend dealer',
   'dealerReview.whereItIs': 'Where it is',
+  'dealerReview.customerPage.title': 'What this office tells customers',
+  'dealerReview.customerPage.note': 'In its own words · read-only',
+  'dealerReview.customerPage.intro':
+    'Every section the office has written for its page, exactly as written and in each language it was written in — hidden sections included. Only the office can change it.',
+  'dealerReview.customerPage.shown': 'Shown to customers',
+  'dealerReview.customerPage.hidden': 'Hidden from customers',
+  'dealerReview.customerPage.deliveryOff': 'Not shown: delivery is off',
+  'dealerReview.customerPage.empty': 'Nothing written',
+  'dealerReview.customerPage.unknown': {
+    one: '{count} more section this console cannot show yet.',
+    other: '{count} more sections this console cannot show yet.',
+  },
   'dealerReview.noAddressRecorded':
     'No address recorded. The pin below is the location the applicant gave.',
   'dealerReview.verificationDocuments': 'Verification documents',
@@ -671,6 +679,7 @@ export const EN = {
   'platformSettings.theNumbersTheWhole':
     'The numbers the whole platform runs on. Every booking freezes the ones in force when it was made, so changing one here can never re-judge a booking that already exists.',
   'platformSettings.theseValuesAreRead': 'These values are read-only here. They come from',
+  'platformSettings.sourceConfiguration': 'the server configuration',
   'platformSettings.whoMayRent': 'Who may rent',
   'platformSettings.windowsAndDeadlines': 'Windows and deadlines',
 
@@ -1099,7 +1108,9 @@ export const EN = {
   'vehicleDetail.couldntLoadThisCar': "Couldn't load this car",
   'vehicleDetail.customer': 'Customer',
   'vehicleDetail.derivedFromBookingsApproved':
-    'Derived from bookings: approved bookings hold their dates and a car out on hire is marked as such. To block dates, take the car off the road; there is no separate blocked-dates list.',
+    "Derived from bookings, in the platform's calendar, from the same holds customers' searches see: a booking holds its days, the car is held while it is prepared before a rental, and a car out on hire is marked as such. To block dates, take the car off the road; there is no separate blocked-dates list.",
+  'vehicleDetail.turnaround': 'Preparing',
+  'vehicleDetail.calendarUnavailable': "This month's calendar could not be loaded.",
   'vehicleDetail.editsToTheListing':
     "Edits to the listing itself (price, photos, delivery) are not logged yet. Booking changes shown here are the most recent from your dealership's activity.",
   'vehicleDetail.heldForBooking': 'Held for booking',
@@ -1415,8 +1426,8 @@ export const EN = {
   'activity.disputeAssigned': '{actor} took the dispute on booking {subject}',
   'activity.disputeResolved': '{actor} resolved the dispute on booking {subject}',
   'activity.settingChanged': '{actor} changed setting {subject}',
-  'activity.reviewHidden': '{actor} hid review {subject}',
-  'activity.reviewRestored': '{actor} restored review {subject}',
+  'activity.reviewHidden': '{actor} hid the review on booking {subject}',
+  'activity.reviewRestored': '{actor} restored the review on booking {subject}',
   'activity.adminInvited': '{actor} invited admin {subject}',
   'activity.adminInvitationResent': '{actor} resent the invitation to {subject}',
   'activity.handoverVerified': '{actor} verified the handover of {subject}',
@@ -1608,6 +1619,10 @@ export const EN = {
   'dealerEmployees.requiredHowYouReach': 'Required. How you reach them about a handover.',
   'dealerEmployees.whetherTheyCanSee':
     'Whether they can see revenue and the reports page. Bookings are always theirs to handle.',
+  'dealerEmployees.invitationNotEmailed': 'The account was created — the email was not sent',
+  'dealerEmployees.accountCreatedEmailFailed':
+    'The account for {email} was created and its invitation is valid, but the mail service would not accept the message. Nothing reached them. Use Resend invite on their row once mail is working; inviting the address again will be refused.',
+  'dealerEmployees.emailNotSentResend': 'Invitation email not sent — resend it',
   'dealerEmployees.invitationSent': 'Invitation sent',
   'dealerEmployees.theyWillFindThe': 'They will find the link in their inbox.',
   'dealerEmployees.theyAreSignedOut':
@@ -2011,6 +2026,8 @@ export const EN = {
   'carForm.addAtLeastOne': 'Add at least one photo before you can publish this car.',
   'carForm.thisCarIsA': 'This car is a draft. Publish it from your fleet when you are ready.',
   'carForm.chooseAVehicleType': 'Choose a vehicle type before saving this car.',
+  'carForm.answerEveryFact':
+    'Give this car its year, seats, transmission, fuel, daily price and deposit before saving it.',
   'carForm.carUpdated': 'Car updated',
   'carForm.carAdded': 'Car added',
 
@@ -2192,6 +2209,7 @@ export const EN = {
   'notifications.reportAccessRevoked': '{who} removed your access to financial reports',
   // Wave 3 (C5, F55): what a customer did, and what the platform did, worded here; the row stores no sentence.
   'notifications.aCustomer': 'A customer',
+  'notifications.aColleague': 'A colleague',
   'notifications.customerCancelled': 'A customer cancelled {what}',
   'notifications.customerReportedNonDelivery':
     'A customer reported that the car for {what} was not handed over',
@@ -2304,6 +2322,7 @@ export const EN = {
   'problem.tooMany': 'Too many attempts. Wait a moment and try again.',
   'problem.unavailable': 'The service could not complete that. Nothing has been changed.',
   'problem.rejectedDetails': 'The details were rejected. Check them and send again.',
+  'problem.requestInvalid': 'Part of what was sent could not be read. Check the form and try again.',
   'problem.reference': 'reference {traceId}',
   // Handover refusals. An office once pressed a refusal it could not see three times, and used three of the
   // customer's five tries (E2E F53); each of these says what to do next.
@@ -2488,6 +2507,10 @@ export const EN = {
   'status.maintenanceVehicle': 'Off the road',
   'handoverType.pickup': 'Pickup',
   'handoverType.return': 'Return',
+  // How a handover was confirmed (`HandoverVerification`), inside an audit entry's change (pre-launch item 174).
+  'handoverVerification.code': "With the customer's code",
+  'handoverVerification.unverified': "Without the customer's code",
+  'handoverVerification.notRequired': 'No code required',
 
   // Wave Two 2026-09-17: common words shared by every console, created once before the screen sweep
   'common.yes': 'Yes',
@@ -2933,6 +2956,18 @@ export const EN = {
   'auditLog.automatedActorOption': '{name} — automated ({count})',
   // Pre-launch item 175: the actor of an entry nobody acted on, worded here and never read from its stored English.
   'auditLog.systemActor': 'System',
+  // The Change column, composed from the parts an entry stores (pre-launch items 50 and 174). Amounts arrive formatted.
+  'auditLog.change.disputeResolved':
+    'Of {held} held: {refund} back to the customer, {platform} to Khadra, {dealer} to the office',
+  'auditLog.change.disputeResolvedWithCharge':
+    'Of {held} held: {refund} back to the customer, {platform} to Khadra, {dealer} to the office; the office charged {charge}',
+  'auditLog.change.handover': '{status} ({handover}, {method})',
+  'auditLog.change.codeLocked': {
+    one: '{handover} code locked after {count} wrong try',
+    other: '{handover} code locked after {count} wrong tries',
+  },
+  'auditLog.change.lookup': '{name} · {state}',
+  'auditLog.change.customerDocument': '{type}: {status}',
   'auditLog.noReasonRecordedWithAction': 'No reason was recorded with this action.',
   'security.activeSessionsCount': {
     one: '{count} active session',
@@ -3430,6 +3465,16 @@ export const EN = {
   'financialDocuments.pdfBytes': '{n} bytes',
   'financialDocuments.pdfHash': 'File hash (SHA-256)',
   'financialDocuments.pdfDrawnFrom': 'Drawn from content hash',
+  'financialDocuments.pdfHoldTitle': '{language} · {kind} — could not be drawn: {reason}',
+  'financialDocuments.pdfHoldDetail': {
+    one: 'Since {since} · {count} attempt. Tried again when the API next starts; the customer is told only that it is being prepared.',
+    other: 'Since {since} · {count} attempts. Tried again when the API next starts; the customer is told only that it is being prepared.',
+  },
+  'renditionKind.asIssued': 'as issued',
+  'renditionKind.voided': 'voided copy',
+  'renditionHoldReason.snapshotAltered': 'the stored record no longer matches what was issued',
+  'renditionHoldReason.snapshotUnreadable': 'the print layout cannot read this record',
+  'renditionHoldReason.drawingFailed': 'the PDF library failed while drawing it',
   'financialDocuments.pdfPreparing': 'A PDF of this document is still being drawn.',
   'financialDocuments.pdfNone': 'No PDF has been drawn of this document yet.',
   'financialDocuments.pdfVoidedNote':
@@ -3572,6 +3617,10 @@ export const EN = {
   'queue.documentsOnHold': {
     one: '{count} financial document on hold — owed and not issued',
     other: '{count} financial documents on hold — owed and not issued',
+  },
+  'queue.documentPdfsNotDrawn': {
+    one: '{count} document whose PDF could not be drawn',
+    other: '{count} documents whose PDFs could not be drawn',
   },
   'queue.documentEmailsNotSent': {
     one: '{count} receipt not emailed — its email failed or has waited too long',
@@ -3982,6 +4031,66 @@ export const EN = {
 
   // Wave 5 (F90): a renter's document on file. Nothing reviews it, so it is not "pending review".
   'status.pendingReviewCustomerDocument': 'Uploaded',
+
+  // Review moderation (pre-launch item 81)
+  'reviews.subtitle': 'Ratings are never edited. A review can only be hidden under a policy reason, and restored.',
+  'reviews.searchHint': 'Search the comment, or paste a booking reference',
+  'reviews.filter.shown': 'Shown',
+  'reviews.filter.hidden': 'Hidden',
+  'reviews.filter.target': 'Review of',
+  'reviews.filter.rating': 'Rating',
+  'reviews.filter.anyRating': 'Any',
+  'reviews.column.reviewer': 'Reviewer',
+  'reviews.column.target': 'About',
+  'reviews.column.rating': 'Rating',
+  'reviews.column.comment': 'Comment',
+  'reviews.column.booking': 'Booking',
+  'reviews.column.date': 'Written',
+  'reviews.role.customer': 'Customer',
+  'reviews.role.office': 'Rental office',
+  'reviews.nameUnavailable': 'No longer on the platform',
+  'reviews.ratingOnly': 'A rating, with no comment',
+  'reviews.ratingOutOfFive': '{rating} out of 5',
+  'reviews.status.published': 'Published',
+  'reviews.status.hidden': 'Hidden',
+  'reviews.status.awaitingReveal': 'Not yet published',
+  'reviews.visibleFrom': 'Visible from {date}',
+  'reviews.hide': 'Hide',
+  'reviews.restore': 'Restore',
+  'reviews.hideTitle': 'Hide this review?',
+  'reviews.hideBodyOffice':
+    'Its words are removed from the office\'s public page. The rating still counts toward the office\'s average: a rating is never edited.',
+  'reviews.hideBodyCustomer':
+    'The office\'s rating of this customer stops counting toward their reputation, which other offices see before approving them.',
+  'reviews.policyReason': 'Policy reason',
+  'reviews.hideConfirm': 'Hide review',
+  'reviews.hidden': 'Review hidden',
+  'reviews.hiddenBodyOffice': 'Its words are gone from the public page; its rating still counts.',
+  'reviews.hiddenBodyCustomer': 'It no longer counts toward the customer\'s reputation.',
+  'reviews.restoreTitle': 'Restore this review?',
+  'reviews.restoreBodyOffice': 'Its words return to the office\'s public page.',
+  'reviews.restoreBodyCustomer': 'The rating counts toward the customer\'s reputation again.',
+  'reviews.restoreConfirm': 'Restore review',
+  'reviews.restored': 'Review restored',
+  'reviews.restoredBodyOffice': 'It is on the office\'s public page again.',
+  'reviews.restoredBodyCustomer': 'It counts toward the customer\'s reputation again.',
+  'reviews.showingRange': {
+    one: 'Showing {count} of {count} review',
+    other: 'Showing {from}–{to} of {count} reviews',
+  },
+  'reviews.forAdministrators': 'Reviews are for administrators.',
+  'reviews.couldNotLoad': 'The reviews could not be loaded. Try again in a moment.',
+  'reviews.couldNotLoadTitle': 'Couldn\'t load the reviews',
+  'reviews.emptyTitle': 'No review matches this',
+  'reviews.emptyText': 'Clear the search or the filters to see every review.',
+  'reviews.alreadyHidden': 'Someone has already hidden this review.',
+  'reviews.notHidden': 'This review is not hidden any more.',
+  'reviewDirection.customerRatesDealer': 'Rental office',
+  'reviewDirection.dealerRatesCustomer': 'Customer',
+  'reviewHideReason.personalContactDetails': 'Contains personal contact details',
+  'reviewHideReason.abusiveLanguage': 'Abusive language',
+  'reviewHideReason.notAboutThisRental': 'Not about this rental',
+  'reviewHideReason.spamOrPromotion': 'Spam or promotion',
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

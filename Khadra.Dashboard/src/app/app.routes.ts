@@ -253,7 +253,13 @@ export const routes: Routes = [
               ),
           },
 
-          notBuilt('reviews', 'nav.reviews'),
+          // Review moderation (pre-launch item 81): was `notBuilt` until the Admin could reach Review.Hide.
+          {
+            path: 'reviews',
+            title: title('nav.reviews'),
+            loadComponent: () =>
+              import('./features/reviews/reviews.component').then((m) => m.ReviewsComponent),
+          },
           // One component serves both: the same aggregate with the same four actions, and the
           // route says which list it is curating.
           {

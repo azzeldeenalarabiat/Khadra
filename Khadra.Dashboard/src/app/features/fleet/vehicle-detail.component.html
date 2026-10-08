@@ -204,6 +204,15 @@
             </div>
           </div>
           <div class="sect-pad">
+            @if (calendarFailed()) {
+              <div class="banner s-bad">
+                <kh-icon name="warning-circle" />
+                {{ t('vehicleDetail.calendarUnavailable') }}
+                <button type="button" class="btn btn-secondary btn-xs" (click)="reload()">
+                  {{ t('common.retry') }}
+                </button>
+              </div>
+            }
             <div class="calendar">
               @for (d of calendar(); track d.n) {
                 <button

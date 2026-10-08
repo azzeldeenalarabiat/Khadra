@@ -93,7 +93,7 @@
                     <div class="page-sub">{{ documentDetail(document) }}</div>
                     @if (document.reviewNote) {
                       <!-- The reason the customer was given, as the administrator wrote it. -->
-                      <div class="queue-desc user-text">{{ document.reviewNote }}</div>
+                      <div class="queue-desc user-text user-prose">{{ document.reviewNote }}</div>
                     }
                   </div>
                   <!-- The file is opened from inside this decision, never browsed (Wave 4, W4-9). -->
@@ -138,7 +138,7 @@
         <section class="sect sect-pad stack stack-9">
           <span class="k">{{ t('customerProfile.accountStatus') }}</span>
           @if (c.suspensionReason) {
-            <div class="decision-record">{{ c.suspensionReason }}</div>
+            <div class="decision-record user-text user-prose">{{ c.suspensionReason }}</div>
           }
           @if (canSuspend()) {
             <button type="button" class="btn btn-danger btn-lg-row" (click)="suspend()">

@@ -348,3 +348,12 @@ kh-icon {
 kh-icon svg {
   display: block;
 }
+
+/* A block of text somebody typed, shown as they typed it (pre-launch item 120): its own line breaks kept, and a long
+   unbroken run (an address, a reference) wrapped rather than pushed out of its panel. Opt-in, on the blocks that show
+   prose — an office's page, a dispute statement, a decision note — never on `.user-text` itself, which also sits in
+   clipped table cells and one-line labels. */
+.user-prose {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

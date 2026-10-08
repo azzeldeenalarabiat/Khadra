@@ -1,5 +1,6 @@
 <div class="bell-wrap">
   <button
+    #trigger
     type="button"
     class="btn btn-secondary btn-33"
     [attr.aria-expanded]="open()"
@@ -14,7 +15,7 @@
   </button>
 
   @if (open()) {
-    <div class="notif-panel" role="menu">
+    <div class="notif-panel" role="menu" khMenuKeys (khMenuLeave)="close()">
       <div class="notif-panel-head">
         <span class="sect-t">{{ t('notif.needsAttention') }}</span>
         @if (count() > 0) {
@@ -60,7 +61,7 @@
         </div>
       }
 
-      <a class="notif-panel-foot" [routerLink]="allRoute()" (click)="close()">
+      <a class="notif-panel-foot" role="menuitem" [routerLink]="allRoute()" (click)="close()">
         {{ t('notif.openDashboard') }}
         <kh-icon name="caret-right" class="icon-mirrored" />
       </a>

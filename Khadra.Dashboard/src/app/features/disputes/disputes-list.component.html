@@ -114,7 +114,7 @@
                     class="row-link mono"
                     [routerLink]="['/disputes', row.ticketId]"
                     (click)="$event.stopPropagation()"
-                    >{{ row.bookingReference }}</a
+                    >{{ row.bookingReference ?? t('payments.noBooking') }}</a
                   >
                   <div class="td-sub">
                     {{ t('disputesList.openedAt', { when: when(row.openedAt) }) }}

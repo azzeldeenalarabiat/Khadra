@@ -215,7 +215,8 @@ export interface EvidenceUpload {
 export interface DisputeListItem {
   readonly ticketId: string;
   readonly bookingId: string;
-  readonly bookingReference: string;
+  /** Null only if the booking cannot be read, which cannot happen (bookings are never deleted). */
+  readonly bookingReference: string | null;
   /** Null when the dealership no longer resolves (no longer on the platform). */
   readonly dealerName: string | null;
   /** Null when the customer's account no longer resolves (closed). */

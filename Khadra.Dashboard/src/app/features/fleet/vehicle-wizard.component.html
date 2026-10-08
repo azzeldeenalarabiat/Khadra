@@ -57,15 +57,9 @@
                 <input
                   id="w-make"
                   class="input"
-                  list="w-makes"
                   [value]="form().make"
                   (input)="patch({ make: text($event) })"
                 />
-                <datalist id="w-makes">
-                  @for (m of makes; track m) {
-                    <option [value]="m"></option>
-                  }
-                </datalist>
                 @if (fieldError('make'); as e) {
                   <div class="field-error">{{ e }}</div>
                 }

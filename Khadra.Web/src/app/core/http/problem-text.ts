@@ -26,6 +26,8 @@ const WORDED: Readonly<Record<string, TranslationKey>> = {
   'auth.account_suspended': 'signIn.suspended',
   'auth.email_not_verified': 'signIn.unverified',
   rate_limited: 'problem.rateLimited',
+  // A body the API could not bind at all (pre-launch item 121).
+  'request.invalid': 'problem.requestInvalid',
   // Payments Phase 6: a PDF not drawn yet. A voided document's is its voided copy, which is handed out like any other.
   'financial_documents.pdf_not_ready': 'invoices.pdf.preparing',
   // Opening and answering a dispute on the website (Wave 3 C4).

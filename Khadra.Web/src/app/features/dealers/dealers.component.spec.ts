@@ -93,3 +93,36 @@ describe('the office directory search box', () => {
     expect(box().value).toBe('');
   });
 });
+
+/** Pre-launch item 155: the directory's city select, when the city list could not be loaded. */
+describe('the office directory city filter', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('says the city list is unavailable instead of offering "Any city" alone', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { queryParams: new BehaviorSubject({ city: 'amman-id' }) } },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(DealersComponent);
+    for (let round = 0; round < 3; round++) {
+      TestBed.tick();
+      for (const request of http.match(() => true)) {
+        if (request.request.url === '/api/v1/cities') request.flush(null, { status: 503, statusText: 'Service Unavailable' });
+        else request.flush(request.request.url === '/api/v1/galleries' ? EMPTY_PAGE : []);
+      }
+      await wait();
+    }
+    TestBed.tick();
+
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('.directory-search__city select')!;
+    expect(select.disabled).toBe(true);
+    // The page's default language is Arabic.
+    expect([...select.options].map((option) => option.textContent?.trim())).toEqual(['قائمة المدن غير متاحة']);
+  });
+});

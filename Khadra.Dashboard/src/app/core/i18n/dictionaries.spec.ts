@@ -22,7 +22,15 @@ const placeholders = (message: Message): Set<string> => {
 };
 
 /** Entries that are meant to read identically in both: the brand, and each language's own name. */
-const UNTRANSLATED_BY_DESIGN = new Set<string>(['lang.en', 'lang.ar', 'app.name']);
+const UNTRANSLATED_BY_DESIGN = new Set<string>([
+  'lang.en',
+  'lang.ar',
+  'app.name',
+  // Two audit-log layouts with no words of their own (pre-launch item 174): a lookup's name and its state, and a
+  // document's slot and its standing. Every word in them arrives as a parameter, already in the reader's language.
+  'auditLog.change.lookup',
+  'auditLog.change.customerDocument',
+]);
 
 describe('translation dictionaries', () => {
   it('carry exactly the same keys', () => {

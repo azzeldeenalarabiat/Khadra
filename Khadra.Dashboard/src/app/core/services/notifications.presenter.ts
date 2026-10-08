@@ -17,11 +17,20 @@ import { Translate, toQueueItems } from './dashboard.presenter';
  */
 export function notificationSentence(item: NotificationItem, t: Translate): string {
   const mine = item.isMine;
-  // A customer is never named to an office: the row carries the server's English stand-in, which the console words in
-  // the reader's own language (Wave 3, F55b), on the rows already stored as on new ones.
-  // The stand-in `DealerTeamNotifier` stores for a customer, compared and never shown as it is.
-  const byCustomer = item.actorName === 'A customer';
-  const who = mine ? t('notifications.you') : byCustomer ? t('notifications.aCustomer') : item.actorName;
+  // A customer is never named to an office, and a colleague whose account could not be read cannot be: the row says
+  // which with a code (pre-launch item 103), worded here in the reader's own language. A row written before the code
+  // existed carries only the server's English stand-in for a customer, which is compared and never shown as it is
+  // (Wave 3, F55b).
+  const byCustomer = item.actorStandIn
+    ? item.actorStandIn === 'Customer'
+    : item.actorName === 'A customer';
+  const who = mine
+    ? t('notifications.you')
+    : byCustomer
+      ? t('notifications.aCustomer')
+      : item.actorStandIn === 'Colleague'
+        ? t('notifications.aColleague')
+        : item.actorName;
   const what = item.subjectReference ?? t('notifications.aBooking');
   const parts = { who, what };
 

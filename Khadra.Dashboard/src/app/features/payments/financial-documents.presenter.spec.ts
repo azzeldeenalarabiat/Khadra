@@ -525,7 +525,7 @@ describe('the PDFs of a document, as the administrator reads them (payments Phas
 
   it('takes "being drawn" from the server, and shows nothing it does not know', () => {
     const none = documentPage(adminPage('booking-statement-receipt-corrected', { renditions: [] }), english, format).pdf;
-    expect(none).toEqual({ downloads: [], renditions: [], preparing: true, voided: false });
+    expect(none).toEqual({ downloads: [], renditions: [], preparing: true, voided: false, holds: [] });
 
     const strange = documentPage(
       adminPage('payment-receipt-paid-in-full', {
@@ -546,7 +546,33 @@ describe('the PDFs of a document, as the administrator reads them (payments Phas
     // A server older than Phase 6 sends neither field: nothing is offered and nothing is being drawn.
     const older = adminPage('payment-receipt-paid-in-full');
     const { pdf: _absent, ...page } = older.document;
-    expect(documentPage({ ...older, document: page }, english, format).pdf).toEqual({ downloads: [], renditions: [], preparing: false, voided: false });
+    expect(documentPage({ ...older, document: page }, english, format).pdf).toEqual({
+      downloads: [],
+      renditions: [],
+      preparing: false,
+      voided: false,
+      holds: [],
+    });
+  });
+
+  // Pre-launch item 197: a PDF that could not be drawn says which, why and since when, in either language — and one
+  // this console has no words for is left out rather than guessed at.
+  it('says which PDF could not be drawn, why, and since when', () => {
+    const held = adminPage('payment-receipt-paid-in-full', {
+      renditions: [],
+      pdfHolds: [
+        { language: 'ar', kind: 'AsIssued', reason: 'SnapshotAltered', attempts: 2, firstFailedAt: '2026-10-03T06:00:00Z', lastFailedAt: '2026-10-04T06:00:00Z' },
+        { language: 'fr', kind: 'AsIssued', reason: 'DrawingFailed', attempts: 1, firstFailedAt: '2026-10-03T06:00:00Z', lastFailedAt: '2026-10-03T06:00:00Z' },
+      ],
+    });
+
+    const [only, ...rest] = documentPage(held, english, format).pdf.holds;
+    expect(rest).toEqual([]);
+    expect(only!.title).toBe('Arabic · as issued — could not be drawn: the stored record no longer matches what was issued');
+    expect(only!.detail).toContain('2 attempts');
+
+    const arabicHold = documentPage(held, arabic, format).pdf.holds[0]!;
+    expect(arabicHold.title).toContain('السجل المخزَّن لم يعد يطابق ما صدر');
   });
 
   it('words a PDF that is not drawn yet, and a voided copy of a document that is not voided', () => {

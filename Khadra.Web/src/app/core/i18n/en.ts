@@ -103,6 +103,8 @@ export const EN = {
   'search.title': 'Find a car',
   'search.city': 'Pickup city',
   'search.anyCity': 'Any city',
+  'search.cityUnavailable': 'Chosen city (city names could not be loaded)',
+  'search.citiesUnavailable': 'City list unavailable',
   'search.pickupDate': 'Pickup date',
   'search.pickupTime': 'Pickup time',
   'search.returnDate': 'Return date',
@@ -314,6 +316,7 @@ export const EN = {
   'signIn.wrongAccount': 'This is the customer website. Rental office and admin accounts sign in on the Khadra business console.',
   'signIn.rateLimited': 'Too many attempts. Wait a little and try again.',
   'signIn.rateLimitedFor': { one: 'Too many attempts. Try again in {count} second.', other: 'Too many attempts. Try again in {count} seconds.' },
+  'signIn.rateLimitedForMinutes': { one: 'Too many attempts. Try again in {count} minute.', other: 'Too many attempts. Try again in {count} minutes.' },
   'signIn.unavailable': 'Signing in is not available right now. Try again in a moment.',
 
   'register.title': 'Create your account',
@@ -383,6 +386,7 @@ export const EN = {
   'problem.underMinimumAgeNoFigure': 'You are under the minimum age to rent a car through Khadra.',
   'problem.invalidToken': 'This link has expired or has already been used.',
   'problem.rateLimited': 'Too many attempts. Wait a little and try again.',
+  'problem.requestInvalid': 'Part of what was sent could not be read. Check the form and try again.',
   'problem.unknown': 'That could not be done. Try again.',
 
   'seo.book.title': 'Request a car — Khadra',

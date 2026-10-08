@@ -14,6 +14,11 @@ export interface NotificationItem {
   readonly subjectId: string | null;
   readonly subjectReference: string | null;
   readonly actorName: string;
+  /**
+   * Set when the actor is a stand-in rather than a name — `RentalOffice` for an office that has left the platform —
+   * and `actorName` then holds the English phrase (pre-launch item 103). Absent on rows written before 2026-10-08.
+   */
+  readonly actorStandIn?: string | null;
   readonly isMine: boolean;
   readonly occurredAt: string;
   readonly readAt: string | null;

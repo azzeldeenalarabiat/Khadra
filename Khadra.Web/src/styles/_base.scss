@@ -145,11 +145,18 @@ button {
 }
 
 // Icons inherit colour and size from their text.
+//
+// And they are never the target of a tap: the control around them is (Wave 6). A tap made before hydration is
+// queued and replayed against its target once the page hydrates — but hydration re-renders an icon's SVG (it is set
+// through innerHTML), so a tap that landed on the old <path> pointed at a node no longer in the page and was dropped.
+// That lost every early tap on an icon-only button, the header's menu button first. With the icon transparent to the
+// pointer, the target is the button itself, which hydration keeps.
 kh-icon {
   display: inline-flex;
   flex: none;
   line-height: 0;
   font-size: 1.15em;
+  pointer-events: none;
   .icon {
     display: inline-flex;
   }

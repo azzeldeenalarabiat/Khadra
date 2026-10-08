@@ -76,6 +76,28 @@ export interface VehicleRequest {
   readonly fuelPolicy: string;
 }
 
+/**
+ * One car's month, day by day, in the PLATFORM's calendar (pre-launch item 54): which booking holds the car, from the
+ * same holds the customer's search sees, and the turnaround before a rental. The days are the server's; the screen
+ * never cuts instants into days itself.
+ */
+export interface VehicleCalendar {
+  readonly year: number;
+  readonly month: number;
+  readonly days: readonly VehicleCalendarDay[];
+}
+
+export interface VehicleCalendarDay {
+  /** `YYYY-MM-DD`, a calendar date. */
+  readonly date: string;
+  /** The holding booking's status, or null on a day nothing holds the car. */
+  readonly status: string | null;
+  readonly bookingId: string | null;
+  readonly reference: string | null;
+  /** Inside the turnaround before a rental that starts later: the car is being prepared. */
+  readonly turnaround: boolean;
+}
+
 /** Step one of the presigned upload: where to PUT the bytes, and the key they will live under. */
 export interface UploadTicket {
   readonly uploadUrl: string;

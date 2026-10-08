@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   HostListener,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
@@ -19,6 +21,7 @@ import { TranslationKey } from '../core/i18n/en';
 import { LanguageSwitchComponent } from '../shared/language-switch/language-switch.component';
 import { IconComponent } from '../shared/icon/icon.component';
 import { NotificationsMenuComponent } from './notifications-menu.component';
+import { MenuKeysDirective } from '../shared/menu-keys/menu-keys.directive';
 
 interface Crumb {
   readonly label: string;
@@ -36,7 +39,7 @@ interface Crumb {
   selector: 'kh-admin-topbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-topbar.component.html',
-  imports: [RouterLink, IconComponent, NotificationsMenuComponent, LanguageSwitchComponent],
+  imports: [RouterLink, IconComponent, NotificationsMenuComponent, LanguageSwitchComponent, MenuKeysDirective],
 })
 export class AdminTopbarComponent {
   private readonly router = inject(Router);
@@ -45,6 +48,7 @@ export class AdminTopbarComponent {
 
   /** Whether the account menu is showing. */
   protected readonly open = signal(false);
+  private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
 
   private readonly path = toSignal(
     this.router.events.pipe(
@@ -101,7 +105,10 @@ export class AdminTopbarComponent {
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void {
-    if (this.open()) this.open.set(false);
+    if (!this.open()) return;
+    this.open.set(false);
+    // Back to the button that opened it, as a menu button does: focus left inside a closed panel is lost.
+    this.trigger()?.nativeElement.focus();
   }
 
   protected async signOut(): Promise<void> {

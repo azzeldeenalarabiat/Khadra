@@ -264,6 +264,19 @@
           @if (p.pdf.preparing) {
             <div class="sect-pad"><div class="state-text">{{ t('financialDocuments.pdfPreparing') }}</div></div>
           }
+          <!-- Pre-launch item 197: a PDF that could not be drawn says which and why here, where it is missing. The
+               customer's page goes on saying only that it is being prepared. -->
+          @for (hold of p.pdf.holds; track hold.key) {
+            <div class="sect-pad">
+              <div class="banner s-bad">
+                <kh-icon name="warning" />
+                <div>
+                  <div>{{ hold.title }}</div>
+                  <div class="td-sub">{{ hold.detail }}</div>
+                </div>
+              </div>
+            </div>
+          }
           @if (p.pdf.downloads.length) {
             <div class="sect-pad fdoc-links">
               @for (download of p.pdf.downloads; track download.key) {

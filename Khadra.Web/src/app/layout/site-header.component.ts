@@ -8,13 +8,14 @@ import { reportLanguage } from '../core/i18n/report-language';
 import { NotificationsService } from '../core/api/notifications.service';
 import { SessionService } from '../core/session/session.service';
 import { DismissDirective } from '../shared/dismiss/dismiss.directive';
+import { MenuKeysDirective } from '../shared/menu-keys/menu-keys.directive';
 import { IconComponent } from '../shared/icon/icon.component';
 import { NotificationsPanelComponent } from './notifications-panel.component';
 
 @Component({
   selector: 'kh-site-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, IconComponent, DismissDirective, NotificationsPanelComponent],
+  imports: [RouterLink, RouterLinkActive, IconComponent, DismissDirective, MenuKeysDirective, NotificationsPanelComponent],
   templateUrl: './site-header.component.html',
 })
 export class SiteHeaderComponent {

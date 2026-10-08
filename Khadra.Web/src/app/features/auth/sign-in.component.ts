@@ -11,6 +11,7 @@ import { safeReturnUrl } from '../../core/session/auth.guards';
 import { forgetReturnAddress } from '../../core/session/return-address';
 import { SessionService, SignInFailure } from '../../core/session/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { rateLimitedMessage } from './sign-in-wait';
 
 /**
  * Sign-in, through the customer BFF. The browser sends the password once, to `/bff/login`; the BFF
@@ -53,9 +54,7 @@ export class SignInComponent {
       case 'wrong-account-type':
         return this.i18n.t('signIn.wrongAccount');
       case 'rate-limited':
-        return failure.retryAfterSeconds !== null
-          ? this.i18n.t('signIn.rateLimitedFor', { count: failure.retryAfterSeconds })
-          : this.i18n.t('signIn.rateLimited');
+        return rateLimitedMessage((key, params) => this.i18n.t(key, params), failure.retryAfterSeconds);
       default:
         return this.i18n.t('signIn.unavailable');
     }

@@ -92,6 +92,13 @@ const SECTIONS: Readonly<Record<string, SectionUi>> = {
 };
 
 /**
+ * Every section this build has a box for, by the API's name. Exported for the spec that keeps the boxes and the body
+ * of a save in step (pre-launch item 125): a box `customerPageRequest` forgot would accept typing and send nothing,
+ * and the save, being a full replacement, would clear what the section held.
+ */
+export const EDITABLE_CUSTOMER_PAGE_SECTIONS: readonly string[] = Object.keys(SECTIONS);
+
+/**
  * The editor's rows, in the SERVER's order and from the server's own list.
  *
  * The list is the point. A console that wrote its own six would offer to hide whatever it happened

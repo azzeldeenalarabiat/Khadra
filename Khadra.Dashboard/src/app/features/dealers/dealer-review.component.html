@@ -57,7 +57,7 @@
                   reads it with the punctuation in the wrong place.
                 -->
                 @if (row.userText; as language) {
-                  <div class="kv-val user-text" dir="auto" [attr.lang]="language">{{ row.v }}</div>
+                  <div class="kv-val user-text user-prose" dir="auto" [attr.lang]="language">{{ row.v }}</div>
                 } @else {
                   <div class="kv-val">{{ row.v }}</div>
                 }
@@ -106,9 +106,9 @@
                  day Documents:LinkLifetimeMinutes changed. Absent when there are no documents,
                  rather than describing links that were never minted.
 
-                 It used to end "· admin only", which is wider than the check behind it: the
-                 signature binds the file and the expiry, not the admin who minted it, so within its
-                 lifetime the link works for any signed-in session. Pre-launch checklist item 14. -->
+                 It used to end "· admin only", which was wider than the check behind it at the
+                 time. Since Wave 6 (pre-launch item 14) each link is bound to the administrator who
+                 loaded this screen and opens in nobody else's session. -->
             @if (linkExpiry(); as expiry) {
               <span class="sect-note">{{ expiry }}</span>
             }
@@ -131,6 +131,50 @@
             </div>
           }
         </section>
+
+        <!--
+          Pre-launch item 113: six free-text sections an office writes for every customer, which no
+          administrator could read. Read-only, and EVERYTHING the office wrote, hidden sections included
+          and marked, each language as written with no fallback — the review is of what the office said,
+          and a missing translation is part of that. The rows are the office editor's own.
+        -->
+        @if (customerPage(); as page) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="storefront" class="kpi-icon" />
+              <span class="sect-t">{{ t('dealerReview.customerPage.title') }}</span>
+              <span class="sect-note">{{ t('dealerReview.customerPage.note') }}</span>
+            </div>
+            <div class="kv-body">
+              <div class="field-hint">{{ t('dealerReview.customerPage.intro') }}</div>
+              @for (row of page.rows; track row.name) {
+                <div class="kv">
+                  <div class="kv-key stack stack-9">
+                    <span>{{ row.label }}</span>
+                    <span class="pill" [class]="'s-' + row.tone">{{ row.stateLabel }}</span>
+                  </div>
+                  <div class="kv-val stack stack-9">
+                    @for (written of row.written; track written.language) {
+                      <div class="stack">
+                        <span class="field-hint">{{ languageName(written.language) }}</span>
+                        <div class="page-sub user-text user-prose" dir="auto" [attr.lang]="written.language">
+                          {{ written.text }}
+                        </div>
+                      </div>
+                    } @empty {
+                      <span class="td-muted">—</span>
+                    }
+                  </div>
+                </div>
+              }
+              @if (page.unknownCount > 0) {
+                <div class="field-hint">
+                  {{ t('dealerReview.customerPage.unknown', { count: page.unknownCount }) }}
+                </div>
+              }
+            </div>
+          </section>
+        }
       </div>
 
       <div class="stack stack-14">
@@ -156,7 +200,7 @@
               <span class="pill" [class]="'s-' + statusTone()">{{ statusLabel() }}</span>
             </div>
             @if (decisionNote(); as note) {
-              <div class="decision-record">{{ note }}</div>
+              <div class="decision-record user-text user-prose">{{ note }}</div>
             } @else {
               <div class="decision-note">{{ t('dealerReview.noReasonWasRecorded') }}</div>
             }

@@ -39,7 +39,7 @@
         <div>
           <div>{{ t('payouts.voidedOn', { when: voided.when }) }}@if (voided.by) { · <span class="user-text">{{ voided.by }}</span> }</div>
           @if (voided.reason) {
-            <div class="user-text">{{ voided.reason }}</div>
+            <div class="user-text user-prose">{{ voided.reason }}</div>
           }
         </div>
       </div>
@@ -77,7 +77,7 @@
         @if (p.settlement.note) {
           <div class="kv-split">
             <div class="kv-key">{{ t('payouts.record.noteLabel') }}</div>
-            <div class="kv-val user-text">{{ p.settlement.note }}</div>
+            <div class="kv-val user-text user-prose">{{ p.settlement.note }}</div>
           </div>
         }
       </div>

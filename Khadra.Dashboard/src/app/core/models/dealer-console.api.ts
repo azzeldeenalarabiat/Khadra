@@ -125,6 +125,15 @@ export interface Employee {
   readonly deactivatedAt: string | null;
 }
 
+/**
+ * The invite's answer: the list's own row, plus whether the invitation email was accepted for delivery
+ * (pre-launch item 47). Not a fact the list carries — the list is rebuilt from the database, and the
+ * outcome of one send is not stored — so only the screen that sent it can say so.
+ */
+export interface InvitedEmployee extends Employee {
+  readonly invitationEmailSent: boolean;
+}
+
 export interface InviteEmployeeRequest {
   readonly fullName: string;
   readonly email: string;

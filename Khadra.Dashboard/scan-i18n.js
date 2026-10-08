@@ -54,14 +54,6 @@ const ALLOW = [
     text: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     reason: 'licence attribution required by the tile provider',
   },
-  // Manufacturer names, which are spelled the same on an Arabic screen as on an English one. The
-  // list itself is a separate defect, recorded in docs/pre-launch-checklist.md: it is nine makes
-  // typed into the wizard rather than a vocabulary the platform serves.
-  {
-    file: 'features/fleet/vehicle-wizard.component.ts',
-    texts: ['Toyota', 'Hyundai', 'Kia', 'Nissan', 'Mitsubishi', 'Chevrolet', 'Honda'],
-    reason: 'manufacturer names, identical in both languages',
-  },
   // The endpoint a dealer is asked to quote to support when the gate cannot answer.
   {
     file: 'features/dealer/dealer-gate.component.html',

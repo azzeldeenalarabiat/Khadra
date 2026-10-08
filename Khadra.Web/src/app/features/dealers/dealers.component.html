@@ -20,12 +20,19 @@
     </label>
     <label class="field directory-search__city">
       <span class="field__label">{{ i18n.t('offices.cityLabel') }}</span>
-      <select class="select" (change)="setCity($any($event.target).value)">
-        <option value="">{{ i18n.t('search.anyCity') }}</option>
-        @for (entry of lookups.activeCities(); track entry.id) {
-          <option [value]="entry.id" [selected]="entry.id === search().city">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
-        }
-      </select>
+      @if (lookups.citiesUnavailable()) {
+        <!-- The list failed: say so rather than offer "Any city" alone (pre-launch item 155). -->
+        <select class="select" disabled>
+          <option>{{ i18n.t('search.citiesUnavailable') }}</option>
+        </select>
+      } @else {
+        <select class="select" (change)="setCity($any($event.target).value)">
+          <option value="">{{ i18n.t('search.anyCity') }}</option>
+          @for (entry of lookups.activeCities(); track entry.id) {
+            <option [value]="entry.id" [selected]="entry.id === search().city">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
+          }
+        </select>
+      }
     </label>
     <label class="toggle-chip directory-search__delivery">
       <input type="checkbox" [checked]="search().delivery" (change)="setDelivery($any($event.target).checked)" />

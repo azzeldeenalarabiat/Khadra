@@ -1,7 +1,13 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { UploadTicket, Vehicle, VehicleRequest, VehicleStatusAction } from '../models/fleet.api';
+import {
+  UploadTicket,
+  Vehicle,
+  VehicleCalendar,
+  VehicleRequest,
+  VehicleStatusAction,
+} from '../models/fleet.api';
 import { DealerConsoleService } from './dealer-console.service';
 
 /**
@@ -25,6 +31,18 @@ export class FleetService {
   readonly vehicle = httpResource<Vehicle>(() => {
     const id = this.editing();
     return id ? `${this.base}/${id}` : undefined;
+  });
+
+  /** The month the open car's calendar shows, as the platform's calendar numbers it. */
+  readonly calendarMonth = signal<{ readonly year: number; readonly month: number } | null>(null);
+
+  /** The open car's month, cut into days by the server (pre-launch item 54). */
+  readonly calendar = httpResource<VehicleCalendar>(() => {
+    const id = this.editing();
+    const month = this.calendarMonth();
+    return id && month
+      ? { url: `${this.base}/${id}/calendar`, params: { year: month.year, month: month.month } }
+      : undefined;
   });
 
   async add(request: VehicleRequest): Promise<Vehicle> {

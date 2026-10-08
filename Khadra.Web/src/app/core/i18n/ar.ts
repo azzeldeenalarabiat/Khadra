@@ -130,6 +130,8 @@ export const AR: Record<TranslationKey, Message> = {
   'search.title': 'ابحث عن سيارة',
   'search.city': 'مدينة الاستلام',
   'search.anyCity': 'كل المدن',
+  'search.cityUnavailable': 'المدينة المختارة (تعذّر تحميل أسماء المدن)',
+  'search.citiesUnavailable': 'قائمة المدن غير متاحة',
   'search.pickupDate': 'تاريخ الاستلام',
   'search.pickupTime': 'وقت الاستلام',
   'search.returnDate': 'تاريخ الإرجاع',
@@ -409,6 +411,14 @@ export const AR: Record<TranslationKey, Message> = {
     many: 'محاولات كثيرة. أعد المحاولة بعد {count} ثانية.',
     other: 'محاولات كثيرة. أعد المحاولة بعد {count} ثانية.',
   },
+  'signIn.rateLimitedForMinutes': {
+    zero: 'محاولات كثيرة. أعد المحاولة بعد {count} دقيقة.',
+    one: 'محاولات كثيرة. أعد المحاولة بعد دقيقة واحدة.',
+    two: 'محاولات كثيرة. أعد المحاولة بعد دقيقتين.',
+    few: 'محاولات كثيرة. أعد المحاولة بعد {count} دقائق.',
+    many: 'محاولات كثيرة. أعد المحاولة بعد {count} دقيقة.',
+    other: 'محاولات كثيرة. أعد المحاولة بعد {count} دقيقة.',
+  },
   'signIn.unavailable': 'تسجيل الدخول غير متاح الآن. أعد المحاولة بعد قليل.',
 
   'register.title': 'أنشئ حسابك',
@@ -478,6 +488,7 @@ export const AR: Record<TranslationKey, Message> = {
   'problem.underMinimumAgeNoFigure': 'عمرك أقل من الحد الأدنى لاستئجار سيارة عبر خضرا.',
   'problem.invalidToken': 'انتهت صلاحية هذا الرابط أو سبق استخدامه.',
   'problem.rateLimited': 'محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.',
+  'problem.requestInvalid': 'تعذّرت قراءة جزء مما أُرسل. راجع النموذج ثم أعد المحاولة.',
   'problem.unknown': 'تعذّر تنفيذ ذلك. أعد المحاولة.',
 
   'seo.book.title': 'طلب سيارة — خضرا',

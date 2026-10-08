@@ -48,6 +48,11 @@ export interface NotificationItem {
   /** A reference the platform issued, such as `KR-1042`. Never a person's name. */
   readonly subjectReference: string | null;
   readonly actorName: string;
+  /**
+   * Set when the actor is a stand-in rather than a name — `Customer`, `Colleague` — and `actorName` then holds the
+   * English phrase the row has always carried (pre-launch item 103). Absent on rows written before 2026-10-08.
+   */
+  readonly actorStandIn?: string | null;
   /** The server decides this: two colleagues can share a name, and the row knows which is which. */
   readonly isMine: boolean;
   readonly occurredAt: string;

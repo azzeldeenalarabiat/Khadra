@@ -17,6 +17,14 @@ const entry = (over: Partial<AuditSubjectFacts>): AuditSubjectFacts => ({
 });
 
 describe('auditSubject', () => {
+  it('names a city by the Arabic name it was recorded with, for an Arabic reader only (item 176)', () => {
+    const city = entry({ entityType: 'City', subjectLabel: 'Madaba', subjectLabelAr: 'مادبا' });
+    expect(auditSubject(city, true)).toEqual({ kind: 'label', label: 'مادبا' });
+    expect(auditSubject(city)).toEqual({ kind: 'label', label: 'Madaba' });
+    // An entry from before the Arabic name was recorded keeps its English one: chosen, never translated.
+    expect(auditSubject(entry({ entityType: 'City', subjectLabel: 'Madaba' }), true)).toEqual({ kind: 'label', label: 'Madaba' });
+  });
+
   it('names a dispute by the booking it is about, whichever way its label was written', () => {
     // Before 2026-09-27 the label was an English sentence; since then, the bare reference.
     for (const subjectLabel of ['Dispute on KH-NY8AHLNK', 'KH-NY8AHLNK']) {

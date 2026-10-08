@@ -151,10 +151,6 @@ export const AR = {
   'notBuilt.fallback.purpose': 'هذه الشاشة جزء من التصميم، لكن لا توجد بيانات خلفها بعد.',
   'notBuilt.fallback.blocked': 'لم يُبنَ السياق الذي سيزوّدها بالبيانات.',
 
-  'notBuilt.reviews.purpose':
-    'تقييمات العملاء لمكاتب التأجير وتقييمات المكاتب للعملاء، وقائمة مراجعتها.',
-  'notBuilt.reviews.blocked':
-    'كيان التقييم موجود في نموذج المجال لكن بلا جدول ولا مستودع ولا بيانات. وإلى أن يوجد، يظهر للمكتب بلا تقييمات «لا توجد تقييمات بعد» بدلًا من رقم لم يمنحه أحد.',
   'notBuilt.notifications.purpose':
     'سجل بما يحتاج إلى مشرف: مراجعات متأخرة، ومُدد خدمة تجاوزت حدها، ومهام فاشلة.',
   'notBuilt.notifications.blocked':
@@ -778,7 +774,9 @@ export const AR = {
   'vehicleDetail.couldntLoadThisCar': 'تعذّر تحميل هذه السيارة',
   'vehicleDetail.customer': 'العميل',
   'vehicleDetail.derivedFromBookingsApproved':
-    'مستمدّ من الحجوزات: الحجوزات المعتمدة تحجز تواريخها، والسيارة المؤجَّرة تُعلَّم بذلك. ولحجب تواريخ، اسحب السيارة من الخدمة؛ إذ لا توجد قائمة منفصلة للتواريخ المحجوبة.',
+    'مستمدّ من الحجوزات وفق تقويم المنصة، ومن الحجوزات نفسها التي يراها العملاء في البحث: الحجز يحجز أيامه، والسيارة محجوزة أثناء تجهيزها قبل الإيجار، والسيارة المؤجَّرة تُعلَّم بذلك. ولحجب تواريخ، اسحب السيارة من الخدمة؛ إذ لا توجد قائمة منفصلة للتواريخ المحجوبة.',
+  'vehicleDetail.turnaround': 'تجهيز',
+  'vehicleDetail.calendarUnavailable': 'تعذّر تحميل تقويم هذا الشهر.',
   'vehicleDetail.editsToTheListing':
     'لا تُسجَّل حتى الآن تعديلات الإعلان نفسه (السعر، الصور، التوصيل). وتغييرات الحجوزات المعروضة هنا هي الأحدث من نشاط مكتبك.',
   'vehicleDetail.heldForBooking': 'محجوزة لحجز',
@@ -1022,6 +1020,22 @@ export const AR = {
   'dealerReview.requestClarification': 'طلب توضيح',
   'dealerReview.suspendDealer': 'إيقاف المكتب',
   'dealerReview.whereItIs': 'الموقع',
+  'dealerReview.customerPage.title': 'ما يقوله هذا المكتب لعملائه',
+  'dealerReview.customerPage.note': 'بكلماته · للقراءة فقط',
+  'dealerReview.customerPage.intro':
+    'كل قسم كتبه المكتب لصفحته، كما كتبه وبكل لغة كتب بها — ومنها الأقسام المخفية. المكتب وحده يستطيع تغييره.',
+  'dealerReview.customerPage.shown': 'ظاهر للعملاء',
+  'dealerReview.customerPage.hidden': 'مخفي عن العملاء',
+  'dealerReview.customerPage.deliveryOff': 'غير ظاهر: التوصيل متوقف',
+  'dealerReview.customerPage.empty': 'لم يُكتب شيء',
+  'dealerReview.customerPage.unknown': {
+    zero: 'لا أقسام أخرى.',
+    one: 'قسم آخر لا تستطيع هذه اللوحة عرضه بعد.',
+    two: 'قسمان آخران لا تستطيع هذه اللوحة عرضهما بعد.',
+    few: '{count} أقسام أخرى لا تستطيع هذه اللوحة عرضها بعد.',
+    many: '{count} قسمًا آخر لا تستطيع هذه اللوحة عرضها بعد.',
+    other: '{count} قسم آخر لا تستطيع هذه اللوحة عرضها بعد.',
+  },
   'dealerReview.noAddressRecorded':
     'لا يوجد عنوان مسجّل. المؤشر أدناه هو الموقع الذي حدده مقدّم الطلب.',
   'dealerReview.verificationDocuments': 'وثائق التحقق',
@@ -1110,6 +1124,7 @@ export const AR = {
   'platformSettings.theNumbersTheWhole':
     'الأرقام التي تعمل بها المنصة كلها. وكل حجز يجمّد ما كان ساريًا عند إنشائه، ولذلك فتغيير رقم هنا لا يعيد الحكم أبدًا على حجز قائم.',
   'platformSettings.theseValuesAreRead': 'هذه القيم للاطّلاع فقط هنا. وهي تأتي من',
+  'platformSettings.sourceConfiguration': 'إعدادات الخادم',
   'platformSettings.whoMayRent': 'من يحق له الاستئجار',
   'platformSettings.windowsAndDeadlines': 'المُهل والمواعيد',
   'dealerDashboard.addVehicle': 'إضافة سيارة',
@@ -1309,8 +1324,8 @@ export const AR = {
   'activity.disputeAssigned': 'أُسند النزاع على الحجز {subject} إلى {actor}',
   'activity.disputeResolved': 'حُسم النزاع على الحجز {subject} من قِبل {actor}',
   'activity.settingChanged': 'غُيّر الإعداد {subject} من قِبل {actor}',
-  'activity.reviewHidden': 'أُخفي التقييم {subject} من قِبل {actor}',
-  'activity.reviewRestored': 'أُعيد إظهار التقييم {subject} من قِبل {actor}',
+  'activity.reviewHidden': 'أُخفي التقييم على الحجز {subject} من قِبل {actor}',
+  'activity.reviewRestored': 'أُعيد إظهار التقييم على الحجز {subject} من قِبل {actor}',
   'activity.adminInvited': 'دُعي المشرف {subject} من قِبل {actor}',
   'activity.adminInvitationResent': 'أُعيد إرسال الدعوة إلى {subject} من قِبل {actor}',
   'activity.handoverVerified': 'وُثّق تسليم الحجز {subject} من قِبل {actor}',
@@ -1498,6 +1513,10 @@ export const AR = {
   'dealerEmployees.requiredHowYouReach': 'مطلوب. الوسيلة التي تتواصل بها معه بشأن عملية تسليم.',
   'dealerEmployees.whetherTheyCanSee':
     'هل يستطيع رؤية الإيرادات وصفحة التقارير. أما الحجوزات فهي من مهامه دائمًا.',
+  'dealerEmployees.invitationNotEmailed': 'أُنشئ الحساب — ولم يُرسَل البريد',
+  'dealerEmployees.accountCreatedEmailFailed':
+    'أُنشئ حساب {email} ودعوته صالحة، لكن خدمة البريد لم تقبل الرسالة، فلم يصل إليه شيء. استخدم «إعادة إرسال الدعوة» في سطره بعد عودة البريد؛ أما دعوة العنوان نفسه من جديد فستُرفض.',
+  'dealerEmployees.emailNotSentResend': 'لم يُرسَل بريد الدعوة — أعد إرساله',
   'dealerEmployees.invitationSent': 'أُرسلت الدعوة',
   'dealerEmployees.theyWillFindThe': 'سيجد الرابط في صندوق بريده.',
   'dealerEmployees.theyAreSignedOut':
@@ -1862,6 +1881,7 @@ export const AR = {
   'carForm.addAtLeastOne': 'أضف صورة واحدة على الأقل قبل أن تتمكن من عرض هذه السيارة.',
   'carForm.thisCarIsA': 'هذه السيارة مسودة. اعرضها من أسطولك عندما تكون جاهزاً.',
   'carForm.chooseAVehicleType': 'اختر نوع السيارة قبل حفظها.',
+  'carForm.answerEveryFact': 'أدخل سنة الصنع وعدد المقاعد وناقل الحركة والوقود والسعر اليومي والتأمين قبل حفظ السيارة.',
   'carForm.carUpdated': 'تم تحديث السيارة',
   'carForm.carAdded': 'تمت إضافة السيارة',
   'employeeSettings.approveAndRejectRequests': 'قبول الطلبات ورفضها، وتسجيل الاستلام والإرجاع.',
@@ -1968,6 +1988,7 @@ export const AR = {
   'notifications.reportAccessGranted': 'صار بإمكانك الوصول إلى التقارير المالية بقرار من {who}',
   'notifications.reportAccessRevoked': 'لم يعد بإمكانك الوصول إلى التقارير المالية بقرار من {who}',
   'notifications.aCustomer': 'أحد العملاء',
+  'notifications.aColleague': 'أحد الزملاء',
   'notifications.customerCancelled': 'ألغى أحد العملاء {what}',
   'notifications.customerReportedNonDelivery': 'أبلغ أحد العملاء أن سيارة {what} لم تُسلَّم',
   'notifications.customerOpenedDispute': 'فتح أحد العملاء نزاعًا على {what}',
@@ -2080,6 +2101,7 @@ export const AR = {
   'problem.tooMany': 'محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.',
   'problem.unavailable': 'تعذّر على الخدمة إتمام العملية. لم يتغيّر شيء.',
   'problem.rejectedDetails': 'رُفضت البيانات. راجعها وأعد الإرسال.',
+  'problem.requestInvalid': 'تعذّرت قراءة جزء مما أُرسل. راجع النموذج ثم أعد المحاولة.',
   'problem.reference': 'المرجع {traceId}',
   'problem.handoverCodeInvalid': 'هذا الرمز غير صحيح. اطلب من العميل التحقق منه أو عرض رمز جديد.',
   'problem.handoverCodeInvalidTries': {
@@ -2310,6 +2332,9 @@ export const AR = {
   'status.maintenanceVehicle': 'مسحوبة من الخدمة',
   'handoverType.pickup': 'التسليم',
   'handoverType.return': 'الإعادة',
+  'handoverVerification.code': 'برمز العميل',
+  'handoverVerification.unverified': 'دون رمز العميل',
+  'handoverVerification.notRequired': 'لا يلزم رمز',
 
   // Wave Two 2026-09-17: common words shared by every console, created once before the screen sweep
   'common.yes': 'نعم',
@@ -2921,6 +2946,21 @@ export const AR = {
   'auditLog.automatedActor': 'آلي',
   'auditLog.automatedActorOption': '{name} — آلي ({count})',
   'auditLog.systemActor': 'النظام',
+  'auditLog.change.disputeResolved':
+    'من {held} المحتجزة: {refund} تُعاد إلى العميل، و{platform} لخضرا، و{dealer} للمكتب',
+  'auditLog.change.disputeResolvedWithCharge':
+    'من {held} المحتجزة: {refund} تُعاد إلى العميل، و{platform} لخضرا، و{dealer} للمكتب؛ وحُمِّل المكتب {charge}',
+  'auditLog.change.handover': '{status} ({handover}، {method})',
+  'auditLog.change.codeLocked': {
+    zero: 'قُفل رمز {handover} بعد {count} محاولة خاطئة',
+    one: 'قُفل رمز {handover} بعد محاولة خاطئة واحدة',
+    two: 'قُفل رمز {handover} بعد محاولتين خاطئتين',
+    few: 'قُفل رمز {handover} بعد {count} محاولات خاطئة',
+    many: 'قُفل رمز {handover} بعد {count} محاولة خاطئة',
+    other: 'قُفل رمز {handover} بعد {count} محاولة خاطئة',
+  },
+  'auditLog.change.lookup': '{name} · {state}',
+  'auditLog.change.customerDocument': '{type}: {status}',
   'auditLog.noReasonRecordedWithAction': 'لم يُسجَّل سبب مع هذا الإجراء.',
   'security.activeSessionsCount': {
     zero: 'لا جلسات نشطة',
@@ -3458,6 +3498,20 @@ export const AR = {
   'financialDocuments.pdfBytes': '{n} بايت',
   'financialDocuments.pdfHash': 'بصمة الملف (SHA-256)',
   'financialDocuments.pdfDrawnFrom': 'أُنشئ من بصمة المحتوى',
+  'financialDocuments.pdfHoldTitle': '{language} · {kind} — تعذّر إنشاؤه: {reason}',
+  'financialDocuments.pdfHoldDetail': {
+    zero: 'منذ {since} · بلا محاولات.',
+    one: 'منذ {since} · محاولة واحدة. يُعاد عند تشغيل الواجهة البرمجية من جديد؛ ولا يُقال للعميل إلا أنه قيد الإعداد.',
+    two: 'منذ {since} · محاولتان. يُعاد عند تشغيل الواجهة البرمجية من جديد؛ ولا يُقال للعميل إلا أنه قيد الإعداد.',
+    few: 'منذ {since} · {count} محاولات. يُعاد عند تشغيل الواجهة البرمجية من جديد؛ ولا يُقال للعميل إلا أنه قيد الإعداد.',
+    many: 'منذ {since} · {count} محاولة. يُعاد عند تشغيل الواجهة البرمجية من جديد؛ ولا يُقال للعميل إلا أنه قيد الإعداد.',
+    other: 'منذ {since} · {count} محاولة. يُعاد عند تشغيل الواجهة البرمجية من جديد؛ ولا يُقال للعميل إلا أنه قيد الإعداد.',
+  },
+  'renditionKind.asIssued': 'كما صدر',
+  'renditionKind.voided': 'النسخة الملغاة',
+  'renditionHoldReason.snapshotAltered': 'السجل المخزَّن لم يعد يطابق ما صدر',
+  'renditionHoldReason.snapshotUnreadable': 'تخطيط الطباعة لا يستطيع قراءة هذا السجل',
+  'renditionHoldReason.drawingFailed': 'تعطّلت مكتبة PDF أثناء الإنشاء',
   'financialDocuments.pdfPreparing': 'ما زال ملف PDF لهذا المستند قيد الإنشاء.',
   'financialDocuments.pdfNone': 'لم يُنشأ ملف PDF لهذا المستند بعد.',
   'financialDocuments.pdfVoidedNote':
@@ -3622,6 +3676,14 @@ export const AR = {
     few: '{count} مستندات مالية معلّقة — مستحقة ولم تصدر',
     many: '{count} مستندًا ماليًا معلّقًا — مستحقة ولم تصدر',
     other: '{count} مستند مالي معلّق — مستحق ولم يصدر',
+  },
+  'queue.documentPdfsNotDrawn': {
+    zero: 'لا مستندات تعذّر إنشاء ملف PDF لها',
+    one: 'مستند واحد تعذّر إنشاء ملف PDF له',
+    two: 'مستندان تعذّر إنشاء ملف PDF لهما',
+    few: '{count} مستندات تعذّر إنشاء ملفات PDF لها',
+    many: '{count} مستندًا تعذّر إنشاء ملفات PDF لها',
+    other: '{count} مستند تعذّر إنشاء ملفات PDF لها',
   },
   'queue.documentEmailsNotSent': {
     zero: 'لا إيصالات لم تُرسَل بالبريد',
@@ -4054,4 +4116,68 @@ export const AR = {
 
   // Wave 5 (F90): the customer website's word for the same status
   'status.pendingReviewCustomerDocument': 'مرفوع',
+
+  // Review moderation (pre-launch item 81)
+  'reviews.subtitle': 'لا يُعدَّل أي تقييم. يمكن فقط إخفاء التقييم لسبب من أسباب السياسة، ثم إعادة إظهاره.',
+  'reviews.searchHint': 'ابحث في التعليق، أو الصق رقم حجز',
+  'reviews.filter.shown': 'الظاهرة',
+  'reviews.filter.hidden': 'المخفية',
+  'reviews.filter.target': 'تقييم لـ',
+  'reviews.filter.rating': 'التقييم',
+  'reviews.filter.anyRating': 'أيّ تقييم',
+  'reviews.column.reviewer': 'المقيِّم',
+  'reviews.column.target': 'عن',
+  'reviews.column.rating': 'التقييم',
+  'reviews.column.comment': 'التعليق',
+  'reviews.column.booking': 'الحجز',
+  'reviews.column.date': 'تاريخ الكتابة',
+  'reviews.role.customer': 'عميل',
+  'reviews.role.office': 'مكتب تأجير',
+  'reviews.nameUnavailable': 'لم يعد على المنصة',
+  'reviews.ratingOnly': 'تقييم بلا تعليق',
+  'reviews.ratingOutOfFive': '{rating} من 5',
+  'reviews.status.published': 'منشور',
+  'reviews.status.hidden': 'مخفي',
+  'reviews.status.awaitingReveal': 'لم يُنشر بعد',
+  'reviews.visibleFrom': 'يظهر من {date}',
+  'reviews.hide': 'إخفاء',
+  'reviews.restore': 'إعادة إظهار',
+  'reviews.hideTitle': 'إخفاء هذا التقييم؟',
+  'reviews.hideBodyOffice':
+    'يُزال نصّه من صفحة المكتب العامة، ويبقى التقييم محسوبًا في متوسط المكتب: لا يُعدَّل أي تقييم.',
+  'reviews.hideBodyCustomer':
+    'يتوقف احتساب تقييم المكتب لهذا العميل في سجلّه الذي تراه المكاتب الأخرى قبل الموافقة عليه.',
+  'reviews.policyReason': 'سبب السياسة',
+  'reviews.hideConfirm': 'إخفاء التقييم',
+  'reviews.hidden': 'أُخفي التقييم',
+  'reviews.hiddenBodyOffice': 'أُزيل نصّه من الصفحة العامة، وما زال التقييم محسوبًا.',
+  'reviews.hiddenBodyCustomer': 'لم يعد محسوبًا في سجلّ العميل.',
+  'reviews.restoreTitle': 'إعادة إظهار هذا التقييم؟',
+  'reviews.restoreBodyOffice': 'يعود نصّه إلى صفحة المكتب العامة.',
+  'reviews.restoreBodyCustomer': 'يعود التقييم محسوبًا في سجلّ العميل.',
+  'reviews.restoreConfirm': 'إعادة إظهار التقييم',
+  'reviews.restored': 'أُعيد إظهار التقييم',
+  'reviews.restoredBodyOffice': 'عاد إلى صفحة المكتب العامة.',
+  'reviews.restoredBodyCustomer': 'عاد محسوبًا في سجلّ العميل.',
+  'reviews.showingRange': {
+    zero: 'لا توجد تقييمات',
+    one: 'عرض تقييم واحد',
+    two: 'عرض {from} إلى {to} من أصل تقييمين',
+    few: 'عرض {from} إلى {to} من أصل {count} تقييمات',
+    many: 'عرض {from} إلى {to} من أصل {count} تقييمًا',
+    other: 'عرض {from} إلى {to} من أصل {count} تقييم',
+  },
+  'reviews.forAdministrators': 'التقييمات للمشرفين فقط.',
+  'reviews.couldNotLoad': 'تعذّر تحميل التقييمات. حاول مرة أخرى بعد قليل.',
+  'reviews.couldNotLoadTitle': 'تعذّر تحميل التقييمات',
+  'reviews.emptyTitle': 'لا يوجد تقييم مطابق',
+  'reviews.emptyText': 'امسح البحث أو عوامل التصفية لعرض كل التقييمات.',
+  'reviews.alreadyHidden': 'أخفى أحدهم هذا التقييم بالفعل.',
+  'reviews.notHidden': 'لم يعد هذا التقييم مخفيًا.',
+  'reviewDirection.customerRatesDealer': 'مكتب تأجير',
+  'reviewDirection.dealerRatesCustomer': 'عميل',
+  'reviewHideReason.personalContactDetails': 'يتضمّن بيانات اتصال شخصية',
+  'reviewHideReason.abusiveLanguage': 'لغة مسيئة',
+  'reviewHideReason.notAboutThisRental': 'لا يتعلق بهذا الاستئجار',
+  'reviewHideReason.spamOrPromotion': 'رسائل مزعجة أو ترويج',
 } as const satisfies Record<TranslationKey, Message>;

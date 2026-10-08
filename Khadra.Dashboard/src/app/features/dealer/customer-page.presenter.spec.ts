@@ -17,6 +17,7 @@ import {
   customerPagePreviews,
   customerPageRequest,
   customerPageRows,
+  EDITABLE_CUSTOMER_PAGE_SECTIONS,
   sectionText,
   unknownCustomerPageSections,
 } from './customer-page.presenter';
@@ -431,5 +432,33 @@ describe('the two previews', () => {
 
     expect(previews.map((preview) => preview.language)).toEqual(['ar', 'en']);
     expect(previews.every((preview) => preview.rows.length === 0)).toBe(true);
+  });
+});
+
+/**
+ * Pre-launch item 125: the boxes this console renders and the fields a save sends are one list. A newer console that
+ * added a box and forgot the request would show it, accept the typing, and clear the section on every save.
+ */
+describe('the customer page boxes and the body of a save', () => {
+  it('sends exactly the fields the editor renders a box for', () => {
+    const rendered = customerPageRows(page({ sections: [...EDITABLE_CUSTOMER_PAGE_SECTIONS] }), en).map((row) => row.field);
+    const sent = Object.keys(customerPageRequest({}, new Set())).filter((key) => key !== 'hiddenSections');
+
+    expect(rendered.length).toBe(EDITABLE_CUSTOMER_PAGE_SECTIONS.length);
+    expect([...sent].sort()).toEqual([...rendered].sort());
+  });
+
+  it('carries what was typed into every rendered box, in both languages', () => {
+    const rows = customerPageRows(page({ sections: [...EDITABLE_CUSTOMER_PAGE_SECTIONS] }), en);
+    const draft = Object.fromEntries(
+      rows.flatMap((row) => [
+        [boxKey(row.field, 'ar'), `ع ${row.field}`],
+        [boxKey(row.field, 'en'), `E ${row.field}`],
+      ]),
+    );
+
+    const request = customerPageRequest(draft, new Set()) as unknown as Record<string, LocalizedText>;
+
+    for (const row of rows) expect(request[row.field]).toEqual({ ar: `ع ${row.field}`, en: `E ${row.field}` });
   });
 });

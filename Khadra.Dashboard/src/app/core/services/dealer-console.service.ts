@@ -18,6 +18,7 @@ import {
   ReportPeriod,
   UpdateCustomerPageRequest,
   UpdateProfileRequest,
+  InvitedEmployee,
 } from '../models/dealer-console.api';
 import { AddressSuggestion, DealerProfile } from '../models/dealers.api';
 import { loaded } from './loaded';
@@ -239,8 +240,8 @@ export class DealerConsoleService {
 
   // ── Staff (spec 4.2) ──
 
-  invite(request: InviteEmployeeRequest): Promise<Employee> {
-    return firstValueFrom(this.http.post<Employee>(`${this.base}/employees`, request));
+  invite(request: InviteEmployeeRequest): Promise<InvitedEmployee> {
+    return firstValueFrom(this.http.post<InvitedEmployee>(`${this.base}/employees`, request));
   }
 
   resendInvitation(employeeId: string): Promise<Employee> {

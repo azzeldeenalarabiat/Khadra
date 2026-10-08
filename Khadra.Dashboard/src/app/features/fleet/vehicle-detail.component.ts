@@ -12,6 +12,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, Tone } from '../../core/models/console.models';
 import { BookingListItem, PagedResult } from '../../core/models/bookings.api';
+import { CalendarDay, calendarCells, shiftCalendarMonth } from './vehicle-calendar.presenter';
 import { Vehicle, VehicleStatusAction } from '../../core/models/fleet.api';
 import { DealerActivityEntry } from '../../core/models/dealer-console.api';
 import { FleetService } from '../../core/services/fleet.service';
@@ -31,12 +32,6 @@ import { ActivityWords, activityActor, activityEvent } from '../dealer/booking-a
 
 type Tab = 'overview' | 'availability' | 'bookings' | 'activity';
 
-interface CalendarDay {
-  readonly n: number;
-  readonly tag: string;
-  readonly tone: Tone;
-  readonly bookingId: string | null;
-}
 
 /**
  * The tabs, as the machine value the page switches on and the key that words it. The words are
@@ -113,6 +108,9 @@ export class VehicleDetailComponent {
 
   constructor() {
     effect(() => this.service.editing.set(this.vehicleId()));
+    // This month in the PLATFORM's calendar, not the browser's: the days below are the server's (item 54).
+    const today = this.formats.todayIso();
+    this.service.calendarMonth.set({ year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) });
   }
 
   protected readonly resource = this.service.vehicle;
@@ -121,7 +119,8 @@ export class VehicleDetailComponent {
   protected readonly car = computed(() => this.data() ?? null);
   protected readonly tab = signal<Tab>('overview');
   protected readonly busy = signal(false);
-  protected readonly month = signal(startOfMonth(new Date()));
+  /** The month on show, as the platform's calendar numbers it; see the constructor. */
+  protected readonly month = this.service.calendarMonth;
 
   /** The tabs in the reader's language. */
   protected readonly tabs = computed(() =>
@@ -282,52 +281,20 @@ export class VehicleDetailComponent {
     ];
   });
 
-  protected readonly monthLabel = computed(() => this.formats.monthYear(this.month()));
-
-  protected readonly calendar = computed<readonly CalendarDay[]>(() => {
-    const c = this.car();
-    const first = this.month();
-    const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-    const holds = this.bookings().filter((b) =>
-      ['Requested', 'Approved', 'Confirmed', 'PickedUp'].includes(b.status),
-    );
-    return Array.from({ length: days }, (_, i) => {
-      const dayStart = new Date(first.getFullYear(), first.getMonth(), i + 1).getTime();
-      const dayEnd = dayStart + 86_400_000;
-      const hold = holds.find(
-        (b) => Date.parse(b.periodStart) < dayEnd && Date.parse(b.periodEnd) > dayStart,
-      );
-      if (hold) {
-        if (hold.status === 'PickedUp')
-          return {
-            n: i + 1,
-            tag: this.t('vehicleDetail.onHire'),
-            tone: 'accent',
-            bookingId: hold.bookingId,
-          };
-        if (hold.status === 'Requested')
-          return {
-            n: i + 1,
-            tag: this.t('vehicleDetail.requested'),
-            tone: 'bad',
-            bookingId: hold.bookingId,
-          };
-        if (hold.status === 'Approved')
-          return {
-            n: i + 1,
-            tag: this.t('status.awaitingPayment'),
-            tone: 'bad',
-            bookingId: hold.bookingId,
-          };
-        return { n: i + 1, tag: hold.reference, tone: 'warn', bookingId: hold.bookingId };
-      }
-      if (c && c.status === 'Maintenance')
-        return { n: i + 1, tag: this.t('status.offTheRoad'), tone: 'dim', bookingId: null };
-      if (c && c.status !== 'Active')
-        return { n: i + 1, tag: this.t('vehicleDetail.notListed'), tone: 'dim', bookingId: null };
-      return { n: i + 1, tag: this.t('vehicleDetail.free'), tone: 'ok', bookingId: null };
-    });
+  protected readonly monthLabel = computed(() => {
+    const month = this.month();
+    return month
+      ? this.formats.calendarMonthYear(`${month.year}-${String(month.month).padStart(2, '0')}-01`)
+      : '';
   });
+
+  /** The month's days, as the server cut them (pre-launch item 54). */
+  private readonly calendarData = loaded(this.service.calendar);
+  protected readonly calendarFailed = computed(() => !!this.service.calendar.error());
+
+  protected readonly calendar = computed<readonly CalendarDay[]>(() =>
+    calendarCells(this.calendarData()?.days ?? [], this.car()?.status ?? null, this.t),
+  );
 
   /** The legend in the reader's language. */
   protected readonly legend = computed(() =>
@@ -354,8 +321,8 @@ export class VehicleDetailComponent {
   });
 
   protected shiftMonth(delta: number): void {
-    const m = this.month();
-    this.month.set(new Date(m.getFullYear(), m.getMonth() + delta, 1));
+    const month = this.month();
+    if (month) this.month.set(shiftCalendarMonth(month, delta));
   }
 
   protected tone(b: BookingListItem): Tone {
@@ -567,9 +534,6 @@ export class VehicleDetailComponent {
   protected reload(): void {
     this.resource.reload();
     this.bookingsResource.reload();
+    this.service.calendar.reload();
   }
-}
-
-function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
 }

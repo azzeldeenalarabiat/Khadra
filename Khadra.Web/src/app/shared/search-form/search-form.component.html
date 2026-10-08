@@ -4,12 +4,20 @@
     @if (!datesOnly()) {
       <label class="field search-card__city">
         <span class="field__label">{{ i18n.t('search.city') }}</span>
-        <select class="select" name="city" [ngModel]="city()" (ngModelChange)="city.set($event)">
-          <option value="">{{ i18n.t('search.anyCity') }}</option>
-          @for (entry of lookups.activeCities(); track entry.id) {
-            <option [value]="entry.id">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
-          }
-        </select>
+        <!-- While the city list has failed, the select says so instead of offering "Any city" alone; the city the
+             search was given is kept and sent (pre-launch item 155). -->
+        @if (lookups.citiesUnavailable()) {
+          <select class="select" name="city" disabled>
+            <option [value]="city()">{{ i18n.t('search.citiesUnavailable') }}</option>
+          </select>
+        } @else {
+          <select class="select" name="city" [ngModel]="city()" (ngModelChange)="city.set($event)">
+            <option value="">{{ i18n.t('search.anyCity') }}</option>
+            @for (entry of lookups.activeCities(); track entry.id) {
+              <option [value]="entry.id">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
+            }
+          </select>
+        }
       </label>
     }
 

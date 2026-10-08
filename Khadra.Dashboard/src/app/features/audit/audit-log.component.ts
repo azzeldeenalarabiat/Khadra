@@ -13,6 +13,7 @@ import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { spellEnumName } from '../../core/i18n/status-key';
 import { legalKindLabel } from '../../core/i18n/legal-kind';
 import { auditActorName, auditSubject, subjectValue } from '../../core/services/audit-subject';
+import { AuditValueText, auditValueText } from '../../core/services/audit-change';
 
 /**
  * The server's audit actions (`AuditAction`), each with the key that words it.
@@ -275,7 +276,7 @@ export class AuditLogComponent {
    * never have rewritten. Anything else is shown as it was recorded.
    */
   protected subjectText(entry: AuditLogEntry): string {
-    const subject = auditSubject(entry);
+    const subject = auditSubject(entry, this.i18n.isRtl());
     switch (subject.kind) {
       case 'dispute':
         return this.t('auditLog.subjectDispute', { reference: subject.reference });
@@ -368,5 +369,33 @@ export class AuditLogComponent {
   /** True when the entry records a change of value, rather than just that something happened. */
   protected hasChange(entry: AuditLogEntry): boolean {
     return !!entry.previousValue || !!entry.newValue;
+  }
+
+  /**
+   * Both sides of every row's change, in the reader's language where the entry stored names or parts, and exactly as
+   * recorded where it stored text (pre-launch items 50 and 174; see `auditValueText`). A computed, so a language
+   * switch re-words the page that is already open.
+   */
+  protected readonly changes = computed(() => {
+    const words = {
+      t: this.t,
+      arabic: this.i18n.isRtl(),
+      storedMoney: (amount: string, currency: string) => this.formats.storedMoney(amount, currency),
+    };
+    return new Map(
+      this.rows().map((row) => [
+        row.id,
+        { previous: auditValueText(row, 'previous', words), next: auditValueText(row, 'new', words) },
+      ]),
+    );
+  });
+
+  protected changeText(value: AuditValueText | null | undefined): string {
+    return value?.text ?? '—';
+  }
+
+  /** Recorded text keeps its own left-to-right run — an English line, a number, a stored amount — on an Arabic row. */
+  protected isRecorded(value: AuditValueText | null | undefined): boolean {
+    return value?.kind === 'recorded';
   }
 }

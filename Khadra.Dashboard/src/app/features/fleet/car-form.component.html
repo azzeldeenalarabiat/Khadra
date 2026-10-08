@@ -87,8 +87,8 @@
             type="number"
             [min]="yearRange()?.earliest ?? null"
             [max]="yearRange()?.latest ?? null"
-            [value]="form().year"
-            (input)="set('year', numeric($event))"
+            [value]="form().year ?? ''"
+            (input)="set('year', answer($event))"
           />
           @if (yearRange(); as range) {
             <!-- Two years and a dash: one Latin run, isolated so Arabic does not read it backwards. -->
@@ -104,8 +104,8 @@
             id="car-seats"
             class="input"
             type="number"
-            [value]="form().seats"
-            (input)="set('seats', numeric($event))"
+            [value]="form().seats ?? ''"
+            (input)="set('seats', answer($event))"
           />
         </div>
         <div class="field">
@@ -123,6 +123,7 @@
         <div class="field">
           <label for="car-transmission">{{ t('common.transmission') }}</label>
           <select id="car-transmission" class="input" (change)="set('transmission', text($event))">
+            <option value="" [selected]="!form().transmission">{{ t('vehicleWizard.choose') }}</option>
             @for (option of transmissions; track option) {
               <option [value]="option" [selected]="form().transmission === option">
                 {{ transmissionLabel(option) }}
@@ -133,6 +134,7 @@
         <div class="field">
           <label for="car-fuel">{{ t('common.fuel') }}</label>
           <select id="car-fuel" class="input" (change)="set('fuelType', text($event))">
+            <option value="" [selected]="!form().fuelType">{{ t('vehicleWizard.choose') }}</option>
             @for (option of fuelTypes; track option) {
               <option [value]="option" [selected]="form().fuelType === option">
                 {{ fuelTypeLabel(option) }}
@@ -198,8 +200,8 @@
             class="input input-num"
             type="number"
             step="0.5"
-            [value]="form().dailyRate"
-            (input)="set('dailyRate', numeric($event))"
+            [value]="form().dailyRate ?? ''"
+            (input)="set('dailyRate', answer($event))"
           />
           @if (fieldError('dailyRate'); as message) {
             <div class="field-error">{{ message }}</div>
@@ -212,8 +214,8 @@
             class="input input-num"
             type="number"
             step="1"
-            [value]="form().securityDeposit"
-            (input)="set('securityDeposit', numeric($event))"
+            [value]="form().securityDeposit ?? ''"
+            (input)="set('securityDeposit', answer($event))"
           />
           <div class="field-hint">
             {{ t('carForm.theDamageDepositFor') }}

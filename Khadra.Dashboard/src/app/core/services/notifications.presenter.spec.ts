@@ -553,3 +553,42 @@ describe('notificationRoute', () => {
     expect(notificationRoute({ ...row('BookingCompleted'), subjectId: null }, 'dealer')).toBeNull();
   });
 });
+
+/** Pre-launch item 103: an actor that is not named is a code beside the old English phrase, worded here. */
+describe('notificationSentence: stand-in actors', () => {
+  const ar: Translate = (key, params) =>
+    (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[⁨⁩]/g, '');
+  const item = (over: Partial<NotificationItem> = {}): NotificationItem => ({
+    notificationId: 'n-1',
+    kind: 'BookingApproved',
+    subjectId: 'b-1',
+    subjectReference: 'KH-ABCD1234',
+    actorName: 'Rana Haddad',
+    isMine: false,
+    occurredAt: '2026-10-08T09:00:00Z',
+    readAt: null,
+    isRead: false,
+    ...over,
+  });
+
+  it('words a colleague whose account could not be read, in Arabic, never the English phrase', () => {
+    const arabic = notificationSentence(item({ actorName: 'A colleague', actorStandIn: 'Colleague' }), ar);
+    expect(arabic).toContain('أحد الزملاء');
+    expect(arabic).not.toContain('A colleague');
+  });
+
+  it('words a customer by the code, and by the old phrase on a row from before the code', () => {
+    for (const row of [
+      item({ kind: 'DisputeOpened', actorName: 'A customer', actorStandIn: 'Customer' }),
+      item({ kind: 'DisputeOpened', actorName: 'A customer' }),
+    ]) {
+      expect(notificationSentence(row, ar)).not.toContain('A customer');
+      expect(notificationSentence(row, t)).toBe(notificationSentence(item({ kind: 'DisputeOpened', actorStandIn: 'Customer' }), t));
+    }
+  });
+
+  it('names a person by their name, even one that happens to read like a stand-in', () => {
+    expect(notificationSentence(item({ actorName: 'A colleague' }), t)).toContain('A colleague');
+    expect(notificationSentence(item({}), ar)).toContain('Rana Haddad');
+  });
+});

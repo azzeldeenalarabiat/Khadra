@@ -119,6 +119,9 @@ export function serverSentence(
  */
 const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'auth.email_taken': 'problem.emailTaken',
+  // Review moderation (item 81): a second administrator got there first.
+  'review.already_hidden': 'reviews.alreadyHidden',
+  'review.not_hidden': 'reviews.notHidden',
   'auth.phone_taken': 'problem.phoneTaken',
   'auth.invalid_email': 'problem.invalidEmail',
   'auth.invalid_phone': 'problem.invalidPhone',
@@ -265,6 +268,11 @@ export function problemMessage(
     const byField = WORDED_FIELDS[named[0].toLowerCase()];
     if (byField) return t(byField);
   }
+
+  // A body the API could not bind at all (pre-launch item 121). After the field wording, which says
+  // more when there is one field to name; before the English title, which is MVC's "One or more
+  // validation errors occurred."
+  if (problem.code === 'request.invalid') return t('problem.requestInvalid');
 
   if (language === 'en' && problem.title) return problem.title;
 
