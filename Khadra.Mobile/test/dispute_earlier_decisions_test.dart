@@ -46,6 +46,7 @@ void main() {
     num? onBooking,
     num? decided,
     Map<String, dynamic>? resolution,
+    Map<String, dynamic>? booking,
   }) =>
       {
         'ticketId': 't-2',
@@ -78,7 +79,7 @@ void main() {
         ],
         'resolution': resolution,
         'depositHeld': jod(held),
-        'booking': null,
+        'booking': booking,
         if (onBooking != null) 'depositOnBooking': jod(onBooking),
         if (decided != null) 'decidedByEarlierTickets': jod(decided),
       };
@@ -329,6 +330,54 @@ void main() {
         expect(find.textContaining('13.000'), findsNothing, reason: "the office's share is not the customer's");
         expect(find.textContaining(RegExp(r'(^|\D)0\.000')), findsNothing, reason: 'no share stands in as zero');
         expect(find.text('Split after reading both sides.'), findsOneWidget);
+      });
+
+      // E2E F43: the decision's refund, as the booking lists it for this ticket, says what became of it.
+      screenTest('a settled dispute says what became of its refund, in $tag', (tester) async {
+        await pump(
+          tester,
+          Dispute.fromJson(disputeJson(
+            live: false,
+            resolution: {
+              'depositHeld': jod(18),
+              'refundToCustomer': jod(9),
+              'note': '',
+              'resolvedByName': 'Khadra',
+              'resolvedAt': '2026-09-26T12:00:00Z',
+            },
+            booking: {
+              'bookingId': 'b-1',
+              'reference': 'KH-24-0007',
+              'status': 'Completed',
+              'refunds': [
+                {
+                  'refundId': 'r-0',
+                  'reason': 'FreeCancellation',
+                  'amount': jod(4),
+                  'status': 'Settled',
+                  'requestedAt': '2026-09-20T10:00:00Z',
+                  'settledAt': '2026-09-21T10:00:00Z',
+                },
+                {
+                  'refundId': 'r-1',
+                  'reason': 'DisputeResolution',
+                  'amount': jod(9),
+                  'status': 'Failed',
+                  'requestedAt': '2026-09-26T12:00:00Z',
+                  'failedAt': '2026-09-26T13:00:00Z',
+                  'disputeTicketId': 't-2',
+                },
+              ],
+            },
+          )),
+          locale,
+        );
+
+        expect(tester.takeException(), isNull);
+        final refund = tester.widget<Text>(find.byKey(const ValueKey('dispute-refund'))).data!;
+        // The words around the figure, whatever order this harness's formats put it in.
+        final [before, after] = l10n.disputeRefundDelayed('{amount}').split('{amount}');
+        expect(plain(refund), allOf(startsWith(before), endsWith(after), contains('9.000')));
       });
     }
   });

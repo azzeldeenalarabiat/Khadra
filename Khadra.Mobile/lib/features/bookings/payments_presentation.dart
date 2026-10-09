@@ -10,11 +10,17 @@ import '../../l10n/app_localizations.dart';
 /// these only choose sentences and never add, subtract or compare two amounts.
 
 /// Where the deposit is, as one sentence; null when there is nothing to say.
-String? depositSentence(AppLocalizations l10n, Formats formats, FinancialDeposit deposit) {
+///
+/// [balanceState] is the balance's own state: on a booking paid in full online the
+/// deposit is not "held until you collect the car", it is part of what was paid (E2E
+/// F26; owner, 2026-10-09). The website's rule, read off the same two states.
+String? depositSentence(AppLocalizations l10n, Formats formats, FinancialDeposit deposit, {String? balanceState}) {
   final amount = deposit.amount == null ? '' : formats.money(deposit.amount!);
   final date = deposit.windowEndsAt == null ? '' : formats.dateTime(deposit.windowEndsAt!);
   return switch (deposit.state) {
-    'Held' => l10n.paymentsDepositHeld(amount),
+    'Held' => balanceState == 'PaidInFull'
+        ? l10n.paymentsDepositHeldInFullPayment(amount)
+        : l10n.paymentsDepositHeld(amount),
     'AppliedToRental' => l10n.paymentsDepositAppliedToRental(amount),
     'InSettlementWindow' => l10n.paymentsDepositInSettlementWindow(amount, date),
     'UnderDispute' => l10n.paymentsDepositUnderDispute(amount),

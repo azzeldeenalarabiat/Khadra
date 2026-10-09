@@ -792,7 +792,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String bookTermsCancellationPenalty(String percent) {
-    return 'الإلغاء بعد ذلك يُقدَّر بـ $percent من العربون، ويُحتفظ به من عربونك عند انتهاء مهلة النزاع ما لم يقضِ نزاع بغير ذلك.';
+    return 'الإلغاء بعد ذلك يترتب عليه غرامة قدرها $percent من العربون. سيتم حسمها من عربونك عند انتهاء مهلة النزاع، إلا إذا صدر قرار مختلف في النزاع.';
   }
 
   @override
@@ -1703,7 +1703,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String cancelPenaltyNotice(String amount) {
-    return 'الإلغاء الآن يُقدِّر عليك مبلغ $amount، ويُحتفظ به من عربونك عند انتهاء مهلة النزاع ما لم يقضِ نزاع بغير ذلك.';
+    return 'الإلغاء الآن يترتب عليه غرامة قدرها $amount. سيتم حسمها من عربونك عند انتهاء مهلة النزاع، إلا إذا صدر قرار مختلف في النزاع.';
   }
 
   @override
@@ -2502,10 +2502,6 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get errorBookingOutsideOpeningHours =>
-      'المكتب مغلق في هذا الوقت. اختر وقتاً ضمن ساعات العمل، أو اطلب توصيل السيارة.';
-
-  @override
   String get errorBookingDeliveryOutOfRange =>
       'هذا الموقع خارج نطاق التوصيل لهذا المكتب. اختر موقعاً أقرب إليه.';
 
@@ -2784,4 +2780,77 @@ class AppLocalizationsAr extends AppLocalizations {
   String handoverReturnAvailableFrom(String time) {
     return 'سيكون رمز الإعادة متاحًا ابتداءً من $time.';
   }
+
+  @override
+  String paymentsDepositHeldInFullPayment(String amount) {
+    return 'عربونك البالغ $amount جزء من المبلغ الكامل الذي دفعته عبر الإنترنت.';
+  }
+
+  @override
+  String get notificationActorRentalOffice => 'مكتب التأجير';
+
+  @override
+  String get notificationYourDisputeOpened => 'نزاعك مفتوح، وستقرّر فيه خضرا';
+
+  @override
+  String bookRefusalDocumentsRejected(String documents) {
+    return 'لم تتمكن خضرا من قبول $documents. ارفع نسخة جديدة من صفحة مستنداتك، ثم أرسل الطلب مرة أخرى.';
+  }
+
+  @override
+  String get documentListSeparator => '، ';
+
+  @override
+  String disputeRefundRequested(String amount) {
+    return 'طُلب استرداد $amount لك، وسيُرسل إلى وسيلة الدفع الأصلية.';
+  }
+
+  @override
+  String disputeRefundOnItsWay(String amount, String date) {
+    return 'استرداد $amount في طريقه إلى وسيلة الدفع الأصلية. بدأنا العملية في $date، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String disputeRefundSettled(String amount, String date) {
+    return 'تم استرداد $amount إلى وسيلة الدفع الأصلية في $date. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String disputeRefundDelayed(String amount) {
+    return 'لم يكتمل استرداد $amount بعد، وتعيد خضرا إرساله. لا يلزمك فعل شيء.';
+  }
+
+  @override
+  String bookingDisputeDecidedOn(String date) {
+    return 'صدر قرار في نزاع على هذا الحجز في $date.';
+  }
+
+  @override
+  String bookingDisputeWithdrawnOn(String date) {
+    return 'سُحب نزاع على هذا الحجز في $date.';
+  }
+
+  @override
+  String get bookingCancelledAfterNonDelivery =>
+      'أُلغي الحجز بعد أن أبلغت أن المكتب لم يسلّمك السيارة.';
+
+  @override
+  String bookingYourReport(String report) {
+    return 'بلاغك: $report';
+  }
+
+  @override
+  String get vehicleDeliveryOnlyThen => 'بالتوصيل فقط في هذه الأوقات';
+
+  @override
+  String get errorBookingPickupOutsideOpeningHours =>
+      'وقت الاستلام خارج ساعات عمل المكتب.';
+
+  @override
+  String get errorBookingReturnOutsideOpeningHours =>
+      'وقت الإرجاع خارج ساعات عمل المكتب.';
+
+  @override
+  String get quoteDeliveryInstead =>
+      'يمكن لهذا المكتب توصيل السيارة في هذه الأوقات بدلًا من ذلك: اختر التوصيل عند إرسال الطلب.';
 }

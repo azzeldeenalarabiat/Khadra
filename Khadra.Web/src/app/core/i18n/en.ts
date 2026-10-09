@@ -672,7 +672,7 @@ export const EN = {
   'cancel.free': 'Cancelling now costs you nothing.',
   // Payments Phase 8 (owner, 2026-09-29): a customer's penalty is kept when the window closes with no dispute. A DRAFT
   // awaiting the owner's sign-off; the range below still needs a dispute, and keeps its sentence.
-  'cancel.penalty': 'Cancelling now assesses {amount} against you. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.',
+  'cancel.penalty': 'Cancelling now incurs a penalty of {amount}. It will be deducted from your deposit when the dispute window closes, unless the dispute outcome changes this.',
   'cancel.penaltyRange': 'Cancelling now assesses between {min} and {max} against you. Nothing is charged unless a dispute is opened and settled.',
   'cancel.confirm': 'Cancel the booking',
   'cancel.keep': 'Keep it',
@@ -723,7 +723,7 @@ export const EN = {
     other: 'Cancelling is free within {count} hours after payment, as long as the rental has not started.',
   },
   // Payments Phase 8 (owner, 2026-09-29). A DRAFT awaiting the owner's sign-off: the terms a customer books under.
-  'book.termsPenalty': 'Cancelling after that assesses {percent} of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.',
+  'book.termsPenalty': 'Cancelling after that incurs a penalty of {percent} of the deposit. It will be deducted from your deposit when the dispute window closes, unless the dispute outcome changes this.',
   'book.submit': 'Send the request',
   'book.sending': 'Sending your request…',
   // E2E F18: the request waits on a step the page already names above (the email, the documents).

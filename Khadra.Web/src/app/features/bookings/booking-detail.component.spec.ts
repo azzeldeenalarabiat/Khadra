@@ -754,7 +754,7 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
   it('tells a customer cancelling a full payment late what comes back above the deposit, in both languages', async () => {
     const english = await openSheet(lateCancellable, 'en');
     expect(english.dialog.textContent).toMatch(new RegExp(`You will get ${amount('84.75').source} back to your original payment method: everything you paid above the deposit`));
-    expect(english.dialog.textContent).toContain('Cancelling now assesses');
+    expect(english.dialog.textContent).toContain('Cancelling now incurs a penalty of');
     expect(english.dialog.textContent).not.toContain('Free cancellation');
     TestBed.resetTestingModule();
 

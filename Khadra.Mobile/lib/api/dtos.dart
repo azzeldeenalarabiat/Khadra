@@ -759,6 +759,7 @@ class CatalogueListing {
     required this.dailyRate,
     required this.isDeliveryAvailable,
     required this.gallery,
+    this.selfPickupAvailable,
   });
 
   final String vehicleId;
@@ -776,6 +777,11 @@ class CatalogueListing {
   final String? coverImageUrl;
   final Money dailyRate;
   final bool isDeliveryAvailable;
+
+  /// On a DATED search, whether the car can be collected at the counter at those times:
+  /// false when the office is closed then but delivers (E2E F2). Null on an undated
+  /// search, and from an older API.
+  final bool? selfPickupAvailable;
   final CatalogueGalleryLabel gallery;
 
   String get title => '$make $model';
@@ -793,6 +799,7 @@ class CatalogueListing {
         dailyRate:
             Money.fromJson(json['dailyRate'] as Map<String, dynamic>? ?? const {}),
         isDeliveryAvailable: json['isDeliveryAvailable'] as bool? ?? false,
+        selfPickupAvailable: json['selfPickupAvailable'] as bool?,
         gallery: CatalogueGalleryLabel.fromJson(
             json['gallery'] as Map<String, dynamic>? ?? const {}),
       );
@@ -1310,6 +1317,7 @@ class PenaltyAssessment {
     required this.requiresTicketToEnforce,
     required this.reason,
     this.state,
+    this.reasonCode,
   });
 
   final String attributedTo;
@@ -1327,6 +1335,11 @@ class PenaltyAssessment {
   /// cancellation preview, and from an API that does not send it.
   final String? state;
 
+  /// Why it was assessed, as a closed code: `DealerDidNotHandOver` when the customer
+  /// cancelled by reporting that the office never handed the car over. Null from an
+  /// API that does not send it.
+  final String? reasonCode;
+
   static PenaltyAssessment? maybe(dynamic json) => json is Map<String, dynamic>
       ? PenaltyAssessment(
           attributedTo: json['attributedTo'] as String? ?? '',
@@ -1340,6 +1353,7 @@ class PenaltyAssessment {
               json['requiresTicketToEnforce'] as bool? ?? true,
           reason: json['reason'] as String? ?? '',
           state: json['state'] as String?,
+          reasonCode: json['reasonCode'] as String?,
         )
       : null;
 }
@@ -1391,6 +1405,38 @@ class CancellationPreview {
 /// One refund against a booking's payments (Phase 3, 2026-09-26): why it is
 /// owed, how much, and where it is. Every reader of the booking sees the same
 /// list.
+/// One dispute on a booking, as the booking lists it: `BookingDisputeDto`.
+class BookingDispute {
+  const BookingDispute({required this.ticketId, required this.status, required this.openedAt, this.closedAt});
+
+  final String ticketId;
+
+  /// Open, UnderReview, Resolved or Withdrawn.
+  final String status;
+  final DateTime openedAt;
+
+  /// Null while it is live.
+  final DateTime? closedAt;
+
+  bool get isWithdrawn => status == 'Withdrawn';
+
+  static BookingDispute? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final ticketId = json['ticketId'] as String? ?? '';
+    final openedAt = _dateTime(json['openedAt']);
+    if (ticketId.isEmpty || openedAt == null) return null;
+    return BookingDispute(
+      ticketId: ticketId,
+      status: json['status'] as String? ?? '',
+      openedAt: openedAt,
+      closedAt: _dateTime(json['closedAt']),
+    );
+  }
+
+  static List<BookingDispute> listOf(dynamic json) =>
+      json is List ? json.map(BookingDispute.maybe).whereType<BookingDispute>().toList() : const [];
+}
+
 class Refund {
   const Refund({
     required this.refundId,
@@ -1400,6 +1446,8 @@ class Refund {
     required this.requestedAt,
     this.settledAt,
     this.failedAt,
+    this.sentAt,
+    this.disputeTicketId,
   });
 
   final String refundId;
@@ -1416,6 +1464,13 @@ class Refund {
   final DateTime requestedAt;
   final DateTime? settledAt;
   final DateTime? failedAt;
+
+  /// When the provider accepted it. Null until then, and from an older API.
+  final DateTime? sentAt;
+
+  /// The dispute whose decision this refund carries out, or null for any other
+  /// refund: what lets the dispute screen say what became of its refund (E2E F43).
+  final String? disputeTicketId;
 
   bool get isRefunded => status == 'Settled';
   bool get isDelayed => status == 'Failed';
@@ -1436,6 +1491,8 @@ class Refund {
       requestedAt: requestedAt,
       settledAt: _dateTime(json['settledAt']),
       failedAt: _dateTime(json['failedAt']),
+      sentAt: _dateTime(json['sentAt']),
+      disputeTicketId: json['disputeTicketId'] as String?,
     );
   }
 
@@ -1845,6 +1902,7 @@ class Booking implements HasDealerLabel {
     this.refundOutstandingAmount,
     this.pickupAvailableFrom,
     this.returnAvailableFrom,
+    this.disputes = const [],
   });
 
   final String bookingId;
@@ -1945,6 +2003,11 @@ class Booking implements HasDealerLabel {
   /// rental start. Null from an API older than Wave 3.
   final DateTime? returnAvailableFrom;
 
+  /// Every dispute on this booking, live or closed, so a decided or withdrawn one is
+  /// reachable from its booking and not only from a notification (E2E F44). Empty
+  /// from an older API.
+  final List<BookingDispute> disputes;
+
   /// Whether any money was, or is being, given back.
   bool get hasRefunds => (refunds?.isNotEmpty ?? false) || depositRefund != null;
 
@@ -2011,6 +2074,7 @@ class Booking implements HasDealerLabel {
         refundOutstandingAmount: Money.maybe(json['refundOutstandingAmount']),
         pickupAvailableFrom: _dateTime(json['pickupAvailableFrom']),
         returnAvailableFrom: _dateTime(json['returnAvailableFrom']),
+        disputes: BookingDispute.listOf(json['disputes']),
       );
 }
 
@@ -2291,6 +2355,7 @@ class NotificationItem {
     required this.actorName,
     required this.occurredAt,
     required this.readAt,
+    this.actorStandIn,
   });
 
   final String notificationId;
@@ -2300,6 +2365,11 @@ class NotificationItem {
   final String actorName;
   final DateTime occurredAt;
   final DateTime? readAt;
+
+  /// Why [actorName] is a stand-in rather than a name: 'RentalOffice' when the office
+  /// is no longer on the platform, and its English stand-in must not reach an Arabic
+  /// list (pre-launch item 103). Null for a real name, and from an older API.
+  final String? actorStandIn;
 
   bool get isRead => readAt != null;
 
@@ -2311,6 +2381,7 @@ class NotificationItem {
         actorName: json['actorName'] as String? ?? '',
         occurredAt: _requiredDateTime(json['occurredAt']),
         readAt: _dateTime(json['readAt']),
+        actorStandIn: json['actorStandIn'] as String?,
       );
 }
 

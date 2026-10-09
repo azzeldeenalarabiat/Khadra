@@ -456,16 +456,7 @@ class _DocumentTile extends StatelessWidget {
     };
   }
 
-  static String _label(AppLocalizations l10n, String type) => switch (type) {
-        DocumentTypes.drivingLicenceFront => l10n.documentsDrivingLicenceFront,
-        DocumentTypes.drivingLicenceBack => l10n.documentsDrivingLicenceBack,
-        DocumentTypes.nationalId => l10n.documentsNationalId,
-        DocumentTypes.passport => l10n.documentsPassport,
-        // A type this build has never heard of still gets a tile, named by the
-        // platform's own word for it, rather than disappearing. Ugly, and better
-        // than a document a customer is required to file and never shown.
-        _ => type,
-      };
+  static String _label(AppLocalizations l10n, String type) => documentTypeLabel(l10n, type);
 
   static String _statusLabel(AppLocalizations l10n, String status) =>
       switch (status) {
@@ -481,3 +472,16 @@ class _DocumentTile extends StatelessWidget {
         _ => KhadraColors.neutral600,
       };
 }
+
+/// A document type's name in the reader's language: My Documents' tiles, and a booking
+/// request refused over a document Khadra could not accept (W4-9).
+String documentTypeLabel(AppLocalizations l10n, String type) => switch (type) {
+      DocumentTypes.drivingLicenceFront => l10n.documentsDrivingLicenceFront,
+      DocumentTypes.drivingLicenceBack => l10n.documentsDrivingLicenceBack,
+      DocumentTypes.nationalId => l10n.documentsNationalId,
+      DocumentTypes.passport => l10n.documentsPassport,
+      // A type this build has never heard of still gets a name, the platform's own
+      // word for it, rather than disappearing. Ugly, and better than a document a
+      // customer is required to file and never shown.
+      _ => type,
+    };

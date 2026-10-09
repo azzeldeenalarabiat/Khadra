@@ -38,6 +38,9 @@ class FakeApi extends KhadraApi {
   /// The cancellation reasons `/app-config` publishes; none unless a test needs to cancel.
   List<Map<String, dynamic>> cancellationReasons = const [];
 
+  /// The refusal reasons `/app-config` publishes; none unless a test reads a refusal.
+  List<Map<String, dynamic>> rejectionReasons = const [];
+
   /// The `legal` block `/app-config` answers with, or null to leave it out — which the
   /// app reads as "not known", exactly as it reads an API that predates it.
   Map<String, dynamic>? legal;
@@ -46,6 +49,7 @@ class FakeApi extends KhadraApi {
     Map<String, dynamic>? mobileApp,
     String? paymentsMode,
     List<Map<String, dynamic>> cancellationReasons = const [],
+    List<Map<String, dynamic>> rejectionReasons = const [],
     Map<String, dynamic>? legal,
   }) =>
       AppConfig.fromJson({
@@ -61,6 +65,7 @@ class FakeApi extends KhadraApi {
         },
         'vocabularies': <String, dynamic>{
           if (cancellationReasons.isNotEmpty) 'cancellationReasons': cancellationReasons,
+          if (rejectionReasons.isNotEmpty) 'rejectionReasons': rejectionReasons,
         },
         if (mobileApp != null) 'mobileApp': mobileApp,
         if (paymentsMode != null) 'payments': {'mode': paymentsMode},
@@ -97,6 +102,7 @@ class FakeApi extends KhadraApi {
         mobileApp: mobileApp,
         paymentsMode: paymentsMode,
         cancellationReasons: cancellationReasons,
+        rejectionReasons: rejectionReasons,
         legal: legal,
       );
 

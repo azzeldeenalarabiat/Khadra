@@ -101,6 +101,30 @@ class VehicleRow extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                // Collectable only by delivery at the times searched (E2E F2): said
+                // here, before the request screen refuses a counter pickup.
+                if (listing.selfPickupAvailable == false) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    key: const ValueKey('delivery-only'),
+                    children: [
+                      const Icon(Icons.local_shipping_outlined, size: 14, color: KhadraColors.accent),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          l10n.vehicleDeliveryOnlyThen,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: KhadraColors.accent,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (!dense) ...[
                   const SizedBox(height: 7),
                   // The transmission's words are the SERVER's, in both languages,

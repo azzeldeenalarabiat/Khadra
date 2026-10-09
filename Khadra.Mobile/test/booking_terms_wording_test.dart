@@ -94,4 +94,54 @@ void main() {
       );
     });
   });
+
+  // Pre-launch item 208: since item 164 an assessed penalty IS kept from the deposit when the dispute window
+  // closes, so no sentence may promise that nothing is charged without a dispute. The owner signed these off,
+  // word for word, on 2026-10-09; the website carries the same sentences (`cancel.penalty`, `book.termsPenalty`).
+  group('what a late cancellation costs (item 208, as approved)', () {
+    test('the cancellation sheet', () {
+      expect(
+        en.cancelPenaltyNotice('JOD 18.000'),
+        'Cancelling now incurs a penalty of JOD 18.000. It will be deducted from your deposit when the dispute '
+        'window closes, unless the dispute outcome changes this.',
+      );
+      expect(
+        ar.cancelPenaltyNotice('18.000 JOD'),
+        'الإلغاء الآن يترتب عليه غرامة قدرها 18.000 JOD. سيتم حسمها من عربونك عند انتهاء مهلة النزاع، '
+        'إلا إذا صدر قرار مختلف في النزاع.',
+      );
+    });
+
+    test('the booking terms', () {
+      expect(
+        en.bookTermsCancellationPenalty('100%'),
+        'Cancelling after that incurs a penalty of 100% of the deposit. It will be deducted from your deposit '
+        'when the dispute window closes, unless the dispute outcome changes this.',
+      );
+      expect(
+        ar.bookTermsCancellationPenalty('100%'),
+        'الإلغاء بعد ذلك يترتب عليه غرامة قدرها 100% من العربون. سيتم حسمها من عربونك عند انتهاء مهلة النزاع، '
+        'إلا إذا صدر قرار مختلف في النزاع.',
+      );
+    });
+
+    test('neither promises that nothing is charged', () {
+      for (final sentence in [
+        en.cancelPenaltyNotice('JOD 18.000'),
+        en.bookTermsCancellationPenalty('100%'),
+      ]) {
+        expect(sentence, isNot(contains('Nothing is charged')));
+        expect(sentence, isNot(contains('assess')));
+      }
+    });
+  });
+
+  // E2E F26 (owner, 2026-10-09): on a booking paid in full online, the deposit is not "held until you collect
+  // the car"; it is part of what was paid. The website's payments.deposit.HeldInFullPayment.
+  test('a deposit held on a booking paid in full, as approved', () {
+    expect(en.paymentsDepositHeldInFullPayment('JOD 18.000'),
+        'Your deposit of JOD 18.000 is part of the full amount you paid online.');
+    expect(ar.paymentsDepositHeldInFullPayment('18.000 JOD'),
+        'عربونك البالغ 18.000 JOD جزء من المبلغ الكامل الذي دفعته عبر الإنترنت.');
+  });
 }

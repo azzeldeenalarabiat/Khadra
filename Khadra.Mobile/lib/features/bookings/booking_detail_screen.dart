@@ -405,6 +405,21 @@ class _StateNotice extends StatelessWidget {
     final party = BookingPresentation.party(l10n, booking.cancelledBy);
     final typed = booking.cancellationReason;
 
+    // Cancelled by the customer's REPORT that the office never handed the car over:
+    // said as that, as the website says it, rather than "Cancelled by you" (E2E F67).
+    // The penalty's code says so; an API without the code, the office bearing it.
+    final penalty = booking.penalty;
+    if (booking.status == 'Cancelled' &&
+        booking.cancelledBy == 'Customer' &&
+        penalty != null &&
+        (penalty.reasonCode == 'DealerDidNotHandOver' ||
+            (penalty.reasonCode == null && penalty.attributedTo == 'Dealer'))) {
+      return [
+        l10n.bookingCancelledAfterNonDelivery,
+        if (typed != null && typed.isNotEmpty) l10n.bookingYourReport(typed),
+      ].join('\n');
+    }
+
     // The CUSTOMER gets their own sentence rather than their pronoun dropped
     // into a shared one. Arabic attaches a pronoun to the preposition — "من
     // قِبلك", not "من قِبل" + a word for "you" — so composing the two produced
@@ -832,7 +847,8 @@ class _Actions extends ConsumerWidget {
       booking.status == 'PickedUp' ||
       booking.liveDisputeId != null ||
       booking.canBeDisputed ||
-      booking.canBeReviewed;
+      booking.canBeReviewed ||
+      booking.disputes.any((dispute) => dispute.closedAt != null);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -917,6 +933,26 @@ class _Actions extends ConsumerWidget {
           onPressed: () => context.push(Routes.openDispute(booking.bookingId)),
           icon: const Icon(Icons.gavel_outlined, size: 18),
           label: Text(l10n.disputeTitle),
+        ),
+      );
+    }
+
+    // A decided or withdrawn dispute stays one tap away from its booking, not only from a
+    // notification (E2E F44): when it closed, and the way in, as on the website.
+    final formats = ref.watch(formatsProvider);
+    for (final dispute in booking.disputes) {
+      final closedAt = dispute.closedAt;
+      if (closedAt == null || formats == null) continue;
+      final when = formats.dateTime(closedAt);
+      actions.add(
+        TextButton.icon(
+          key: ValueKey('closed-dispute-${dispute.ticketId}'),
+          onPressed: () => context.push(Routes.dispute(dispute.ticketId)),
+          icon: const Icon(Icons.gavel_outlined, size: 18),
+          label: Text(
+            '${dispute.isWithdrawn ? l10n.bookingDisputeWithdrawnOn(when) : l10n.bookingDisputeDecidedOn(when)}'
+            ' · ${l10n.disputeView}',
+          ),
         ),
       );
     }
@@ -1135,6 +1171,12 @@ class _VehicleCard extends ConsumerWidget {
                           // plate could not, and overflowed beside the photo at
                           // 360 and 375 in Arabic. The plate stays one isolated
                           // Latin unit inside it.
+                          //
+                          // Not at all until the office approves: the server
+                          // withholds the plate until then (owner decision A3),
+                          // and "Plate:" with nothing after it read as a fault
+                          // (E2E F65).
+                          if (vehicle.plateNumber.isNotEmpty)
                           Text.rich(
                             TextSpan(children: [
                               TextSpan(text: '${l10n.bookingPlate}: '),
@@ -1704,7 +1746,9 @@ class _PaymentsSection extends StatelessWidget {
     // While the records contradict one another, the review notice is the one
     // thing said about them: a sentence read from them could be the
     // contradiction itself (a refund the rule owes and nobody recorded).
-    final deposit = financials.needsReview ? null : depositSentence(l10n, formats, financials.deposit);
+    final deposit = financials.needsReview
+        ? null
+        : depositSentence(l10n, formats, financials.deposit, balanceState: balance.state);
 
     Widget? line(String label, Money? value) =>
         value == null || value.isZero ? null : KhadraDetailRow(label: label, value: Text(formats.money(value)));
@@ -2231,6 +2275,11 @@ class _Activity extends ConsumerWidget {
   ) {
     final code = change.reasonCode;
     if (code == null) return null;
+
+    // A refusal is worded from the refusal list alone. Both lists carry `Other`, and the
+    // cancellation list's "Another reason" is not what an office refusing means by it
+    // (E2E F69). The website asks the list the status names, and so does this.
+    if (change.toStatus == 'Rejected') return Vocabularies.label(rejectionReasons, code, arabic);
 
     final mine = BookingPresentation.cancellationReason(l10n, code);
     if (mine != null) return mine;

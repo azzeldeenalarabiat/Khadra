@@ -28,11 +28,13 @@ void main() {
     final codes = <String>{};
     final pattern = RegExp(r'"([a-z]+\.[a-z_]+)"');
 
-    for (final directory in const ['Khadra.Domain', 'Khadra.Application']) {
+    // The API's own layer too: the bearer challenge's codes are written there (E2E F10).
+    for (final directory in const ['Khadra.Domain', 'Khadra.Application', 'Khadra.WebAPI']) {
       final root = Directory('${repositoryRoot.path}/$directory');
       if (!root.existsSync()) continue;
       for (final file in root.listSync(recursive: true).whereType<File>()) {
         if (!file.path.endsWith('.cs')) continue;
+        if (RegExp(r'[\\/](bin|obj)[\\/]').hasMatch(file.path)) continue;
         for (final match in pattern.allMatches(file.readAsStringSync())) {
           codes.add(match.group(1)!);
         }

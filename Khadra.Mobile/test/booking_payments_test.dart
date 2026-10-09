@@ -208,6 +208,24 @@ void main() {
       expect(plain(depositSentence(ar, formatsFor('ar'), deposit('KeptAsPenalty'))!), contains('احتُفظ بعربونك البالغ'));
     });
 
+    // E2E F26 (owner, 2026-10-09): paid in full online, the deposit is part of what was paid, not "held until
+    // you collect the car". The balance's state decides, as on the website.
+    test('a deposit held on a booking paid in full reads as part of the full payment, in both languages', () {
+      expect(
+        plain(depositSentence(en, formatsFor('en'), deposit('Held'), balanceState: 'PaidInFull')!),
+        'Your deposit of JOD 18.000 is part of the full amount you paid online.',
+      );
+      expect(
+        plain(depositSentence(ar, formatsFor('ar'), deposit('Held'), balanceState: 'PaidInFull')!),
+        'عربونك البالغ 18.000 JOD جزء من المبلغ الكامل الذي دفعته عبر الإنترنت.',
+      );
+      // Any other balance keeps the sentence it always had.
+      expect(
+        plain(depositSentence(en, formatsFor('en'), deposit('Held'), balanceState: 'DueAtHandover')!),
+        contains('is held until you collect the car'),
+      );
+    });
+
     test('names only the customer\'s own share of a dispute, in both languages', () {
       final decided = deposit('DecidedByDispute', decision: {'toCustomer': jod(9)});
       final nothing = deposit('DecidedByDispute', decision: {'toCustomer': jod(0)});

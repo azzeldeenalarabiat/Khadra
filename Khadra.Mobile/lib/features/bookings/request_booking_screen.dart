@@ -17,6 +17,7 @@ import '../auth/auth_form_widgets.dart';
 import '../catalogue/date_range_sheet.dart';
 import '../catalogue/search_providers.dart';
 import '../documents/document_providers.dart';
+import '../documents/documents_screen.dart' show documentTypeLabel;
 import 'booking_providers.dart';
 
 /// The last screen before a request reaches a gallery.
@@ -253,7 +254,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
         KhadraSectionTitle(l10n.bookPriceTitle),
         switch (quote) {
           AsyncLoading() => const KhadraLoading(compact: true),
-          AsyncError(:final error) => _quoteProblem(l10n, ApiFailure.from(error)),
+          AsyncError(:final error) => _quoteProblem(l10n, ApiFailure.from(error), vehicle),
           AsyncData(:final value) => _PriceBreakdown(
               quote: value,
               formats: formats,
@@ -314,9 +315,20 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
     );
   }
 
-  Widget _quoteProblem(AppLocalizations l10n, ApiFailure failure) =>
-      KhadraNotice(
+  /// A price the server would not work out, in its own reason (E2E F1): which handover
+  /// falls outside the office's hours, or which date limit the period breaks. Outside the
+  /// hours at the counter, and with an office that could bring the car instead, it says
+  /// so, as the website does; never where the office or this car cannot be delivered.
+  Widget _quoteProblem(AppLocalizations l10n, ApiFailure failure, CatalogueVehicle vehicle) => KhadraNotice(
         title: failure.messageFor(l10n, config: _config),
+        body: offersDeliveryInstead(
+          failure,
+          selfPickup: _pickupMethod == _selfPickup,
+          galleryDelivers: vehicle.gallery.delivery.isEnabled,
+          carIsDeliveryEligible: vehicle.isDeliveryEligible,
+        )
+            ? l10n.quoteDeliveryInstead
+            : null,
         tone: NoticeTone.bad,
       );
 
@@ -371,14 +383,47 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
         )));
       }
 
+      // A document Khadra could not accept (W4-9): named, as the website names it, and
+      // the documents read again so the checklist on this screen says what to upload.
+      if (failure.hasCode('booking.documents_incomplete')) ref.invalidate(myDocumentsProvider);
+
       setState(() {
         _submitting = false;
-        _error = failure.messageFor(l10n, config: _config);
+        _error = rejectedDocumentsMessage(l10n, failure) ?? failure.messageFor(l10n, config: _config);
       });
       _revealError();
     }
   }
 }
+
+/// A request refused because a document was not accepted, naming the documents the way
+/// the website does (W4-9). Null for any other refusal, and when the server named no
+/// rejected document (an older API, or documents that are only missing): the general
+/// sentence is right then.
+String? rejectedDocumentsMessage(AppLocalizations l10n, ApiFailure failure) {
+  if (!failure.hasCode('booking.documents_incomplete')) return null;
+  final named = failure.extensions['rejectedDocumentTypes'];
+  final types = named is List ? named.whereType<String>().toList() : const <String>[];
+  if (types.isEmpty) return null;
+  return l10n.bookRefusalDocumentsRejected(
+    types.map((type) => documentTypeLabel(l10n, type)).join(l10n.documentListSeparator),
+  );
+}
+
+/// Whether a refused price may suggest delivery instead (E2E F1): only for a counter
+/// pickup refused over the office's opening hours, and only where the office delivers
+/// and this car may be delivered. The website's rule.
+bool offersDeliveryInstead(
+  ApiFailure failure, {
+  required bool selfPickup,
+  required bool galleryDelivers,
+  required bool carIsDeliveryEligible,
+}) =>
+    (failure.hasCode('booking.pickup_outside_opening_hours') ||
+        failure.hasCode('booking.return_outside_opening_hours')) &&
+    selfPickup &&
+    galleryDelivers &&
+    carIsDeliveryEligible;
 
 class _VehicleStrip extends StatelessWidget {
   const _VehicleStrip({required this.vehicle, required this.formats});

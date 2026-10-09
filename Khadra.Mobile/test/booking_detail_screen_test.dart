@@ -67,6 +67,10 @@ void main() {
     Map<String, dynamic>? refundOutstandingAmount,
     DateTime? pickupAvailableFrom,
     DateTime? returnAvailableFrom,
+    String? plateNumber = '12-34567',
+    String? cancelledBy,
+    String? cancellationReason,
+    List<Map<String, dynamic>>? disputes,
   }) =>
       Booking.fromJson({
         'bookingId': 'b-1',
@@ -119,7 +123,7 @@ void main() {
           'model': 'Sportage',
           'year': 2024,
           'color': 'White',
-          'plateNumber': '12-34567',
+          'plateNumber': plateNumber,
         },
         'dealerName': dealerRemoved ? 'Dealer no longer on the platform' : 'Petra Rentals',
         'dealerRemoved': dealerRemoved,
@@ -135,6 +139,9 @@ void main() {
         if (refundOutstandingAmount != null) 'refundOutstandingAmount': refundOutstandingAmount,
         if (pickupAvailableFrom != null) 'pickupAvailableFrom': pickupAvailableFrom.toIso8601String(),
         if (returnAvailableFrom != null) 'returnAvailableFrom': returnAvailableFrom.toIso8601String(),
+        if (cancelledBy != null) 'cancelledBy': cancelledBy,
+        if (cancellationReason != null) 'cancellationReason': cancellationReason,
+        if (disputes != null) 'disputes': disputes,
       });
 
   Future<FakeApi> pump(WidgetTester tester, Booking booking,
@@ -979,6 +986,145 @@ void main() {
       // The words before the time, whatever the time reads as.
       expect(find.textContaining(ar.handoverPickupAvailableFrom('{time}').split('{time}').first), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  // Wave 7: the app catches up with what the website already says (E2E F65, F44, F67, F69).
+  group('the catch-up with the website', () {
+    Future<void> reveal(WidgetTester tester, Finder target) =>
+        tester.scrollUntilVisible(target, 200, scrollable: find.byType(Scrollable).first);
+
+    screenTest('F65: no "Plate" with nothing after it before the office approves', (tester) async {
+      await pump(
+        tester,
+        bookingOf(status: 'Requested', history: pathTo('Requested'), isAwaitingDecision: true, plateNumber: null),
+      );
+
+      expect(find.textContaining('${en.bookingPlate}:', findRichText: true), findsNothing);
+    });
+
+    screenTest('F65: the plate, once the server sends it', (tester) async {
+      await pump(tester, bookingOf(status: 'Confirmed', history: pathTo('Confirmed'), depositPaid: true));
+
+      expect(find.textContaining('${en.bookingPlate}:', findRichText: true), findsOneWidget);
+    });
+
+    screenTest('F44: a decided and a withdrawn dispute are each one tap from the booking', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Completed',
+          history: pathTo('Completed'),
+          depositPaid: true,
+          disputes: [
+            {
+              'ticketId': 't-1',
+              'status': 'Resolved',
+              'openedAt': now.add(const Duration(days: 7)).toIso8601String(),
+              'closedAt': now.add(const Duration(days: 8)).toIso8601String(),
+            },
+            {
+              'ticketId': 't-2',
+              'status': 'Withdrawn',
+              'openedAt': now.add(const Duration(days: 9)).toIso8601String(),
+              'closedAt': now.add(const Duration(days: 9, hours: 2)).toIso8601String(),
+            },
+          ],
+        ),
+      );
+
+      await reveal(tester, find.byKey(const ValueKey('closed-dispute-t-2')));
+      expect(find.byKey(const ValueKey('closed-dispute-t-1')), findsOneWidget);
+      expect(find.textContaining('A dispute on this booking was decided on'), findsOneWidget);
+      expect(find.textContaining('A dispute on this booking was withdrawn on'), findsOneWidget);
+      expect(find.textContaining(en.disputeView), findsNWidgets(2));
+    });
+
+    screenTest('F44: a live dispute is not listed twice', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Completed',
+          history: pathTo('Completed'),
+          depositPaid: true,
+          disputes: [
+            {'ticketId': 't-3', 'status': 'Open', 'openedAt': now.add(const Duration(days: 7)).toIso8601String()},
+          ],
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('closed-dispute-t-3'), skipOffstage: false), findsNothing);
+    });
+
+    for (final (label, reasonCode, attributedTo) in [
+      ('the penalty says so', 'DealerDidNotHandOver', 'Dealer'),
+      ('an older API: the office bears the penalty', null, 'Dealer'),
+    ]) {
+      screenTest('F67: a cancellation by reporting non-delivery reads as that ($label)', (tester) async {
+        await pump(
+          tester,
+          bookingOf(
+            status: 'Cancelled',
+            history: [
+              ...pathTo('Confirmed'),
+              changeJson('Cancelled', now.add(const Duration(hours: 4)), from: 'Confirmed', reason: 'Nobody was at the counter.'),
+            ],
+            depositPaid: true,
+            cancelledBy: 'Customer',
+            cancellationReason: 'Nobody was at the counter.',
+            penalty: {
+              'attributedTo': attributedTo,
+              'minAmount': {'amount': 33, 'currency': 'JOD'},
+              'maxAmount': {'amount': 33, 'currency': 'JOD'},
+              'isRange': false,
+              'isNothingOwed': false,
+              'requiresTicketToEnforce': true,
+              'reason': '',
+              'reasonCode': ?reasonCode,
+            },
+          ),
+        );
+
+        expect(find.textContaining(en.bookingCancelledAfterNonDelivery), findsOneWidget);
+        expect(find.textContaining(en.bookingYourReport('Nobody was at the counter.')), findsOneWidget);
+        expect(find.textContaining(en.bookingCancelledByYou), findsNothing);
+      });
+    }
+
+    screenTest('F67: any other cancellation by the customer still says "Cancelled by you"', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Cancelled',
+          history: [...pathTo('Confirmed'), changeJson('Cancelled', now.add(const Duration(hours: 4)), from: 'Confirmed')],
+          depositPaid: true,
+          cancelledBy: 'Customer',
+        ),
+      );
+
+      expect(find.textContaining(en.bookingCancelledByYou), findsOneWidget);
+      expect(find.textContaining(en.bookingCancelledAfterNonDelivery), findsNothing);
+    });
+
+    screenTest("F69: a refusal coded Other reads the office's refusal, not \"Another reason\"", (tester) async {
+      final api = FakeApi()
+        ..rejectionReasons = [
+          {'name': 'Other', 'labelEn': 'Declined by the rental office', 'labelAr': 'رُفض من قِبل مكتب التأجير'},
+        ];
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Rejected',
+          history: [
+            changeJson('Requested', now),
+            changeJson('Rejected', now.add(const Duration(hours: 1)), from: 'Requested', actor: 'Dealer', code: 'Other'),
+          ],
+        ),
+        api: api,
+      );
+
+      await reveal(tester, find.textContaining('Declined by the rental office'));
+      expect(find.textContaining(en.reasonOther), findsNothing);
     });
   });
 }

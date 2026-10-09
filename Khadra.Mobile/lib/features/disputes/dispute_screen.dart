@@ -17,9 +17,10 @@ import 'earlier_decisions.dart';
 
 /// One dispute: what was said, by whom, and what Khadra decided.
 ///
-/// A resolution here is RECORDED, not executed. Nothing on this platform moves
-/// money until the Payments context ships, and the screen says so beside the
-/// figures rather than letting a customer read a refund as one that has happened.
+/// A decision's refund is carried out by the platform, and the screen says what
+/// became of it — requested, on its way, refunded, being sent again — from the
+/// refund the booking lists for this ticket (E2E F43), never from the decision
+/// alone, which would read a refund as one that has happened.
 class DisputeScreen extends ConsumerWidget {
   const DisputeScreen({super.key, required this.ticketId});
 
@@ -181,6 +182,7 @@ class _BodyState extends ConsumerState<_Body> {
           _Resolution(
             resolution: resolution,
             decidedEarlier: decidedEarlier(dispute),
+            refund: disputeRefundText(l10n, formats, dispute.ticketId, dispute.booking?.refunds),
             formats: formats,
           ),
         ],
@@ -325,10 +327,28 @@ class _Statement extends StatelessWidget {
 /// to end by saying nothing had been charged, which was true only until Payments
 /// existed: a resolution now moves money, and the booking's Payments section says
 /// where it is (pre-launch item 173).
+/// What became of the refund this decision gave the customer, or null when the
+/// booking lists none for it (E2E F43): the refund the booking lists for THIS
+/// ticket, worded by its own status, as the website words it. An unknown status
+/// says nothing rather than guess.
+String? disputeRefundText(AppLocalizations l10n, Formats formats, String ticketId, List<Refund>? refunds) {
+  final refund = refunds?.where((candidate) => candidate.disputeTicketId == ticketId).firstOrNull;
+  if (refund == null) return null;
+  final amount = formats.money(refund.amount);
+  return switch (refund.status) {
+    'Settled' => l10n.disputeRefundSettled(amount, formats.dateTime(refund.settledAt ?? refund.requestedAt)),
+    'Sent' => l10n.disputeRefundOnItsWay(amount, formats.dateTime(refund.sentAt ?? refund.requestedAt)),
+    'Requested' => l10n.disputeRefundRequested(amount),
+    'Failed' => l10n.disputeRefundDelayed(amount),
+    _ => null,
+  };
+}
+
 class _Resolution extends StatelessWidget {
   const _Resolution({
     required this.resolution,
     required this.decidedEarlier,
+    required this.refund,
     required this.formats,
   });
 
@@ -336,6 +356,9 @@ class _Resolution extends StatelessWidget {
 
   /// What earlier disputes on the booking decided before this one, or null.
   final Money? decidedEarlier;
+
+  /// What became of this decision's refund, or null. See [disputeRefundText].
+  final String? refund;
   final Formats formats;
 
   @override
@@ -372,6 +395,14 @@ class _Resolution extends StatelessWidget {
             const SizedBox(height: Space.sm),
             Text(
               resolution.note,
+              style: const TextStyle(fontSize: 13, height: 1.5),
+            ),
+          ],
+          if (refund case final text?) ...[
+            const SizedBox(height: Space.sm),
+            Text(
+              text,
+              key: const ValueKey('dispute-refund'),
               style: const TextStyle(fontSize: 13, height: 1.5),
             ),
           ],

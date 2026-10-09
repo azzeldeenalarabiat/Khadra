@@ -94,6 +94,10 @@ extension ApiFailureMessages on ApiFailure {
           },
         'auth.invalid_token' => l10n.errorAuthInvalidToken,
         'auth.invalid_refresh_token' => l10n.authSessionExpired,
+        // The bearer challenge's two codes (Khadra.WebAPI, E2E F10): they reached the
+        // customer as the server's English title.
+        'auth.session_invalid' => l10n.authSessionExpired,
+        'auth.unauthenticated' => l10n.authSignInToContinue,
         // The account exists; the message did not go out. Different from a
         // refusal, and the remedy is to ask again rather than to correct
         // anything.
@@ -151,11 +155,16 @@ extension ApiFailureMessages on ApiFailure {
 
         // The server's sentence for these two names the gallery's own schedule,
         // in English. The app cannot reproduce that string, but it does not need
-        // to: the gallery's opening hours are on its own page, and pointing there
-        // is more use than a translated timetable.
-        'booking.pickup_outside_opening_hours' ||
+        // to: the gallery's opening hours are on its own page. Which handover is
+        // outside them is the part worth saying (E2E F1), as the website says it;
+        // the request screen adds the delivery offer where there is one.
+        'booking.pickup_outside_opening_hours' =>
+          l10n.errorBookingPickupOutsideOpeningHours,
         'booking.return_outside_opening_hours' =>
-          l10n.errorBookingOutsideOpeningHours,
+          l10n.errorBookingReturnOutsideOpeningHours,
+        // A period whose return is not after its pickup (E2E F1): the server's
+        // English otherwise.
+        'period.end_before_start' => l10n.validationReturnAfterPickup,
 
         // ── Delivery ─────────────────────────────────────────────────────────
         'booking.delivery_out_of_range' => l10n.errorBookingDeliveryOutOfRange,

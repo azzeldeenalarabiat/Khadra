@@ -1277,7 +1277,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookTermsCancellationPenalty.
   ///
   /// In en, this message translates to:
-  /// **'Cancelling after that is assessed at {percent} of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.'**
+  /// **'Cancelling after that incurs a penalty of {percent} of the deposit. It will be deducted from your deposit when the dispute window closes, unless the dispute outcome changes this.'**
   String bookTermsCancellationPenalty(String percent);
 
   /// No description provided for @bookRequest.
@@ -2735,7 +2735,7 @@ abstract class AppLocalizations {
   /// No description provided for @cancelPenaltyNotice.
   ///
   /// In en, this message translates to:
-  /// **'Cancelling now assesses {amount} against you. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.'**
+  /// **'Cancelling now incurs a penalty of {amount}. It will be deducted from your deposit when the dispute window closes, unless the dispute outcome changes this.'**
   String cancelPenaltyNotice(String amount);
 
   /// No description provided for @cancelConfirm.
@@ -3966,12 +3966,6 @@ abstract class AppLocalizations {
   /// **'A rental cannot be booked more than {days} days ahead.'**
   String errorBookingBeyondHorizonBy(int days);
 
-  /// No description provided for @errorBookingOutsideOpeningHours.
-  ///
-  /// In en, this message translates to:
-  /// **'This office is closed at that time. Choose a time while they are open, or have the car delivered.'**
-  String get errorBookingOutsideOpeningHours;
-
   /// No description provided for @errorBookingDeliveryOutOfRange.
   ///
   /// In en, this message translates to:
@@ -4433,6 +4427,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your return code will be available from {time}.'**
   String handoverReturnAvailableFrom(String time);
+
+  /// F26 (owner, 2026-10-09): a deposit still held on a booking paid in full.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is part of the full amount you paid online.'**
+  String paymentsDepositHeldInFullPayment(String amount);
+
+  /// Item 103: who acted, when the office is no longer on the platform (actorStandIn RentalOffice). The website's notification.someone.
+  ///
+  /// In en, this message translates to:
+  /// **'The rental office'**
+  String get notificationActorRentalOffice;
+
+  /// D10: the website's notification.YourDisputeOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Your dispute is open, and Khadra will decide it'**
+  String get notificationYourDisputeOpened;
+
+  /// W4-9: a request refused with booking.documents_incomplete naming rejectedDocumentTypes. The website's book.refusal.documentsRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Khadra could not accept your {documents}. Upload a new one from your documents, then send the request again.'**
+  String bookRefusalDocumentsRejected(String documents);
+
+  /// Between the names of documents in one sentence.
+  ///
+  /// In en, this message translates to:
+  /// **', '**
+  String get documentListSeparator;
+
+  /// F43: what became of this decision's refund. The website's dispute.refundRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Your refund of {amount} has been requested and will go to your original payment method.'**
+  String disputeRefundRequested(String amount);
+
+  /// F43. The website's dispute.refundOnItsWay.
+  ///
+  /// In en, this message translates to:
+  /// **'Your refund of {amount} is on its way to your original payment method. We started it on {date}; your bank may take additional time to show it.'**
+  String disputeRefundOnItsWay(String amount, String date);
+
+  /// F43. The website's dispute.refundSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} was refunded to your original payment method on {date}. Your bank may take additional time to show it.'**
+  String disputeRefundSettled(String amount, String date);
+
+  /// F43. The website's dispute.refundDelayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your refund of {amount} has not gone through yet. Khadra is sending it again; there is nothing you need to do.'**
+  String disputeRefundDelayed(String amount);
+
+  /// F44: a closed dispute, reachable from its booking. The website's booking.disputeDecidedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'A dispute on this booking was decided on {date}.'**
+  String bookingDisputeDecidedOn(String date);
+
+  /// F44. The website's booking.disputeWithdrawnOn.
+  ///
+  /// In en, this message translates to:
+  /// **'A dispute on this booking was withdrawn on {date}.'**
+  String bookingDisputeWithdrawnOn(String date);
+
+  /// F67: a booking the customer cancelled by reporting non-delivery. The website's booking.cancelledAfterNonDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled after you reported that the office did not hand over the car.'**
+  String get bookingCancelledAfterNonDelivery;
+
+  /// F67. The website's booking.yourReport, followed by what the customer wrote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your report: {report}'**
+  String bookingYourReport(String report);
+
+  /// F2: a dated search result the office can deliver but not hand over at the counter (selfPickupAvailable false). The website's car.deliveryOnlyThen.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery only at these times'**
+  String get vehicleDeliveryOnlyThen;
+
+  /// F1. The website's book.refusal.booking.pickup_outside_opening_hours.
+  ///
+  /// In en, this message translates to:
+  /// **'The pickup time is outside the office\'s opening hours.'**
+  String get errorBookingPickupOutsideOpeningHours;
+
+  /// F1. The website's book.refusal.booking.return_outside_opening_hours.
+  ///
+  /// In en, this message translates to:
+  /// **'The return time is outside the office\'s opening hours.'**
+  String get errorBookingReturnOutsideOpeningHours;
+
+  /// F1: after an opening-hours refusal, when the car and its office can deliver. The website's quote.deliveryInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'This office can deliver the car at these times instead: choose delivery when you send the request.'**
+  String get quoteDeliveryInstead;
 }
 
 class _AppLocalizationsDelegate

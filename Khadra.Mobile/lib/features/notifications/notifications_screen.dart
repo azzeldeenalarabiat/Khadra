@@ -239,39 +239,48 @@ class _NotificationRow extends ConsumerWidget {
   /// A kind this build has never seen falls through to a generic line rather than
   /// rendering an empty row: the platform can add one at any time, and an old app
   /// in a store should degrade rather than break.
-  static String _message(AppLocalizations l10n, NotificationItem item) =>
-      switch (item.kind) {
+  ///
+  /// Who acted is the server's name, except where the server says it is a stand-in for
+  /// an office no longer on the platform: then the reader's own words for it, as the
+  /// website does (pre-launch item 103).
+  static String _message(AppLocalizations l10n, NotificationItem item) {
+    final actor = item.actorStandIn == 'RentalOffice'
+        ? l10n.notificationActorRentalOffice
+        : item.actorName;
+    return switch (item.kind) {
         'YourBookingApproved' =>
-          l10n.notificationYourBookingApproved(item.actorName),
+          l10n.notificationYourBookingApproved(actor),
         'YourBookingRejected' =>
-          l10n.notificationYourBookingRejected(item.actorName),
+          l10n.notificationYourBookingRejected(actor),
         'YourBookingExpired' =>
-          l10n.notificationYourBookingExpired(item.actorName),
+          l10n.notificationYourBookingExpired(actor),
         'YourBookingCompleted' =>
-          l10n.notificationYourBookingCompleted(item.actorName),
+          l10n.notificationYourBookingCompleted(actor),
         'YourBookingMarkedNoShow' =>
-          l10n.notificationYourBookingMarkedNoShow(item.actorName),
+          l10n.notificationYourBookingMarkedNoShow(actor),
         'YourBookingConfirmed' =>
-          l10n.notificationYourBookingConfirmed(item.actorName),
+          l10n.notificationYourBookingConfirmed(actor),
         'YourBookingCancelled' =>
-          l10n.notificationYourBookingCancelled(item.actorName),
+          l10n.notificationYourBookingCancelled(actor),
         'YourBookingPickedUp' =>
-          l10n.notificationYourBookingPickedUp(item.actorName),
+          l10n.notificationYourBookingPickedUp(actor),
         'YourBookingReturned' =>
-          l10n.notificationYourBookingReturned(item.actorName),
+          l10n.notificationYourBookingReturned(actor),
         'YourPaymentReminder' => l10n.notificationYourPaymentReminder,
         'YourPickupReminder' =>
-          l10n.notificationYourPickupReminder(item.actorName),
+          l10n.notificationYourPickupReminder(actor),
         'YourReturnReminder' =>
-          l10n.notificationYourReturnReminder(item.actorName),
+          l10n.notificationYourReturnReminder(actor),
+        'YourDisputeOpened' => l10n.notificationYourDisputeOpened,
         'YourDisputeUpdated' => l10n.notificationYourDisputeUpdated,
         documentRejectedKind => l10n.notificationYourDocumentRejected,
         'YourDepositRefunded' =>
-          l10n.notificationYourDepositRefunded(item.actorName),
+          l10n.notificationYourDepositRefunded(actor),
         'YourPartialRefundSettled' =>
-          l10n.notificationYourPartialRefundSettled(item.actorName),
-        _ => l10n.notificationUnknown(item.actorName),
+          l10n.notificationYourPartialRefundSettled(actor),
+        _ => l10n.notificationUnknown(actor),
       };
+  }
 
   static IconData _icon(String kind) => switch (kind) {
         'YourBookingApproved' => Icons.check_circle_outline,
@@ -285,7 +294,7 @@ class _NotificationRow extends ConsumerWidget {
         'YourBookingReturned' => Icons.assignment_return_outlined,
         'YourPaymentReminder' => Icons.payments_outlined,
         'YourPickupReminder' || 'YourReturnReminder' => Icons.alarm_outlined,
-        'YourDisputeUpdated' => Icons.gavel_outlined,
+        'YourDisputeOpened' || 'YourDisputeUpdated' => Icons.gavel_outlined,
         documentRejectedKind => Icons.upload_file_outlined,
         'YourDepositRefunded' || 'YourPartialRefundSettled' => Icons.currency_exchange_outlined,
         _ => Icons.notifications_none,

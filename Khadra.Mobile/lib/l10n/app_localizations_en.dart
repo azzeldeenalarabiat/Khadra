@@ -757,7 +757,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookTermsCancellationPenalty(String percent) {
-    return 'Cancelling after that is assessed at $percent of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.';
+    return 'Cancelling after that incurs a penalty of $percent of the deposit. It will be deducted from your deposit when the dispute window closes, unless the dispute outcome changes this.';
   }
 
   @override
@@ -1642,7 +1642,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String cancelPenaltyNotice(String amount) {
-    return 'Cancelling now assesses $amount against you. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.';
+    return 'Cancelling now incurs a penalty of $amount. It will be deducted from your deposit when the dispute window closes, unless the dispute outcome changes this.';
   }
 
   @override
@@ -2439,10 +2439,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get errorBookingOutsideOpeningHours =>
-      'This office is closed at that time. Choose a time while they are open, or have the car delivered.';
-
-  @override
   String get errorBookingDeliveryOutOfRange =>
       'That spot is outside this office’s delivery area. Choose one closer to them.';
 
@@ -2722,4 +2718,78 @@ class AppLocalizationsEn extends AppLocalizations {
   String handoverReturnAvailableFrom(String time) {
     return 'Your return code will be available from $time.';
   }
+
+  @override
+  String paymentsDepositHeldInFullPayment(String amount) {
+    return 'Your deposit of $amount is part of the full amount you paid online.';
+  }
+
+  @override
+  String get notificationActorRentalOffice => 'The rental office';
+
+  @override
+  String get notificationYourDisputeOpened =>
+      'Your dispute is open, and Khadra will decide it';
+
+  @override
+  String bookRefusalDocumentsRejected(String documents) {
+    return 'Khadra could not accept your $documents. Upload a new one from your documents, then send the request again.';
+  }
+
+  @override
+  String get documentListSeparator => ', ';
+
+  @override
+  String disputeRefundRequested(String amount) {
+    return 'Your refund of $amount has been requested and will go to your original payment method.';
+  }
+
+  @override
+  String disputeRefundOnItsWay(String amount, String date) {
+    return 'Your refund of $amount is on its way to your original payment method. We started it on $date; your bank may take additional time to show it.';
+  }
+
+  @override
+  String disputeRefundSettled(String amount, String date) {
+    return '$amount was refunded to your original payment method on $date. Your bank may take additional time to show it.';
+  }
+
+  @override
+  String disputeRefundDelayed(String amount) {
+    return 'Your refund of $amount has not gone through yet. Khadra is sending it again; there is nothing you need to do.';
+  }
+
+  @override
+  String bookingDisputeDecidedOn(String date) {
+    return 'A dispute on this booking was decided on $date.';
+  }
+
+  @override
+  String bookingDisputeWithdrawnOn(String date) {
+    return 'A dispute on this booking was withdrawn on $date.';
+  }
+
+  @override
+  String get bookingCancelledAfterNonDelivery =>
+      'Cancelled after you reported that the office did not hand over the car.';
+
+  @override
+  String bookingYourReport(String report) {
+    return 'Your report: $report';
+  }
+
+  @override
+  String get vehicleDeliveryOnlyThen => 'Delivery only at these times';
+
+  @override
+  String get errorBookingPickupOutsideOpeningHours =>
+      'The pickup time is outside the office\'s opening hours.';
+
+  @override
+  String get errorBookingReturnOutsideOpeningHours =>
+      'The return time is outside the office\'s opening hours.';
+
+  @override
+  String get quoteDeliveryInstead =>
+      'This office can deliver the car at these times instead: choose delivery when you send the request.';
 }
