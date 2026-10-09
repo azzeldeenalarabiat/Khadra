@@ -4,6 +4,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HandoverCodeComponent, qrLibrary } from './handover-code.component';
+import { FormatService } from '../../core/i18n/format.service';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 const BOOKING = '01a0d082-8706-7748-af32-79cb5883e591';
 const URL = `/api/v1/bookings/${BOOKING}/handover-code`;
@@ -175,5 +177,64 @@ describe('HandoverCodeComponent — the QR', () => {
     expect(qrLibrary({ default: library })).toBe(library);
     expect(qrLibrary({ default: {} })).toBeNull();
     expect(qrLibrary(undefined)).toBeNull();
+  });
+});
+
+/**
+ * Since Wave 7 the server issues a code only inside its window (pre-launch item 225) and refuses earlier with
+ * `booking.pickup_too_early` / `booking.return_too_early`, naming the moment as `availableFrom`. The booking page
+ * offers the code from the server's own moment, so only a browser clock running ahead gets here, and the panel
+ * says when rather than a bare "not yet".
+ */
+describe('HandoverCodeComponent — asked for before its window', () => {
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HandoverCodeComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()],
+    });
+    TestBed.inject(I18nService).use('en');
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  async function refusedWith(expected: 'Pickup' | 'Return', code: string, availableFrom: string | null) {
+    const fixture = TestBed.createComponent(HandoverCodeComponent);
+    fixture.componentRef.setInput('bookingId', BOOKING);
+    fixture.componentRef.setInput('expected', expected);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    http.expectOne(URL).flush({ code, availableFrom }, { status: 409, statusText: 'Conflict' });
+    for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    return {
+      alert: element.querySelector('[role=alert]')?.textContent?.replace(/[⁨⁩]/g, '').trim() ?? '',
+      digits: element.querySelector('.handover__digits'),
+      when: TestBed.inject(FormatService).dateTime(availableFrom).replace(/[⁨⁩]/g, ''),
+    };
+  }
+
+  it('names the moment a pickup code becomes available', async () => {
+    const shown = await refusedWith('Pickup', 'booking.pickup_too_early', '2026-10-12T07:00:00+00:00');
+
+    expect(shown.alert).toContain('Your pickup code will be available from');
+    expect(shown.alert).toContain(shown.when);
+    expect(shown.digits).toBeNull();
+  });
+
+  it('names the moment a return code becomes available', async () => {
+    const shown = await refusedWith('Return', 'booking.return_too_early', '2026-10-12T09:00:00+00:00');
+
+    expect(shown.alert).toContain('Your return code will be available from');
+    expect(shown.alert).toContain(shown.when);
+  });
+
+  it('falls back to the general wording when the server names no moment', async () => {
+    const shown = await refusedWith('Pickup', 'booking.pickup_too_early', null);
+
+    expect(shown.alert).not.toContain('will be available from');
+    expect(shown.alert).not.toBe('');
   });
 });

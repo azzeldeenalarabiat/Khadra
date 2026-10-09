@@ -1,10 +1,21 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { HandoverCode } from '../../core/api/bookings.api';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
 import { problemText } from '../../core/http/problem-text';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { clockCountdown, countdownParts } from './countdown';
@@ -29,6 +40,7 @@ export class HandoverCodeComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly http = inject(HttpClient);
   private readonly appConfig = inject(AppConfigService);
+  private readonly format = inject(FormatService);
 
   readonly bookingId = input.required<string>();
   /**
@@ -46,10 +58,28 @@ export class HandoverCodeComponent implements OnInit {
   protected readonly problem = signal<ProblemSnapshot | null>(null);
 
   /** `handover.not_available`: the booking is no longer at a handover (it moved on, or ended). */
-  protected readonly notAvailable = computed(() => this.problem()?.code === 'handover.not_available');
+  protected readonly notAvailable = computed(
+    () => this.problem()?.code === 'handover.not_available',
+  );
   protected readonly problemMessage = computed(() => {
     const problem = this.problem();
-    return problem ? problemText(problem, this.i18n.t.bind(this.i18n), this.i18n.language(), this.appConfig.config()) : null;
+    if (!problem) return null;
+    // Asked for before its window (pre-launch item 225): the server says when, and so does the panel. Only a
+    // browser clock that is ahead of the server's gets here; the page offers the code from the server's moment.
+    if (
+      problem.availableFrom &&
+      (problem.code === 'booking.pickup_too_early' || problem.code === 'booking.return_too_early')
+    ) {
+      const key =
+        problem.code === 'booking.return_too_early' ? 'handover.returnFrom' : 'handover.pickupFrom';
+      return this.i18n.t(key, { when: this.format.dateTime(problem.availableFrom) });
+    }
+    return problemText(
+      problem,
+      this.i18n.t.bind(this.i18n),
+      this.i18n.language(),
+      this.appConfig.config(),
+    );
   });
 
   protected readonly isReturn = computed(() => (this.code()?.type ?? this.expected()) === 'Return');
@@ -81,7 +111,9 @@ export class HandoverCodeComponent implements OnInit {
     this.problem.set(null);
     let issued: HandoverCode;
     try {
-      issued = await firstValueFrom(this.http.post<HandoverCode>(`/api/v1/bookings/${this.bookingId()}/handover-code`, {}));
+      issued = await firstValueFrom(
+        this.http.post<HandoverCode>(`/api/v1/bookings/${this.bookingId()}/handover-code`, {}),
+      );
     } catch (error) {
       const problem = snapshotProblem(error);
       // A refused request for a NEW code leaves the one on screen working: the server replaces a code
@@ -134,7 +166,10 @@ export function qrLibrary(loaded: unknown): QrLibrary | null {
     'toDataURL' in candidate &&
     typeof (candidate as QrLibrary).toDataURL === 'function';
   if (usable(loaded)) return loaded;
-  const inner = typeof loaded === 'object' && loaded !== null ? (loaded as { default?: unknown }).default : undefined;
+  const inner =
+    typeof loaded === 'object' && loaded !== null
+      ? (loaded as { default?: unknown }).default
+      : undefined;
   return usable(inner) ? inner : null;
 }
 

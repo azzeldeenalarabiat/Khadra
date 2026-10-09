@@ -11,15 +11,26 @@ export interface ProblemSnapshot {
   readonly title: string | null;
   readonly traceId: string | null;
   readonly errors: Readonly<Record<string, readonly string[]>> | null;
+  /**
+   * The moment something refused as too early becomes possible (`booking.pickup_too_early`,
+   * `booking.return_too_early`; pre-launch item 225), as the server sent it. Absent otherwise.
+   */
+  readonly availableFrom?: string | null;
 }
 
 export function snapshotProblem(error: unknown): ProblemSnapshot {
-  const failure = (typeof error === 'object' && error !== null ? error : {}) as { status?: unknown; error?: unknown };
-  const body = (typeof failure.error === 'object' && failure.error !== null ? failure.error : {}) as {
+  const failure = (typeof error === 'object' && error !== null ? error : {}) as {
+    status?: unknown;
+    error?: unknown;
+  };
+  const body = (
+    typeof failure.error === 'object' && failure.error !== null ? failure.error : {}
+  ) as {
     code?: unknown;
     title?: unknown;
     traceId?: unknown;
     errors?: unknown;
+    availableFrom?: unknown;
   };
   return {
     status: typeof failure.status === 'number' ? failure.status : 0,
@@ -27,6 +38,7 @@ export function snapshotProblem(error: unknown): ProblemSnapshot {
     title: typeof body.title === 'string' && body.title.trim() !== '' ? body.title : null,
     traceId: typeof body.traceId === 'string' ? body.traceId : null,
     errors: isFieldErrors(body.errors) ? body.errors : null,
+    availableFrom: typeof body.availableFrom === 'string' ? body.availableFrom : null,
   };
 }
 
@@ -34,6 +46,8 @@ function isFieldErrors(value: unknown): value is Record<string, string[]> {
   return (
     typeof value === 'object' &&
     value !== null &&
-    Object.values(value).every((entry) => Array.isArray(entry) && entry.every((item) => typeof item === 'string'))
+    Object.values(value).every(
+      (entry) => Array.isArray(entry) && entry.every((item) => typeof item === 'string'),
+    )
   );
 }

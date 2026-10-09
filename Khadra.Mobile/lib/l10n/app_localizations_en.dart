@@ -2648,4 +2648,78 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get updateRequiredWhereFrom =>
       'Get the latest version from wherever you downloaded Khadra.';
+
+  @override
+  String get legalTerms => 'Terms of Service';
+
+  @override
+  String get legalPrivacy => 'Privacy notice';
+
+  @override
+  String legalVersion(String label) {
+    return 'Version $label';
+  }
+
+  @override
+  String get legalTextJustUpdated =>
+      'This text has just been updated. Try again in a few minutes.';
+
+  @override
+  String get legalTextOpenPage => 'Open the text in your browser';
+
+  @override
+  String get consentAgreeLead => 'I have read and accept the ';
+
+  @override
+  String get consentAgreeAnd => ' and the ';
+
+  @override
+  String get consentRequired => 'Tick the box to accept the texts in force.';
+
+  @override
+  String get consentVersionChanged =>
+      'The texts were updated while this page was open. Read the current version and tick the box again.';
+
+  @override
+  String get consentTextsUnavailable =>
+      'The texts in force could not be loaded. Try again.';
+
+  @override
+  String get consentTitle => 'Before you continue';
+
+  @override
+  String get consentBody =>
+      'Khadra has published the texts that govern your use of Khadra. Read them, then accept them to continue, or sign out.';
+
+  @override
+  String get consentAgree => 'I have read these texts and accept them.';
+
+  @override
+  String get consentRead => 'Read';
+
+  @override
+  String get consentAccept => 'Accept and continue';
+
+  @override
+  String get consentAccepting => 'Recording your acceptance…';
+
+  @override
+  String get consentChanged =>
+      'A newer version came into force while this page was open. Read the texts listed now, then accept again.';
+
+  @override
+  String get consentFailed => 'Your acceptance was not recorded. Try again.';
+
+  @override
+  String get consentPending => 'Accept the updated terms to continue.';
+
+  @override
+  String handoverPickupAvailableFrom(String time) {
+    return 'Your pickup code will be available from $time.';
+  }
+
+  @override
+  String handoverReturnAvailableFrom(String time) {
+    return 'Your return code will be available from $time.';
+  }
 }

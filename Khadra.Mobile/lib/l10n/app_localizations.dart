@@ -4307,6 +4307,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Get the latest version from wherever you downloaded Khadra.'**
   String get updateRequiredWhereFrom;
+
+  /// No description provided for @legalTerms.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get legalTerms;
+
+  /// No description provided for @legalPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy notice'**
+  String get legalPrivacy;
+
+  /// No description provided for @legalVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {label}'**
+  String legalVersion(String label);
+
+  /// The public copy of a legal text is cached for up to five minutes, so right after a publish it can still be the previous version. The app never shows a text other than the one being accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This text has just been updated. Try again in a few minutes.'**
+  String get legalTextJustUpdated;
+
+  /// No description provided for @legalTextOpenPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the text in your browser'**
+  String get legalTextOpenPage;
+
+  /// The registration checkbox, built around the two links: [lead][Terms of Service][and][Privacy notice]. Mirrors the website's consent.agreeLead and consent.agreeAnd.
+  ///
+  /// In en, this message translates to:
+  /// **'I have read and accept the '**
+  String get consentAgreeLead;
+
+  /// No description provided for @consentAgreeAnd.
+  ///
+  /// In en, this message translates to:
+  /// **' and the '**
+  String get consentAgreeAnd;
+
+  /// No description provided for @consentRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Tick the box to accept the texts in force.'**
+  String get consentRequired;
+
+  /// No description provided for @consentVersionChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The texts were updated while this page was open. Read the current version and tick the box again.'**
+  String get consentVersionChanged;
+
+  /// No description provided for @consentTextsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The texts in force could not be loaded. Try again.'**
+  String get consentTextsUnavailable;
+
+  /// No description provided for @consentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you continue'**
+  String get consentTitle;
+
+  /// No description provided for @consentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Khadra has published the texts that govern your use of Khadra. Read them, then accept them to continue, or sign out.'**
+  String get consentBody;
+
+  /// No description provided for @consentAgree.
+  ///
+  /// In en, this message translates to:
+  /// **'I have read these texts and accept them.'**
+  String get consentAgree;
+
+  /// No description provided for @consentRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get consentRead;
+
+  /// No description provided for @consentAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept and continue'**
+  String get consentAccept;
+
+  /// No description provided for @consentAccepting.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording your acceptance…'**
+  String get consentAccepting;
+
+  /// No description provided for @consentChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'A newer version came into force while this page was open. Read the texts listed now, then accept again.'**
+  String get consentChanged;
+
+  /// No description provided for @consentFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your acceptance was not recorded. Try again.'**
+  String get consentFailed;
+
+  /// No description provided for @consentPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept the updated terms to continue.'**
+  String get consentPending;
+
+  /// Before the pickup window opens (pre-launch item 225). The time is the server's, in Amman.
+  ///
+  /// In en, this message translates to:
+  /// **'Your pickup code will be available from {time}.'**
+  String handoverPickupAvailableFrom(String time);
+
+  /// No description provided for @handoverReturnAvailableFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Your return code will be available from {time}.'**
+  String handoverReturnAvailableFrom(String time);
 }
 
 class _AppLocalizationsDelegate

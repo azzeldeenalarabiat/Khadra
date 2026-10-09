@@ -6204,3 +6204,30 @@ and the prompt on `pendingConsents` or 403 `legal.consent_pending` (the 1.4.0 le
 `docs/fix-and-polish-ledger.md`). Publish 1.4.0 first; then deploy the API with `MobileApp:MinimumSupportedVersion`
 raised to 1.4.0, consent required of the app's registration, and the gate's exemption for a declared version removed —
 every build the minimum still admits can answer it then. `docs/contracts/README.md` describes the exemption.
+
+### 239. The pre-1.4.0 bridges stay in the code until they are removed
+
+**Status:** open, close-out of Wave 7 · **Raised:** 2026-10-10 (Fix & Polish Wave 7; owner, 2026-10-09)
+
+Wave 7 holds every caller to three rules that installed apps older than 1.4.0 cannot answer: consent at registration
+and on every request (items 224 and 238), a handover code only once its window has opened (item 225), and a customer's
+copy of a decided dispute carrying only their own share (item 151). So that the API can ship ahead of the app, a
+request that DECLARES an app version older than 1.4.0 (`X-Khadra-App-Version`) is spared each of them. The owner's
+words, 2026-10-09: "a temporary backward-compatibility bridge only, not a security boundary". A caller holding a
+customer's own token can declare 1.3.0 directly and skip all three, exactly as it could skip the consent gate before
+Wave 7. The bridges become inert the moment `MobileApp:MinimumSupportedVersion` reaches 1.4.0, because the version gate
+refuses a declared 1.3.0 with 426 before any of them runs. Inert is not removed, and a rollback of the minimum would
+wake them.
+
+The bridge is these, and nothing else reads them: `MobileAppContract.ConsentAwareFrom`, `HandoverWindowAwareFrom` and
+`DisputeSharesWithheldFrom`; `ClientInfo.DeclaredVersion` and `PredatesRule`; the declared-version branch in
+`LegalConsentGate.MustJudge`; `Required: !client.PredatesRule(...)` in `RegisterCustomerHandler`; the window check's
+condition in `IssueHandoverCodeHandler`; `withholdOtherShares` on `DisputeDto.ForCustomer` and
+`DisputeResolutionDto.ForCustomer`, and the `ClientInfo` the dispute commands carry to the composer for it. Each one's
+tests pin the older build's exemption beside the newer build's rule.
+
+**To close, once the minimum is 1.4.0 on Staging and on Production and verified (an emulator or second device on 1.3.0
+gets the update screen):** delete all of the above and the older-build tests, so every caller is held to all three
+rules unconditionally. Pin "tracked minimum ≥ 1.4.0" in `MobileAppMinimumVersionTests`. Then amend the rollback in
+`docs/contracts/README.md`: clearing the minimum no longer brings 1.3.0 back to a working app, because the API it
+would reach asks what 1.3.0 cannot answer.

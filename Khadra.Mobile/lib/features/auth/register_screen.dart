@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/providers.dart';
@@ -11,6 +13,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../legal/legal_text_screen.dart';
 import 'auth_form_widgets.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -37,8 +40,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _error;
   String? _dateError;
 
+  /// The consent checkbox (pre-launch item 238): ticked by the person, never pre-ticked.
+  bool _acceptedTexts = false;
+  String? _consentError;
+
+  /// The two links inside the consent sentence, owned here so each build's are disposed.
+  final List<TapGestureRecognizer> _textLinks = [];
+
   @override
   void dispose() {
+    for (final link in _textLinks) {
+      link.dispose();
+    }
     _name.dispose();
     _email.dispose();
     _phone.dispose();
@@ -69,7 +82,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
-  Future<void> _submit(int? minimumAge) async {
+  Future<void> _submit(int? minimumAge, List<LegalDocumentRef> texts) async {
     final l10n = AppLocalizations.of(context);
     final formValid = _formKey.currentState?.validate() ?? false;
 
@@ -79,11 +92,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // nothing.
     final needsDate = minimumAge != null && _dateOfBirth == null;
     if (needsDate) setState(() => _dateError = l10n.validationDateOfBirth);
-    if (!formValid || needsDate) return;
+
+    // The texts in force must be accepted, and the server holds the app to it from
+    // 1.4.0 (pre-launch item 238). With none in force there is nothing to tick.
+    final needsConsent = texts.isNotEmpty && !_acceptedTexts;
+    if (needsConsent) setState(() => _consentError = l10n.consentRequired);
+    if (!formValid || needsDate || needsConsent) return;
 
     setState(() {
       _busy = true;
       _error = null;
+      _consentError = null;
     });
 
     try {
@@ -94,6 +113,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             phone: _phone.text.trim(),
             dateOfBirth: _dateOfBirth,
             isForeignNational: _isForeignNational,
+            // Exactly the versions /app-config listed and the person ticked, in the
+            // language they read them in.
+            acceptedLegalVersions: [for (final text in texts) text.versionId],
+            legalLanguage: ref.read(appLanguageProvider),
           );
 
       // Creating an account is a choice about how to use the app, so the Get
@@ -122,14 +145,80 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
     } on ApiFailure catch (failure) {
       if (!mounted) return;
+      // A text came into force, or a version changed, while the form was open; or the
+      // texts were never known (the config said "not known"). Either way the list is
+      // read again and the person ticks the box against what is in force now.
+      final consentMoved = failure.code == 'legal.version_not_current' || failure.code == 'legal.consent_required';
+      if (consentMoved) ref.invalidate(appConfigProvider);
       setState(() {
         _busy = false;
-        _error = failure.messageFor(
-          l10n,
-          config: ref.read(appConfigProvider).valueOrNull,
-        );
+        if (consentMoved) {
+          _acceptedTexts = false;
+          _error = texts.isEmpty ? l10n.consentTextsUnavailable : l10n.consentVersionChanged;
+        } else {
+          _error = failure.messageFor(
+            l10n,
+            config: ref.read(appConfigProvider).valueOrNull,
+          );
+        }
       });
     }
+  }
+
+  /// "I have read and accept the [Terms of Service] and the [Privacy notice]", each name opening
+  /// that text in the version being accepted. Built from pieces so each link is its own target,
+  /// the website's consent.agreeLead / consent.agreeAnd.
+  Widget _consent(AppLocalizations l10n, List<LegalDocumentRef> texts) {
+    for (final link in _textLinks) {
+      link.dispose();
+    }
+    _textLinks.clear();
+    final spans = <InlineSpan>[TextSpan(text: l10n.consentAgreeLead)];
+    for (var i = 0; i < texts.length; i++) {
+      if (i > 0) spans.add(TextSpan(text: l10n.consentAgreeAnd));
+      final document = texts[i];
+      final link = TapGestureRecognizer()..onTap = () => LegalTextScreen.open(context, document);
+      _textLinks.add(link);
+      spans.add(TextSpan(
+        text: legalDocumentTitle(l10n, document.kind),
+        style: const TextStyle(color: KhadraColors.accent, decoration: TextDecoration.underline),
+        recognizer: link,
+      ));
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                key: const ValueKey('register-consent'),
+                value: _acceptedTexts,
+                onChanged: _busy
+                    ? null
+                    : (value) => setState(() {
+                          _acceptedTexts = value ?? false;
+                          if (_acceptedTexts) _consentError = null;
+                        }),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: Space.sm),
+                  child: Text.rich(TextSpan(children: spans), style: const TextStyle(fontSize: 14, height: 1.4)),
+                ),
+              ),
+            ],
+          ),
+          if (_consentError != null)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: Space.md),
+              child: Text(_consentError!, style: const TextStyle(color: KhadraColors.bad, fontSize: 12)),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -139,6 +228,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final formats = ref.watch(formatsProvider);
     final minimumAge = config.valueOrNull?.minimumRenterAge;
     final passwordPolicy = ref.watch(passwordPolicyProvider);
+    // The texts in force, from /app-config. Empty when nothing is published (nothing
+    // to tick) and when the server could not say (the submit then re-reads them).
+    final texts = config.valueOrNull?.legal?.documents ?? const <LegalDocumentRef>[];
 
     return AuthScaffold(
       title: l10n.authCreateAccountTitle,
@@ -240,13 +332,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
 
+        if (texts.isNotEmpty) _consent(l10n, texts),
+
         // Until the config answers, the form does not know whether to ask for a
-        // date of birth, so submitting early could send a registration the server
-        // refuses on a field the customer was never shown.
+        // date of birth or for consent, so submitting early could send a
+        // registration the server refuses on a field the customer was never shown.
         KhadraSubmitButton(
           label: l10n.authSignUp,
           busy: _busy || config.isLoading,
-          onPressed: () => _submit(minimumAge),
+          onPressed: () => _submit(minimumAge, texts),
         ),
         const SizedBox(height: Space.xl),
         Row(

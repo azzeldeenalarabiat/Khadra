@@ -58,20 +58,36 @@ public sealed partial class DisputeViewComposer(
         return await ComposeAsync(ticket, booking, viewer, cancellationToken);
     }
 
+    /// <summary>The view for a reader whose client is not known: held to every rule, so the minimised customer copy.</summary>
+    public Task<DisputeDto> ComposeAsync(
+        DisputeTicket ticket,
+        Booking booking,
+        BookingParty viewer,
+        CancellationToken cancellationToken) =>
+        ComposeAsync(ticket, booking, viewer, ClientInfo.Unknown, cancellationToken);
+
     /// <param name="viewer">
     /// The party the view is for, always named: a path that forgot it must not get the administrator's
-    /// copy by default. A customer's copy carries no commission; an office's carries no refund, no fee,
-    /// and of a decision only the basis, the office's own share and any charge to it (owner decision 3).
+    /// copy by default. A customer's copy carries no commission, and of a decision only their own share
+    /// (owner decision 3); an office's carries no refund, no fee, and of a decision only the basis, the
+    /// office's own share and any charge to it.
+    /// </param>
+    /// <param name="client">
+    /// Who is reading. Only an app build older than <see cref="MobileAppContract.DisputeSharesWithheldFrom"/> still
+    /// reads the office's and the platform's shares on the customer's copy: it renders them, and would show a share it
+    /// was no longer sent as zero (a temporary bridge, pre-launch item 239).
     /// </param>
     public async Task<DisputeDto> ComposeAsync(
         DisputeTicket ticket,
         Booking booking,
         BookingParty viewer,
+        ClientInfo client,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ticket);
         ArgumentNullException.ThrowIfNull(booking);
         ArgumentNullException.ThrowIfNull(viewer);
+        ArgumentNullException.ThrowIfNull(client);
 
         var now = clock.UtcNow;
         var context = await bookingReader.ContextAsync(booking.Id, cancellationToken);
@@ -155,7 +171,9 @@ public sealed partial class DisputeViewComposer(
             // The office's copy only: what the decision comes to for its money (Wave 2 C1).
             viewer == BookingParty.Dealer ? await ExpectedOutcomeAsync(ticket, booking, resolvedTickets, now, cancellationToken) : null);
         // The customer's copy names the platform and the office, never their people (D5 A; owner, 2026-10-06, Q4).
-        return viewer == BookingParty.Customer ? view.ForCustomer(context.DealerName) : view;
+        return viewer == BookingParty.Customer
+            ? view.ForCustomer(context.DealerName, withholdOtherShares: !client.PredatesRule(MobileAppContract.DisputeSharesWithheldFrom))
+            : view;
     }
 
     /// <summary>

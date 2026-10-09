@@ -18,14 +18,16 @@ public sealed class RegisterCustomerHandler(AccountRegistrar registrar)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        // The website must ask for the texts in force, and the server holds it to that (W4-D7). The customer app is
-        // spared until a build asks for them itself (1.4.0): an installed build cannot be patched, only refused, and a
-        // registration it never knew to send must not start failing under it.
+        // The website must ask for the texts in force, and the server holds it to that (W4-D7); so must the customer app,
+        // from the build that asks for them itself (1.4.0, pre-launch item 238). An app build older than that is spared
+        // until the minimum refuses it outright: an installed build cannot be patched, only refused, and a registration
+        // it never knew to send must not start failing under it (a temporary bridge, not a boundary; item 239). The
+        // channel is where consent was given, whether or not it was required of that build.
         var client = request.Client ?? ClientInfo.Unknown;
         var consent = new ConsentRequest(
             request.Consent ?? ConsentInput.None,
             client.IsCustomerApp ? ConsentChannel.App : ConsentChannel.Website,
-            Required: !client.IsCustomerApp);
+            Required: !client.PredatesRule(MobileAppContract.ConsentAwareFrom));
 
         return registrar.RegisterAsync(
             request.Email,

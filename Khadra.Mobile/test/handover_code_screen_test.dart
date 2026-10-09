@@ -3,10 +3,12 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
+import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/features/bookings/handover_code_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'support/fake_api.dart';
 
@@ -176,5 +178,53 @@ void main() {
     await close(tester);
 
     expect(result, isFalse);
+  });
+
+  // Pre-launch item 225 (Wave 7): the server issues no code before its window and names the moment it opens. The
+  // booking screen offers the code from that moment on the server's clock, so this is a tap a second early.
+  group('asked for before its window', () {
+    setUpAll(tz_data.initializeTimeZones);
+
+    ApiFailure tooEarly(String code, String? availableFrom) => ApiFailure(
+          kind: ApiFailureKind.conflict,
+          code: code,
+          statusCode: 409,
+          extensions: {if (availableFrom != null) 'availableFrom': availableFrom},
+        );
+
+    testWidgets('says when the pickup code will be available', (tester) async {
+      api.handoverFailure = tooEarly('booking.pickup_too_early', '2026-10-12T07:00:00+00:00');
+      await open(tester);
+      await tester.pumpAndSettle();
+
+      // 07:00 UTC is 10:00 in Amman.
+      expect(find.textContaining('Your pickup code will be available from'), findsOneWidget);
+      expect(find.textContaining('10:00'), findsOneWidget);
+      expect(find.byType(QrImageView), findsNothing);
+
+      await close(tester);
+    });
+
+    testWidgets('says when the return code will be available', (tester) async {
+      api.handoverFailure = tooEarly('booking.return_too_early', '2026-10-12T09:00:00+00:00');
+      await open(tester, status: 'PickedUp');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Your return code will be available from'), findsOneWidget);
+      expect(find.textContaining('12:00'), findsOneWidget);
+
+      await close(tester);
+    });
+
+    testWidgets('falls back to the general wording when the server names no moment', (tester) async {
+      api.handoverFailure = tooEarly('booking.pickup_too_early', null);
+      await open(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('will be available from'), findsNothing);
+      expect(find.text(en.handoverNotAvailable), findsOneWidget);
+
+      await close(tester);
+    });
   });
 }

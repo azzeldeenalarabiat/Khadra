@@ -171,15 +171,32 @@ public sealed class LegalConsentGateTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, config.StatusCode);
     }
 
-    /// <summary>No installed build knows to ask, and an installed build cannot be patched, only refused.</summary>
+    /// <summary>
+    /// An installed build older than 1.4.0 cannot ask, and cannot be patched, only refused: it is spared until the minimum
+    /// refuses it outright (a temporary bridge, never a security boundary; pre-launch item 239).
+    /// </summary>
     [Fact]
-    public async Task The_customer_app_is_never_judged_by_the_version_it_declares()
+    public async Task An_app_build_older_than_the_consent_release_is_spared_until_the_minimum_rises()
     {
         using var client = ClientFor(_customer, appVersion: "1.3.0");
 
         using var documents = await client.GetAsync(new Uri("/api/v1/customers/me/documents", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, documents.StatusCode);
+    }
+
+    /// <summary>From 1.4.0 the app asks for consent itself, so it is judged like the website (pre-launch item 238).</summary>
+    [Theory]
+    [InlineData("1.4.0")]
+    [InlineData("1.4.0+7")]
+    [InlineData("1.10.0")]
+    public async Task The_consent_asking_app_and_every_later_build_are_judged(string version)
+    {
+        using var client = ClientFor(_customer, appVersion: version);
+
+        using var documents = await client.GetAsync(new Uri("/api/v1/customers/me/documents", UriKind.Relative));
+
+        Assert.True(await RefusedByTheGateAsync(documents));
     }
 
     [Fact]
@@ -243,14 +260,18 @@ public sealed class LegalConsentGateTests : IDisposable
     }
 
     /// <summary>
-    /// The exemption is keyed on a DECLARED version (the advisor's review): a legacy User-Agent or an unreadable version
-    /// is something anyone can type, and with no minimum configured neither would be refused first. When the minimum
-    /// reaches the first build that asks for consent (1.4.0), the exemption is deleted: see pre-launch item 238.
+    /// The bridge is keyed on a DECLARED version older than the release that asks for consent (the advisor's reviews of
+    /// Waves 4 and 7): a legacy User-Agent or an unreadable version is something anyone can type, and with no minimum
+    /// configured neither would be refused first. When the minimum reaches 1.4.0 the bridge is deleted (item 239).
     /// </summary>
     [Fact]
-    public void Only_an_app_build_that_declared_its_version_is_spared()
+    public void Only_an_app_build_that_declared_a_version_older_than_the_consent_release_is_spared()
     {
         Assert.False(LegalConsentGate.MustJudge(Request(version: "1.3.0"), Actor(UserRole.Customer)));
+        Assert.False(LegalConsentGate.MustJudge(Request(version: "1.4.0-rc.1"), Actor(UserRole.Customer)));
+        Assert.True(LegalConsentGate.MustJudge(Request(version: "1.4.0"), Actor(UserRole.Customer)));
+        Assert.True(LegalConsentGate.MustJudge(Request(version: "1.4.0+7"), Actor(UserRole.Customer)));
+        Assert.True(LegalConsentGate.MustJudge(Request(version: "1.10.0"), Actor(UserRole.Customer)));
         Assert.True(LegalConsentGate.MustJudge(Request(version: "not-a-version"), Actor(UserRole.Customer)));
         Assert.True(LegalConsentGate.MustJudge(Request(userAgent: "Khadra (Android 16)"), Actor(UserRole.Customer)));
     }

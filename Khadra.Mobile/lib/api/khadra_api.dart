@@ -67,6 +67,8 @@ class KhadraApi {
     required String phone,
     DateTime? dateOfBirth,
     bool isForeignNational = false,
+    List<String> acceptedLegalVersions = const [],
+    String? legalLanguage,
   }) async =>
       RegisteredUser.fromJson(_object(await _client.post<dynamic>(
         '/api/v1/auth/register',
@@ -81,6 +83,12 @@ class KhadraApi {
           if (dateOfBirth != null)
             'dateOfBirth': _dateOnly(dateOfBirth),
           'isForeignNational': isForeignNational,
+          // The texts in force this person ticked, exactly as /app-config listed
+          // them, and the language they read them in (pre-launch item 238).
+          if (acceptedLegalVersions.isNotEmpty) ...{
+            'acceptedLegalVersions': acceptedLegalVersions,
+            'legalLanguage': legalLanguage,
+          },
         },
         options: AuthInterceptor.anonymous(),
       )));
@@ -107,6 +115,33 @@ class KhadraApi {
 
   Future<AuthUser> me() async =>
       AuthUser.fromJson(_object(await _client.get<dynamic>('/api/v1/auth/me')));
+
+  // ── Legal texts and consent (pre-launch items 224 and 238) ────────────────────
+
+  /// The texts in force this person has still to accept. Uncached, and allowed
+  /// while consent is pending: it is what the prompt reads.
+  Future<MyLegalConsents> myLegalConsents() async => MyLegalConsents.fromJson(
+        _object(await _client.get<dynamic>('/api/v1/auth/me/legal-consents')),
+      );
+
+  /// Accepts exactly the versions the prompt showed, in the language they were
+  /// read in. A version no longer in force is refused (409 legal.version_not_current).
+  Future<MyLegalConsents> acceptLegalTexts({
+    required List<String> versionIds,
+    required String language,
+  }) async =>
+      MyLegalConsents.fromJson(_object(await _client.post<dynamic>(
+        '/api/v1/auth/me/legal-consents',
+        body: {'versionIds': versionIds, 'language': language},
+      )));
+
+  /// A text in force, rendered by the server. Anonymous and publicly cached for
+  /// five minutes: the caller compares its version with the one it is showing.
+  Future<PublicLegalDocument> legalDocument(String slug) async =>
+      PublicLegalDocument.fromJson(_object(await _client.get<dynamic>(
+        '/api/v1/legal-documents/${Uri.encodeComponent(slug)}/current',
+        options: AuthInterceptor.anonymous(),
+      )));
 
   /// Tells the platform which phone to wake for this session, and in which language.
   ///

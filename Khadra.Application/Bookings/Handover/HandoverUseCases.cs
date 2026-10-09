@@ -21,18 +21,27 @@ public sealed record HandoverCodeDto(string Type, string Code, string QrPayload,
 }
 
 /// <summary>The customer asks for a code to prove, at the counter, that this booking is theirs.</summary>
-public sealed record IssueHandoverCodeCommand(Id BookingId) : ICommand<Result<HandoverCodeDto, Error>>;
+public sealed record IssueHandoverCodeCommand(Id BookingId, ClientInfo? Client = null) : ICommand<Result<HandoverCodeDto, Error>>;
 
 /// <remarks>
 /// <para>
 /// <b>Which handover is decided by the booking</b>, never by the caller: Confirmed means the car is
 /// waiting to be collected, PickedUp means it is out and coming back. Any other status has nothing to
-/// prove and is refused. A code is issued the whole time the booking is Confirmed, even before the
-/// pickup window opens. That is deliberate (owner, 2026-10-06): installed customer apps ask for it on
-/// any confirmed booking, and refusing a request they used to have accepted would break every one of
-/// them. The window is enforced where it protects something instead — the office cannot RECORD a
-/// pickup before <c>Booking.PickupAvailableFrom</c> or a return before the start — so an early code
-/// proves nothing, and it expires within minutes anyway. The website hides it until the window opens.
+/// prove and is refused.
+/// </para>
+/// <para>
+/// <b>Not before its window</b> (pre-launch item 225; owner, Wave 7): a pickup code is issued from
+/// <c>Booking.PickupAvailableFrom</c> and a return code from <c>Booking.ReturnAvailableFrom</c>, by the
+/// very predicates the office's recording reads, so issuing and recording cannot drift apart. Too early
+/// is refused with the same <c>booking.pickup_too_early</c> / <c>booking.return_too_early</c> the office
+/// gets, naming the moment as <c>availableFrom</c> so the website and the app can say when.
+/// </para>
+/// <para>
+/// <b>The one exception is temporary.</b> A customer app build older than
+/// <see cref="MobileAppContract.HandoverWindowAwareFrom"/> offers the code on any confirmed booking and
+/// cannot be patched, only refused, so it is still answered early until the minimum supported version
+/// refuses it outright (pre-launch item 239). A bridge, not a security boundary: an early code still
+/// proves nothing, because recording refuses before the window regardless, and it expires within minutes.
 /// </para>
 /// <para>
 /// <b>Asking again replaces the code.</b> The previous one stops working at once, so a screenshot a
@@ -68,6 +77,13 @@ public sealed class IssueHandoverCodeHandler(
             return HandoverErrors.NotAvailable;
 
         var now = clock.UtcNow;
+        if (!(request.Client ?? ClientInfo.Unknown).PredatesRule(MobileAppContract.HandoverWindowAwareFrom))
+        {
+            var window = type == HandoverType.Pickup ? booking.PickupWindowOpenAt(now) : booking.ReturnWindowOpenAt(now);
+            if (window.IsFailure)
+                return window.Error;
+        }
+
         foreach (var previous in await codes.ListCurrentAsync(booking.Id, type, cancellationToken))
             previous.Supersede(now);
 

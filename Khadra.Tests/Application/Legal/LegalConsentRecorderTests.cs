@@ -120,7 +120,7 @@ public sealed class LegalConsentRecorderTests
     [Fact]
     public void The_channel_is_the_app_for_a_declared_app_build_the_website_for_a_customer_and_the_console_otherwise()
     {
-        var app = new ClientInfo("1.2.3.4", "Khadra/1.3.0", IsCustomerApp: true);
+        var app = new ClientInfo("1.2.3.4", "Khadra/1.3.0", AppVersion.Parse("1.3.0"));
         var browser = new ClientInfo("1.2.3.4", "Mozilla/5.0");
 
         Assert.Same(ConsentChannel.App, LegalConsentRecorder.ChannelFor(UserRole.Customer, app));

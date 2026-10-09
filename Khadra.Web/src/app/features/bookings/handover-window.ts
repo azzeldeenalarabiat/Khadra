@@ -4,10 +4,10 @@ import { Booking } from '../../core/api/bookings.api';
  * Whether the customer's handover code is worth showing yet (Wave 3 D4; owner, 2026-10-05).
  *
  * The rental office cannot record a pickup before the booking's `pickupAvailableFrom` — the rental start less the
- * turnaround frozen on it — nor a return before `returnAvailableFrom`, the rental start. The server still issues a
- * code at any time while the booking is confirmed, because installed apps ask for one on every confirmed booking
- * (owner, 2026-10-06); this page simply does not offer one the office could not use, and says when it will. The
- * moments are the SERVER's; nothing here works them out.
+ * turnaround frozen on it — nor a return before `returnAvailableFrom`, the rental start, and since Wave 7 the server
+ * does not issue the code before then either (pre-launch item 225): this page does not offer it, and says when it
+ * will. The moments are the SERVER's; nothing here works them out. A browser clock that runs ahead can still ask a
+ * moment early, and the code panel words the server's refusal with the moment it names.
  */
 export interface HandoverWindow {
   /** Which code the booking is waiting for, or null when it waits for none. */
@@ -19,7 +19,8 @@ export interface HandoverWindow {
 }
 
 export function handoverWindow(booking: Booking | null | undefined, now: number): HandoverWindow {
-  const kind = booking?.status === 'Confirmed' ? 'Pickup' : booking?.status === 'PickedUp' ? 'Return' : null;
+  const kind =
+    booking?.status === 'Confirmed' ? 'Pickup' : booking?.status === 'PickedUp' ? 'Return' : null;
   if (!booking || !kind) return { kind: null, open: false, opensAt: null };
   const moment = kind === 'Pickup' ? booking.pickupAvailableFrom : booking.returnAvailableFrom;
   if (!moment) return { kind, open: true, opensAt: null };

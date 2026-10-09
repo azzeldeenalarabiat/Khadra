@@ -171,4 +171,62 @@ void main() {
       async.elapse(const Duration(seconds: 5));
     });
   });
+
+  // Pre-launch item 238: while the consent prompt stands in front of the app, every read a surface
+  // makes is refused with 403 legal.consent_pending. Polling behind it would only collect refusals,
+  // and each one raises the prompt again.
+  group('held behind the consent prompt', () {
+    test('nothing polls, nothing is touched, and nothing re-reads on becoming visible', () {
+      run((async) {
+        live.register(surface(poll: const Duration(seconds: 60)));
+        live.setHeld(true);
+
+        async.elapse(const Duration(minutes: 10));
+        live.touch('queue');
+        live.markStale('queue');
+        live.becameVisible();
+        async.flushMicrotasks();
+
+        expect(reads, 0);
+      });
+    });
+
+    test('lets go at once when the prompt is gone, and polls on its cadence again', () {
+      run((async) {
+        live.register(surface(poll: const Duration(seconds: 60)));
+        live.setHeld(true);
+        async.elapse(const Duration(minutes: 2));
+
+        live.setHeld(false);
+        async.flushMicrotasks();
+        expect(reads, 1, reason: 'the screen behind the prompt reads itself as soon as it is uncovered');
+
+        async.elapse(const Duration(seconds: 65));
+        expect(reads, 2);
+      });
+    });
+
+    test('the lifecycle and the prompt cannot undo each other', () {
+      run((async) {
+        live.register(surface(poll: const Duration(seconds: 60)));
+        live.setHeld(true);
+
+        // Back to the front while the prompt is still up: still held.
+        live.setResumed(false);
+        live.setResumed(true);
+        async.elapse(const Duration(minutes: 3));
+        expect(reads, 0);
+
+        // The prompt goes while the app is in the background: still asleep.
+        live.setResumed(false);
+        live.setHeld(false);
+        async.elapse(const Duration(minutes: 3));
+        expect(reads, 0);
+
+        live.setResumed(true);
+        async.flushMicrotasks();
+        expect(reads, 1);
+      });
+    });
+  });
 }

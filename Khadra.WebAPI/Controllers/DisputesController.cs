@@ -54,7 +54,7 @@ public sealed class DisputesController(ICurrentActor actor) : ApiControllerBase
     public async Task<ActionResult> Open([FromBody] OpenDisputeRequest request, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new OpenDisputeCommand(actor.UserId!.Value, Id.From(request.BookingId), request.Reason, request.EvidenceKeys ?? []),
+            new OpenDisputeCommand(actor.UserId!.Value, Id.From(request.BookingId), request.Reason, request.EvidenceKeys ?? [], Client),
             cancellationToken);
         return FromResult(result, dispute => CreatedAtAction(nameof(Get), new { ticketId = dispute.TicketId }, dispute));
     }
@@ -64,7 +64,7 @@ public sealed class DisputesController(ICurrentActor actor) : ApiControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Get(Guid ticketId, CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new GetMyDisputeQuery(actor.UserId!.Value, Id.From(ticketId)), cancellationToken);
+        var result = await Mediator.Send(new GetMyDisputeQuery(actor.UserId!.Value, Id.From(ticketId), Client), cancellationToken);
         return FromResult(result);
     }
 
@@ -77,7 +77,7 @@ public sealed class DisputesController(ICurrentActor actor) : ApiControllerBase
         CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new AddDisputeStatementCommand(actor.UserId!.Value, Id.From(ticketId), request.Body, request.EvidenceKeys ?? []),
+            new AddDisputeStatementCommand(actor.UserId!.Value, Id.From(ticketId), request.Body, request.EvidenceKeys ?? [], Client),
             cancellationToken);
         return FromResult(result);
     }
@@ -87,7 +87,7 @@ public sealed class DisputesController(ICurrentActor actor) : ApiControllerBase
     [ProducesResponseType<DisputeDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult> Withdraw(Guid ticketId, CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new WithdrawDisputeCommand(actor.UserId!.Value, Id.From(ticketId)), cancellationToken);
+        var result = await Mediator.Send(new WithdrawDisputeCommand(actor.UserId!.Value, Id.From(ticketId), Client), cancellationToken);
         return FromResult(result);
     }
 }

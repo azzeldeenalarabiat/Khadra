@@ -17,19 +17,6 @@ export function decidedEarlier(d: { readonly decidedByEarlierTickets?: Money }):
 }
 
 /**
- * Whether a settled dispute may be summed up as "nothing is owed by either side": it waived everything
- * AND no earlier dispute on the booking decided part of the deposit. A later ticket that split nothing
- * also "waives everything", but the first may have kept money for the office — so there the page shows
- * the figures instead, with the earlier decision beside them.
- */
-export function readsAsWaived(d: {
-  readonly resolution: { readonly waivesEverything: boolean } | null;
-  readonly decidedByEarlierTickets?: Money;
-}): boolean {
-  return !!d.resolution?.waivesEverything && decidedEarlier(d) === null;
-}
-
-/**
  * On a live dispute, what earlier disputes on the same booking already decided (owner, 2026-09-26;
  * pre-launch item 169), or null when none did — including on an API too old to say. Nothing here
  * subtracts: the only choice made is which sentence, from whether the server says anything is left.
@@ -40,7 +27,8 @@ export function earlierDecisionNotice(
   money: (value: Money) => string,
 ): string | null {
   const decided = d.decidedByEarlierTickets;
-  if (!d.isLive || !decided || decided.amount <= 0 || !d.depositOnBooking || !d.depositHeld) return null;
+  if (!d.isLive || !decided || decided.amount <= 0 || !d.depositOnBooking || !d.depositHeld)
+    return null;
   return d.depositHeld.amount > 0
     ? t('dispute.earlierDecidedPart', {
         decided: money(decided),

@@ -10,7 +10,9 @@ import '../api/khadra_api.dart';
 import 'api/api_client.dart';
 import 'api/app_version_interceptor.dart';
 import 'api/auth_interceptor.dart';
+import 'api/consent_interceptor.dart';
 import 'api/language_interceptor.dart';
+import 'api/server_clock.dart';
 import 'config/app_environment.dart';
 import 'config/app_version.dart';
 import 'config/update_requirement.dart';
@@ -63,6 +65,20 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     // the screen it raises.
     onUpdateRequired: (requirement) =>
         ref.read(serverUpdateRefusalProvider.notifier).state ??= requirement,
+  ));
+
+  // The server's clock, from every answer of the API's own: what the app OFFERS
+  // (a pickup code) is judged against the server's "now", never only the phone's.
+  dio.interceptors.add(ServerClockInterceptor(
+    ref.read(serverClockProvider),
+    apiBaseUrl: AppEnvironment.apiBaseUrl,
+  ));
+
+  // A text in force not yet accepted (403 legal.consent_pending): the consent
+  // prompt goes up over the app. Before the auth interceptor, for the same reason
+  // the version check is: it must see the refusal whatever comes after.
+  dio.interceptors.add(ConsentInterceptor(
+    onConsentPending: () => ref.read(consentRequiredProvider.notifier).state = true,
   ));
 
   dio.interceptors.add(AuthInterceptor(
@@ -305,6 +321,18 @@ final installedAppVersionProvider = Provider<String?>((ref) => null);
 /// could flip back would tear the whole navigator down and put it up again.
 final serverUpdateRefusalProvider =
     StateProvider<UpdateRequirement?>((ref) => null);
+
+/// The server's clock, as the answers of the API have stated it. See [ServerClock].
+final serverClockProvider = Provider<ServerClock>((ref) => ServerClock());
+
+/// Whether the signed-in person has a legal text in force still to accept, so the
+/// consent prompt stands in for the app (pre-launch items 224 and 238).
+///
+/// Raised by `/auth/me` naming pending texts, or by any call refused with
+/// `403 legal.consent_pending` ([ConsentInterceptor]). Lowered when the prompt's
+/// acceptance leaves nothing pending, and whenever nobody is signed in. Unlike the
+/// update refusal it CAN be cleared: answering it is the whole point.
+final consentRequiredProvider = StateProvider<bool>((ref) => false);
 
 /// Whether this build must be updated before it can be used — null when it may
 /// run.

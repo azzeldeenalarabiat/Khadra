@@ -1,21 +1,34 @@
 <div class="container page page--medium booking">
   @if (notFound()) {
-    <kh-state-panel icon="gavel" [title]="i18n.t('dispute.notFoundTitle')" [text]="i18n.t('dispute.notFoundText')" />
+    <kh-state-panel
+      icon="gavel"
+      [title]="i18n.t('dispute.notFoundTitle')"
+      [text]="i18n.t('dispute.notFoundText')"
+    />
   } @else if (problem(); as failure) {
     <kh-state-panel kind="error" [problem]="failure" (action)="dispute.reload()" />
   } @else if (dispute.value(); as d) {
     @if (justOpened() && d.isLive) {
-      <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('dispute.opened') }}</p></div>
+      <div class="notice notice--ok" role="status">
+        <kh-icon name="check-circle" />
+        <p>{{ i18n.t('dispute.opened') }}</p>
+      </div>
     }
     <a class="crumbs small" [routerLink]="i18n.link('bookings', d.bookingId)">
-      <kh-icon [name]="i18n.isArabic() ? 'arrow-right' : 'arrow-left'" /> {{ i18n.t('dispute.onBooking', { reference: d.booking.reference }) }}</a>
+      <kh-icon [name]="i18n.isArabic() ? 'arrow-right' : 'arrow-left'" />
+      {{ i18n.t('dispute.onBooking', { reference: d.booking.reference }) }}</a
+    >
 
     <header class="card card--pad">
-      <p class="row"><span class="badge {{ tone(d.status) }}">{{ status(d.status) }}</span>
-        <span class="faint small">{{ openedBy(d.openedByParty, d.openedAt) }}</span></p>
+      <p class="row">
+        <span class="badge {{ tone(d.status) }}">{{ status(d.status) }}</span>
+        <span class="faint small">{{ openedBy(d.openedByParty, d.openedAt) }}</span>
+      </p>
       <h1 class="booking-head__title">{{ i18n.t('dispute.title') }}</h1>
       @if (d.isLive) {
-        <p class="muted">{{ i18n.t('dispute.answerBy', { deadline: format.dateTime(d.slaDeadline) }) }}</p>
+        <p class="muted">
+          {{ i18n.t('dispute.answerBy', { deadline: format.dateTime(d.slaDeadline) }) }}
+        </p>
       } @else if (d.closedAt) {
         <p class="muted">{{ i18n.t('dispute.closedAt', { date: format.dateTime(d.closedAt) }) }}</p>
       }
@@ -31,13 +44,26 @@
       <ul class="history">
         @for (statement of d.statements; track statement.statementId) {
           <li>
-            <span><strong>{{ party(statement.party) }}</strong>&ngsp;<span class="faint small">· {{ format.dateTime(statement.createdAt) }}</span></span>
+            <span
+              ><strong>{{ party(statement.party) }}</strong
+              >&ngsp;<span class="faint small"
+                >· {{ format.dateTime(statement.createdAt) }}</span
+              ></span
+            >
             <span class="prose user-text" dir="auto">{{ statement.body }}</span>
             @if (statement.evidence?.length) {
               <span class="row small">
                 @for (file of statement.evidence; track file.url) {
-                  <a class="link user-text" dir="auto" [href]="file.url" target="_blank" rel="noopener"><kh-icon name="paperclip" />{{ file.fileName }}</a>
-                }</span>
+                  <a
+                    class="link user-text"
+                    dir="auto"
+                    [href]="file.url"
+                    target="_blank"
+                    rel="noopener"
+                    ><kh-icon name="paperclip" />{{ file.fileName }}</a
+                  >
+                }
+              </span>
             }
           </li>
         } @empty {
@@ -49,53 +75,95 @@
     @if (d.resolution; as r) {
       <section class="card card--pad" aria-labelledby="resolution-title">
         <h2 id="resolution-title" class="card__title">{{ i18n.t('dispute.resolution') }}</h2>
-        @if (waived()) {
-          <p>{{ i18n.t('dispute.waived') }}</p>
-        } @else {
-          <dl class="lines">
-            <div><dt>{{ i18n.t('dispute.refund') }}</dt><dd>{{ format.money(r.refundToCustomer) }}</dd></div>
-            @if (r.dealerCharge) {
-              <div><dt>{{ i18n.t('dispute.dealerCharge') }}</dt><dd>{{ format.money(r.dealerCharge) }}</dd></div>
-            }
-            @if (earlierDecided(); as earlier) {
-              <div><dt>{{ i18n.t('dispute.decidedEarlier') }}</dt><dd>{{ format.money(earlier) }}</dd></div>
-            }
-          </dl>
+        <!-- The customer's own share and nothing else (owner decision 3; pre-launch item 151). -->
+        <dl class="lines">
+          <div>
+            <dt>{{ i18n.t('dispute.refund') }}</dt>
+            <dd>{{ format.money(r.refundToCustomer) }}</dd>
+          </div>
+          @if (earlierDecided(); as earlier) {
+            <div>
+              <dt>{{ i18n.t('dispute.decidedEarlier') }}</dt>
+              <dd>{{ format.money(earlier) }}</dd>
+            </div>
+          }
+        </dl>
+        @if (r.note) {
+          <p class="prose user-text" dir="auto">{{ r.note }}</p>
         }
-        @if (r.note) { <p class="prose user-text" dir="auto">{{ r.note }}</p> }
-        @if (refundText(); as text) { <p class="small">{{ text }}</p> }
+        @if (refundText(); as text) {
+          <p class="small">{{ text }}</p>
+        }
       </section>
     }
 
     @if (earlierNotice(); as notice) {
-      <div class="notice"><kh-icon name="info" /><p>{{ notice }}</p></div>
+      <div class="notice">
+        <kh-icon name="info" />
+        <p>{{ notice }}</p>
+      </div>
     }
 
     <!-- Wave 3 C4: either side may add to a live dispute; only the side that opened it may withdraw it. -->
     @if (d.isLive) {
       <section class="card card--pad stack" aria-labelledby="add-title">
         <h2 id="add-title" class="card__title">{{ i18n.t('dispute.add.title') }}</h2>
-        @if (added()) { <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('dispute.add.done') }}</p></div> }
+        @if (added()) {
+          <div class="notice notice--ok" role="status">
+            <kh-icon name="check-circle" />
+            <p>{{ i18n.t('dispute.add.done') }}</p>
+          </div>
+        }
         <label class="field">
           <span class="field__label">{{ i18n.t('dispute.add.label') }}</span>
-          <textarea class="textarea user-text" dir="auto" [value]="addBody()" (input)="setBody($event)" [disabled]="adding()"></textarea>
+          <textarea
+            class="textarea user-text"
+            dir="auto"
+            [value]="addBody()"
+            (input)="setBody($event)"
+            [disabled]="adding()"
+          ></textarea>
         </label>
         <div class="field">
           <span class="field__label">{{ i18n.t('dispute.evidence.label') }}</span>
           @for (file of evidence.files(); track $index) {
-            <p class="row small"><kh-icon name="paperclip" /><span class="user-text" dir="auto">{{ file.name }}</span>
-              <button type="button" class="btn btn--ghost btn--sm" [disabled]="adding()" (click)="evidence.remove($index)"
-                [attr.aria-label]="i18n.t('dispute.evidence.remove', { name: file.name })"><kh-icon name="x" /></button></p>
+            <p class="row small">
+              <kh-icon name="paperclip" /><span class="user-text" dir="auto">{{ file.name }}</span>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                [disabled]="adding()"
+                (click)="evidence.remove($index)"
+                [attr.aria-label]="i18n.t('dispute.evidence.remove', { name: file.name })"
+              >
+                <kh-icon name="x" />
+              </button>
+            </p>
           }
           <label class="btn btn--secondary btn--sm">
             <kh-icon name="paperclip" />{{ i18n.t('dispute.evidence.label') }}
-            <input type="file" class="sr-only" multiple [accept]="accept()" [disabled]="adding()" (change)="choose($event)" />
+            <input
+              type="file"
+              class="sr-only"
+              multiple
+              [accept]="accept()"
+              [disabled]="adding()"
+              (change)="choose($event)"
+            />
           </label>
         </div>
-        @if (addProblemText(); as text) { <p class="field__error" role="alert">{{ text }}</p> }
+        @if (addProblemText(); as text) {
+          <p class="field__error" role="alert">{{ text }}</p>
+        }
         <div class="row">
-          <button type="button" class="btn btn--primary" [disabled]="adding()" (click)="addStatement(d)">
-            {{ adding() ? i18n.t('dispute.open.sending') : i18n.t('dispute.add.submit') }}</button>
+          <button
+            type="button"
+            class="btn btn--primary"
+            [disabled]="adding()"
+            (click)="addStatement(d)"
+          >
+            {{ adding() ? i18n.t('dispute.open.sending') : i18n.t('dispute.add.submit') }}
+          </button>
         </div>
       </section>
 
@@ -104,18 +172,41 @@
           <h2 id="withdraw-title" class="sr-only">{{ i18n.t('dispute.withdraw.button') }}</h2>
           @if (askingToWithdraw()) {
             <p>{{ i18n.t('dispute.withdraw.confirm') }}</p>
-            @if (withdrawProblemText(); as text) { <p class="field__error" role="alert">{{ text }}</p> }
+            @if (withdrawProblemText(); as text) {
+              <p class="field__error" role="alert">{{ text }}</p>
+            }
             <div class="row">
-              <button type="button" class="btn btn--ghost" [disabled]="withdrawing()" (click)="askingToWithdraw.set(false)">{{ i18n.t('dispute.withdraw.no') }}</button>
-              <button type="button" class="btn btn--danger" [disabled]="withdrawing()" (click)="withdraw(d)">{{ i18n.t('dispute.withdraw.yes') }}</button>
+              <button
+                type="button"
+                class="btn btn--ghost"
+                [disabled]="withdrawing()"
+                (click)="askingToWithdraw.set(false)"
+              >
+                {{ i18n.t('dispute.withdraw.no') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn--danger"
+                [disabled]="withdrawing()"
+                (click)="withdraw(d)"
+              >
+                {{ i18n.t('dispute.withdraw.yes') }}
+              </button>
             </div>
           } @else {
-            <div class="row"><button type="button" class="btn btn--ghost" (click)="askingToWithdraw.set(true)">{{ i18n.t('dispute.withdraw.button') }}</button></div>
+            <div class="row">
+              <button type="button" class="btn btn--ghost" (click)="askingToWithdraw.set(true)">
+                {{ i18n.t('dispute.withdraw.button') }}
+              </button>
+            </div>
           }
         </section>
       }
     }
   } @else {
-    <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+    <div class="card card--pad" aria-busy="true">
+      <div class="skeleton skeleton--title"></div>
+      <div class="skeleton skeleton--text"></div>
+    </div>
   }
 </div>

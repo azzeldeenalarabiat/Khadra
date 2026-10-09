@@ -17,7 +17,8 @@ public abstract class ApiControllerBase : ControllerBase
     protected ClientInfo Client => new(
         HttpContext.Connection.RemoteIpAddress?.ToString(),
         Request.Headers.UserAgent.ToString(),
-        Security.MobileAppVersionGate.Identify(Request).DeclaresAVersion);
+        // Set only for an app build whose declared version parsed: null for a browser, a legacy build, a typo.
+        Security.MobileAppVersionGate.Identify(Request).Version);
 
     // Maps a Result-returning handler to HTTP. Success is 200 by default; pass `onSuccess` for 201/202/204.
     protected ActionResult FromResult<T>(Result<T, Error> result, Func<T, ActionResult>? onSuccess = null) =>

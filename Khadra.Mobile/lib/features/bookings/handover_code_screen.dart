@@ -107,11 +107,27 @@ class _HandoverCodeScreenState extends ConsumerState<HandoverCodeScreen> {
     super.dispose();
   }
 
+  /// A code asked for before its window opens (pre-launch item 225): the server refuses with
+  /// the moment it will be issued, and that moment is what the customer is told — in Amman,
+  /// from the server's own figure. Null for any other failure.
+  String? _tooEarly(AppLocalizations l10n, ApiFailure failure) {
+    final pickup = failure.code == 'booking.pickup_too_early';
+    if (!pickup && failure.code != 'booking.return_too_early') return null;
+    final from = DateTime.tryParse(failure.extensions['availableFrom'] as String? ?? '');
+    final formats = ref.watch(formatsProvider);
+    if (from == null || formats == null) return null;
+    final time = formats.dateTime(from);
+    return pickup ? l10n.handoverPickupAvailableFrom(time) : l10n.handoverReturnAvailableFrom(time);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final grant = _grant;
-    final expired = grant != null && !DateTime.now().toUtc().isBefore(grant.expiresAt);
+    // The server's clock, not the phone's: a phone running fast would grey out a code the
+    // office would still accept, at the counter (see ServerClock).
+    final now = ref.watch(serverClockProvider).now();
+    final expired = grant != null && !now.isBefore(grant.expiresAt);
 
     return Scaffold(
       appBar: AppBar(
@@ -136,7 +152,7 @@ class _HandoverCodeScreenState extends ConsumerState<HandoverCodeScreen> {
                   )
                 else if (_failure != null && grant == null)
                   KhadraNotice(
-                    title: _failure!.messageFor(l10n),
+                    title: _tooEarly(l10n, _failure!) ?? _failure!.messageFor(l10n),
                     tone: NoticeTone.warn,
                     icon: Icons.error_outline,
                   )
@@ -175,7 +191,7 @@ class _HandoverCodeScreenState extends ConsumerState<HandoverCodeScreen> {
                   ),
                   const SizedBox(height: Space.sm),
                   Text(
-                    expired ? l10n.handoverExpired : l10n.handoverValidFor(_remaining(grant.expiresAt)),
+                    expired ? l10n.handoverExpired : l10n.handoverValidFor(_remaining(grant.expiresAt, now)),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -205,8 +221,8 @@ class _HandoverCodeScreenState extends ConsumerState<HandoverCodeScreen> {
   }
 
   /// "14:59" — minutes and seconds left, from the server's own expiry.
-  static String _remaining(DateTime expiresAt) {
-    final left = expiresAt.difference(DateTime.now().toUtc());
+  static String _remaining(DateTime expiresAt, DateTime now) {
+    final left = expiresAt.difference(now);
     if (left.isNegative) return '0:00';
     final minutes = left.inMinutes;
     final seconds = left.inSeconds % 60;

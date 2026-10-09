@@ -15,7 +15,8 @@ namespace Khadra.Tests.Application.IdentityAccess;
 public sealed class RegistrationConsentTests
 {
     private static readonly ClientInfo Website = new("1.2.3.4", "Mozilla/5.0");
-    private static readonly ClientInfo CustomerApp = new("1.2.3.4", "Dart/3.5", IsCustomerApp: true);
+    private static readonly ClientInfo OlderApp = new("1.2.3.4", "Dart/3.5", AppVersion.Parse("1.3.0"));
+    private static readonly ClientInfo ConsentAwareApp = new("1.2.3.4", "Dart/3.5", AppVersion.Parse("1.4.0+7"));
 
     private static RegisterCustomerCommand Customer(ConsentInput? consent, ClientInfo client) =>
         new("Ali@Example.com", "Passw0rd1", "Ali Ahmad", "079 123 4567", Users.AdultBirthDate, false, consent, client);
@@ -59,31 +60,53 @@ public sealed class RegistrationConsentTests
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
-    /// <summary>An installed app cannot be patched, only refused: a registration it never knew to send must not fail.</summary>
+    /// <summary>
+    /// An installed build older than 1.4.0 cannot be patched, only refused: a registration it never knew to send must not
+    /// fail under it, until the minimum refuses the build outright (a temporary bridge; pre-launch item 239).
+    /// </summary>
     [Fact]
-    public async Task The_customer_app_registers_without_them_until_a_build_asks()
+    public async Task An_app_build_older_than_the_consent_release_registers_without_them()
     {
         var context = new AuthHandlerTestContext();
         context.Legal.PublishBoth();
 
-        var result = await new RegisterCustomerHandler(context.Registrar).Handle(Customer(null, CustomerApp), CancellationToken.None);
+        var result = await new RegisterCustomerHandler(context.Registrar).Handle(Customer(null, OlderApp), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value.ConsentsRecorded);
         Assert.Empty(context.Legal.Staged);
     }
 
+    /// <summary>From 1.4.0 the app asks, so the server holds it to the answer as it holds the website (item 238).</summary>
+    [Fact]
+    public async Task The_consent_asking_app_cannot_register_without_the_texts_in_force_and_nothing_is_saved()
+    {
+        var context = new AuthHandlerTestContext();
+        context.Legal.PublishBoth();
+
+        var result = await new RegisterCustomerHandler(context.Registrar).Handle(Customer(null, ConsentAwareApp), CancellationToken.None);
+
+        Assert.Equal(LegalErrors.ConsentRequired.Code, result.Error.Code);
+        Assert.Empty(context.Legal.Staged);
+        Assert.Empty(context.SentEmails());
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>Where consent was given is the channel, whether or not it was required of that build.</summary>
     [Fact]
     public async Task An_app_build_that_does_send_them_records_them_as_the_apps()
     {
-        var context = new AuthHandlerTestContext();
-        var (terms, privacy) = context.Legal.PublishBoth();
+        foreach (var app in new[] { ConsentAwareApp, OlderApp })
+        {
+            var context = new AuthHandlerTestContext();
+            var (terms, privacy) = context.Legal.PublishBoth();
 
-        var result = await new RegisterCustomerHandler(context.Registrar).Handle(
-            Customer(new ConsentInput([terms.Value, privacy.Value], "en"), CustomerApp), CancellationToken.None);
+            var result = await new RegisterCustomerHandler(context.Registrar).Handle(
+                Customer(new ConsentInput([terms.Value, privacy.Value], "en"), app), CancellationToken.None);
 
-        Assert.Equal(2, result.Value.ConsentsRecorded);
-        Assert.All(context.Legal.Staged, consent => Assert.Same(ConsentChannel.App, consent.Channel));
+            Assert.Equal(2, result.Value.ConsentsRecorded);
+            Assert.All(context.Legal.Staged, consent => Assert.Same(ConsentChannel.App, consent.Channel));
+        }
     }
 
     [Fact]

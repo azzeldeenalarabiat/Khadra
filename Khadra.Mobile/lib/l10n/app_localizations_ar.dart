@@ -2709,4 +2709,79 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get updateRequiredWhereFrom =>
       'احصل على أحدث إصدار من المكان الذي نزّلت منه خضرا.';
+
+  @override
+  String get legalTerms => 'شروط الخدمة';
+
+  @override
+  String get legalPrivacy => 'إشعار الخصوصية';
+
+  @override
+  String legalVersion(String label) {
+    return 'الإصدار $label';
+  }
+
+  @override
+  String get legalTextJustUpdated =>
+      'حُدِّث هذا النص للتو. حاول مرة أخرى بعد بضع دقائق.';
+
+  @override
+  String get legalTextOpenPage => 'افتح النص في متصفحك';
+
+  @override
+  String get consentAgreeLead => 'قرأت وأوافق على ';
+
+  @override
+  String get consentAgreeAnd => ' و';
+
+  @override
+  String get consentRequired =>
+      'ضع علامة في المربع للموافقة على النصوص السارية.';
+
+  @override
+  String get consentVersionChanged =>
+      'حُدّثت النصوص أثناء فتح هذه الصفحة. اقرأ الإصدار الحالي ثم ضع علامة في المربع مرة أخرى.';
+
+  @override
+  String get consentTextsUnavailable =>
+      'تعذّر تحميل النصوص السارية. حاول مرة أخرى.';
+
+  @override
+  String get consentTitle => 'قبل المتابعة';
+
+  @override
+  String get consentBody =>
+      'نشرت خضرا النصوص التي تحكم استخدامك لخضرا. اقرأها ثم وافق عليها للمتابعة، أو سجّل الخروج.';
+
+  @override
+  String get consentAgree => 'قرأت هذه النصوص وأوافق عليها.';
+
+  @override
+  String get consentRead => 'اقرأ';
+
+  @override
+  String get consentAccept => 'أوافق وأتابع';
+
+  @override
+  String get consentAccepting => 'جارٍ تسجيل موافقتك…';
+
+  @override
+  String get consentChanged =>
+      'دخل إصدار أحدث حيّز التنفيذ أثناء فتح هذه الصفحة. اقرأ النصوص المعروضة الآن ثم وافق مرة أخرى.';
+
+  @override
+  String get consentFailed => 'لم تُسجَّل موافقتك. حاول مرة أخرى.';
+
+  @override
+  String get consentPending => 'وافق على الشروط المحدَّثة للمتابعة.';
+
+  @override
+  String handoverPickupAvailableFrom(String time) {
+    return 'سيكون رمز الاستلام متاحًا ابتداءً من $time.';
+  }
+
+  @override
+  String handoverReturnAvailableFrom(String time) {
+    return 'سيكون رمز الإعادة متاحًا ابتداءً من $time.';
+  }
 }

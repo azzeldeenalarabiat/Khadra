@@ -4,14 +4,19 @@ import { AR } from '../../core/i18n/ar';
 import { EN, TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
-import { decidedEarlier, earlierDecisionNotice, EarlierDecisionFigures, readsAsWaived } from './earlier-decisions';
+import {
+  decidedEarlier,
+  earlierDecisionNotice,
+  EarlierDecisionFigures,
+} from './earlier-decisions';
 
 /**
  * A later dispute on a booking splits only what earlier ones left (owner, 2026-09-26; item 169). The
  * website says so in the server's own figures, the same sentence the app and both consoles use —
  * resolved against the REAL dictionaries, so these are the words a customer reads.
  */
-const en = (key: TranslationKey, params?: MessageParams) => resolveMessage(EN[key], params, 'en-GB', false) ?? key;
+const en = (key: TranslationKey, params?: MessageParams) =>
+  resolveMessage(EN[key], params, 'en-GB', false) ?? key;
 // Arabic wraps every value in zero-width direction isolates (resolve.ts); compare the visible words.
 const ar = (key: TranslationKey, params?: MessageParams) =>
   (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[\u2068\u2069]/g, '');
@@ -24,27 +29,28 @@ const live = (held: number, decided: number): EarlierDecisionFigures => ({
   decidedByEarlierTickets: jod(decided),
 });
 
-describe('a settled dispute summed up as "nothing is owed"', () => {
-  const settled = (decided?: number) => ({
-    resolution: { waivesEverything: true },
-    ...(decided === undefined ? {} : { decidedByEarlierTickets: jod(decided) }),
-  });
-
-  it('reads that way for a first dispute that waived everything, and from an API too old to say', () => {
-    expect(readsAsWaived(settled(0))).toBe(true);
-    expect(readsAsWaived(settled())).toBe(true);
-  });
-
-  it('never reads that way over an earlier dispute that decided part of the deposit', () => {
-    expect(readsAsWaived(settled(18))).toBe(false);
-    expect(decidedEarlier(settled(18))).toEqual(jod(18));
+/**
+ * A settled dispute is shown to the customer in their own figures, beside what earlier disputes decided
+ * (owner decision 3; pre-launch item 151). The page no longer sums a decision up as "nothing is owed by
+ * either side": the office's share and any charge to it are not the customer's, and are not sent to them.
+ */
+describe('what earlier disputes decided, beside a settled one', () => {
+  it('is the server figure when one decided part of the deposit', () => {
+    expect(decidedEarlier({ decidedByEarlierTickets: jod(18) })).toEqual(jod(18));
     expect(en('dispute.decidedEarlier')).toBe('Decided by earlier disputes');
     expect(ar('dispute.decidedEarlier')).toBe('حُسم في نزاعات سابقة');
   });
 
-  it('does not read that way when the decision moved money', () => {
-    expect(readsAsWaived({ resolution: { waivesEverything: false } })).toBe(false);
-    expect(readsAsWaived({ resolution: null })).toBe(false);
+  it('is nothing on a first dispute, and from an API too old to say', () => {
+    expect(decidedEarlier({ decidedByEarlierTickets: jod(0) })).toBeNull();
+    expect(decidedEarlier({})).toBeNull();
+  });
+
+  it('leaves no wording behind that sums a decision up for the other parties', () => {
+    expect('dispute.waived' in EN).toBe(false);
+    expect('dispute.dealerCharge' in EN).toBe(false);
+    expect('dispute.waived' in AR).toBe(false);
+    expect('dispute.dealerCharge' in AR).toBe(false);
   });
 });
 

@@ -982,6 +982,40 @@
   "updateRequiredWhereFrom": "Get the latest version from wherever you downloaded Khadra.",
   "@updateRequiredWhereFrom": {
     "description": "Instead of the button, when the API has published no download link. The app invents none."
-  }
+  },
+
+  "legalTerms": "Terms of Service",
+  "legalPrivacy": "Privacy notice",
+  "legalVersion": "Version {label}",
+  "@legalVersion": { "placeholders": { "label": { "type": "String" } } },
+  "legalTextJustUpdated": "This text has just been updated. Try again in a few minutes.",
+  "@legalTextJustUpdated": {
+    "description": "The public copy of a legal text is cached for up to five minutes, so right after a publish it can still be the previous version. The app never shows a text other than the one being accepted."
+  },
+  "legalTextOpenPage": "Open the text in your browser",
+  "consentAgreeLead": "I have read and accept the ",
+  "@consentAgreeLead": {
+    "description": "The registration checkbox, built around the two links: [lead][Terms of Service][and][Privacy notice]. Mirrors the website's consent.agreeLead and consent.agreeAnd."
+  },
+  "consentAgreeAnd": " and the ",
+  "consentRequired": "Tick the box to accept the texts in force.",
+  "consentVersionChanged": "The texts were updated while this page was open. Read the current version and tick the box again.",
+  "consentTextsUnavailable": "The texts in force could not be loaded. Try again.",
+  "consentTitle": "Before you continue",
+  "consentBody": "Khadra has published the texts that govern your use of Khadra. Read them, then accept them to continue, or sign out.",
+  "consentAgree": "I have read these texts and accept them.",
+  "consentRead": "Read",
+  "consentAccept": "Accept and continue",
+  "consentAccepting": "Recording your acceptance…",
+  "consentChanged": "A newer version came into force while this page was open. Read the texts listed now, then accept again.",
+  "consentFailed": "Your acceptance was not recorded. Try again.",
+  "consentPending": "Accept the updated terms to continue.",
+  "handoverPickupAvailableFrom": "Your pickup code will be available from {time}.",
+  "@handoverPickupAvailableFrom": {
+    "description": "Before the pickup window opens (pre-launch item 225). The time is the server's, in Amman.",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "handoverReturnAvailableFrom": "Your return code will be available from {time}.",
+  "@handoverReturnAvailableFrom": { "placeholders": { "time": { "type": "String" } } }
 
 }

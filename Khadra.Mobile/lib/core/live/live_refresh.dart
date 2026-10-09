@@ -81,6 +81,14 @@ class LiveRefresh {
   Timer? _heartbeat;
   bool _awake = true;
 
+  /// Set while something stands in front of the whole app that every surface's read would only be
+  /// refused behind: the consent prompt (pre-launch item 238), whose server answers each of these
+  /// reads with 403 until the texts are accepted. Separate from [_awake] so the lifecycle and the
+  /// prompt cannot undo each other.
+  bool _held = false;
+
+  bool get _running => _awake && !_held;
+
   /// The floor under every trigger except a write. Twenty seconds is short enough that a customer
   /// returning to a tab sees a fresh answer, and long enough that flicking between tabs is not a
   /// burst of requests.
@@ -119,7 +127,7 @@ class LiveRefresh {
 
   /// The app came to the front, or a tab did. Trigger A.
   void becameVisible() {
-    if (!_awake) return;
+    if (!_running) return;
     for (final surface in _surfaces.values) {
       if (_isVisible(surface)) unawaited(_refresh(surface, force: false));
     }
@@ -131,6 +139,7 @@ class LiveRefresh {
   /// it move, not be told to wait twenty seconds. A push passes false, so a chatty server still
   /// cannot make this app ask faster than the policy allows.
   void touch(String id, {bool force = true}) {
+    if (_held) return;
     final surface = _surfaces[id];
     if (surface != null) unawaited(_refresh(surface, force: force));
   }
@@ -139,7 +148,19 @@ class LiveRefresh {
   void setResumed(bool resumed) {
     if (_awake == resumed) return;
     _awake = resumed;
-    if (resumed) {
+    _resumeOrStop();
+  }
+
+  /// Holds every surface while something stands in front of the whole app (see [_held]), and lets
+  /// them go again — at once, through trigger A — when it is gone.
+  void setHeld(bool held) {
+    if (_held == held) return;
+    _held = held;
+    _resumeOrStop();
+  }
+
+  void _resumeOrStop() {
+    if (_running) {
       _start();
       becameVisible();
     } else {
@@ -148,7 +169,7 @@ class LiveRefresh {
   }
 
   void _start() {
-    if (!_awake || _surfaces.isEmpty) return;
+    if (!_running || _surfaces.isEmpty) return;
     _heartbeat ??= Timer.periodic(heartbeat, (_) => _tick());
   }
 
@@ -159,7 +180,7 @@ class LiveRefresh {
 
   /// Trigger B.
   void _tick() {
-    if (!_awake) return;
+    if (!_running) return;
     final at = _now;
     for (final surface in _surfaces.values) {
       if (surface.poll == null || !_isVisible(surface)) continue;

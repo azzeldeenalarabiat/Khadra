@@ -32,16 +32,21 @@ public sealed class HandoverCodeTests
             .Do(call => _issued.Add(call.Arg<HandoverCode>()));
     }
 
-    private Booking Given(Booking booking, Id? caller = null)
+    /// <summary>The booking as the handler will load it, and the clock at <paramref name="at"/>: by default the moment
+    /// its next handover may be recorded, which is the earliest a code is issued (pre-launch item 225).</summary>
+    private Booking Given(Booking booking, Id? caller = null, DateTimeOffset? at = null)
     {
         _bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
         _actor.UserId.Returns(caller ?? booking.CustomerId);
+        _clock.UtcNow = at ?? (booking.Status == BookingStatus.PickedUp ? booking.ReturnAvailableFrom : booking.PickupAvailableFrom);
         return booking;
     }
 
-    private Task<CSharpFunctionalExtensions.Result<HandoverCodeDto, Error>> Issue(Booking booking) =>
+    private static ClientInfo App(string version) => new("1.2.3.4", "Dart/3.5", AppVersion.Parse(version));
+
+    private Task<CSharpFunctionalExtensions.Result<HandoverCodeDto, Error>> Issue(Booking booking, ClientInfo? client = null) =>
         new IssueHandoverCodeHandler(_bookings, _codes, Service, _settings, _actor, _unitOfWork, _clock)
-            .Handle(new IssueHandoverCodeCommand(booking.Id), CancellationToken.None);
+            .Handle(new IssueHandoverCodeCommand(booking.Id, client), CancellationToken.None);
 
     [Fact]
     public async Task A_confirmed_booking_gets_a_six_digit_pickup_code_stored_only_as_a_hash()
@@ -53,7 +58,7 @@ public sealed class HandoverCodeTests
         Assert.Equal("Pickup", dto.Type);
         Assert.Matches("^[0-9]{6}$", dto.Code);
         Assert.Equal($"khadra-handover:v1:{booking.Reference.Value}:{dto.Code}", dto.QrPayload);
-        Assert.Equal(Build.Now.AddMinutes(15), dto.ExpiresAt);
+        Assert.Equal(_clock.UtcNow.AddMinutes(15), dto.ExpiresAt);
         var stored = Assert.Single(_issued);
         Assert.DoesNotContain(dto.Code, stored.CodeHash, StringComparison.Ordinal);
         Assert.True(Service.Matches(stored.CodeHash, booking.Id, HandoverType.Pickup, dto.Code));
@@ -75,13 +80,79 @@ public sealed class HandoverCodeTests
     public async Task Asking_again_kills_the_previous_code()
     {
         var booking = Given(Build.ConfirmedBooking());
-        var previous = HandoverCode.Issue(booking.Id, HandoverType.Pickup, new string('a', 64), Build.Now.AddMinutes(-5), TimeSpan.FromMinutes(15));
+        var now = _clock.UtcNow;
+        var previous = HandoverCode.Issue(booking.Id, HandoverType.Pickup, new string('a', 64), now.AddMinutes(-5), TimeSpan.FromMinutes(15));
         _codes.ListCurrentAsync(booking.Id, HandoverType.Pickup, Arg.Any<CancellationToken>()).Returns([previous]);
 
         await Issue(booking);
 
-        Assert.Equal(Build.Now, previous.SupersededAt);
-        Assert.Equal("handover.code_invalid", previous.Verify(true, 5, Id.New(), Build.Now).Error.Code);
+        Assert.Equal(now, previous.SupersededAt);
+        Assert.Equal("handover.code_invalid", previous.Verify(true, 5, Id.New(), now).Error.Code);
+    }
+
+    // ── When a code may be asked for (pre-launch item 225; Wave 7) ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// The same predicate the office's recording reads, so issuing and recording cannot drift apart: a code cannot
+    /// predate the moment the handover it proves may be recorded, and the refusal names that moment so the website and
+    /// the app can say when. The website and the console declare no version, so they are held to it from the deploy.
+    /// </summary>
+    [Fact]
+    public async Task Before_the_pickup_window_opens_no_code_is_issued_and_the_refusal_says_when()
+    {
+        var booking = Given(Build.ConfirmedBooking());
+
+        foreach (var client in new[] { ClientInfo.Unknown, App("1.4.0"), App("1.4.0+7"), App("1.10.0") })
+        {
+            _clock.UtcNow = booking.PickupAvailableFrom.AddMinutes(-1);
+
+            var refused = await Issue(booking, client);
+
+            Assert.Equal("booking.pickup_too_early", refused.Error.Code);
+            Assert.Equal(booking.PickupAvailableFrom, refused.Error.Extensions!["availableFrom"]);
+        }
+
+        Assert.Empty(_issued);
+        await _unitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task The_code_is_issued_the_moment_the_window_opens()
+    {
+        var booking = Given(Build.ConfirmedBooking());
+
+        Assert.Equal(booking.PickupAvailableFrom, _clock.UtcNow);
+        Assert.Equal("Pickup", (await Issue(booking, App("1.4.0+7"))).Value.Type);
+    }
+
+    /// <summary>A car collected early, inside the turnaround, cannot be returned before the rental starts, so it gets no
+    /// return code before then either.</summary>
+    [Fact]
+    public async Task No_return_code_is_issued_before_the_rental_starts()
+    {
+        var booking = Build.ConfirmedBooking();
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.PickupAvailableFrom).IsSuccess);
+        Given(booking, at: booking.Period.Start.AddMinutes(-1));
+
+        var refused = await Issue(booking, App("1.4.0+7"));
+
+        Assert.Equal("booking.return_too_early", refused.Error.Code);
+        Assert.Equal(booking.Period.Start, refused.Error.Extensions!["availableFrom"]);
+        Assert.Empty(_issued);
+    }
+
+    /// <summary>
+    /// An installed build older than 1.4.0 offers the code on any confirmed booking and cannot be patched, only refused:
+    /// it is answered as before until the minimum refuses it outright (a temporary bridge, not a security boundary --
+    /// recording is still refused before the window, and that is what an early code would have to get past; item 239).
+    /// </summary>
+    [Fact]
+    public async Task An_app_build_older_than_the_release_is_still_given_an_early_code_until_the_minimum_rises()
+    {
+        var booking = Given(Build.ConfirmedBooking(), at: Build.Now);
+
+        Assert.True(Build.Now < booking.PickupAvailableFrom);
+        Assert.Equal("Pickup", (await Issue(booking, App("1.3.0"))).Value.Type);
     }
 
     [Fact]

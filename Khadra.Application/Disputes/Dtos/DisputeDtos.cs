@@ -87,11 +87,17 @@ public sealed record DisputeDto(
     /// at a person. The office's copy, the administrator's and the audit trail keep every name.
     /// </para>
     /// <para>
-    /// No installed app reads any of these names or ids. The customer's own name and statements are unchanged.
+    /// No installed app reads any of these names or ids. The customer's own name and statements are unchanged. Of a
+    /// decision, the customer reads only the basis and their own share (owner decision 3; pre-launch item 151): see
+    /// <see cref="DisputeResolutionDto.ForCustomer"/>.
     /// </para>
     /// </remarks>
     /// <param name="officeName">The office as the customer's booking already names it.</param>
-    public DisputeDto ForCustomer(string officeName)
+    /// <param name="withholdOtherShares">
+    /// False only for an app build older than 1.4.0, which renders the office's and the platform's shares and would show
+    /// one it was no longer sent as zero (a temporary bridge; pre-launch item 239).
+    /// </param>
+    public DisputeDto ForCustomer(string officeName, bool withholdOtherShares)
     {
         var customer = BookingParty.Customer.Name;
         var openedByCustomer = OpenedByParty == customer;
@@ -113,7 +119,7 @@ public sealed record DisputeDto(
                         AuthorAccountClosed = false,
                     })
                 .ToList(),
-            Resolution = Resolution?.ForCustomer(),
+            Resolution = Resolution?.ForCustomer(withholdOtherShares),
         };
     }
 
@@ -183,13 +189,15 @@ public sealed record DisputeResolutionDto(
     MoneyDto DepositHeld,
     /// <summary>The customer's share. Null on the rental office's copy (<see cref="ForDealer"/>).</summary>
     MoneyDto? RefundToCustomer,
-    /// <summary>The platform's share. Null on the rental office's copy (<see cref="ForDealer"/>).</summary>
+    /// <summary>The platform's share. Null on the rental office's copy and on the customer's (<see cref="ForCustomer"/>).</summary>
     MoneyDto? RetainedByPlatform,
-    MoneyDto TransferredToDealer,
+    /// <summary>The office's share. Null on the customer's copy (<see cref="ForCustomer"/>).</summary>
+    MoneyDto? TransferredToDealer,
+    /// <summary>What the office was charged beyond the deposit. Null on the customer's copy, always.</summary>
     MoneyDto? DealerCharge,
     /// <summary>
-    /// True when the customer received the whole basis and nobody was charged. Null on the rental
-    /// office's copy: it is read from the platform's share, so it would tell the office the customer's.
+    /// True when the customer received the whole basis and nobody was charged. Null on the rental office's copy and on
+    /// the customer's: it is read from the other parties' shares, so it would tell either reader one that is not theirs.
     /// </summary>
     bool? WaivesEverything,
     string Note,
@@ -223,15 +231,33 @@ public sealed record DisputeResolutionDto(
     /// <summary>
     /// The rental office's copy (owner decision 3, 2026-09-26; pre-launch item 151): the basis the decision
     /// split, the office's own share and any charge assessed to it — never the customer's refund or the
-    /// platform's share, nor the waiver flag, which is read from them. The customer's copy is unchanged:
-    /// it is the installed app's contract, and the owner deferred its half of item 151 (2026-09-27).
+    /// platform's share, nor the waiver flag, which is read from them.
     /// </summary>
     public DisputeResolutionDto ForDealer() =>
         this with { RefundToCustomer = null, RetainedByPlatform = null, WaivesEverything = null };
 
-    /// <summary>The customer's copy: decided by Khadra, never by a named administrator (owner decision D5 A, 2026-10-05).</summary>
-    public DisputeResolutionDto ForCustomer() =>
-        this with { ResolvedByAdminId = null, ResolvedByName = Platform.Name, ResolvedByAccountClosed = false };
+    /// <summary>
+    /// The customer's copy (owner decision 3; pre-launch item 151, Wave 7): decided by Khadra, never by a named
+    /// administrator (owner decision D5 A, 2026-10-05), and of the money only the basis and the customer's own share --
+    /// never the office's or the platform's share, what the office was charged, or the waiver flag read from those.
+    /// </summary>
+    /// <param name="withholdOtherShares">
+    /// False only for an app build older than 1.4.0: it renders the office's and the platform's shares, and a share it
+    /// was no longer sent would read as zero -- a false figure -- so it is still sent them until the minimum refuses it
+    /// outright (a temporary bridge; pre-launch item 239). No build renders the charge or the waiver flag, so those are
+    /// withheld from every customer.
+    /// </param>
+    public DisputeResolutionDto ForCustomer(bool withholdOtherShares) =>
+        this with
+        {
+            RetainedByPlatform = withholdOtherShares ? null : RetainedByPlatform,
+            TransferredToDealer = withholdOtherShares ? null : TransferredToDealer,
+            DealerCharge = null,
+            WaivesEverything = null,
+            ResolvedByAdminId = null,
+            ResolvedByName = Platform.Name,
+            ResolvedByAccountClosed = false,
+        };
 }
 
 /// <summary>What the party gets back from a successful upload request: where to PUT, and the key to quote.</summary>

@@ -221,10 +221,11 @@ public static class BookingErrors
     /// the rental start less the frozen turnaround (owner, 2026-10-05; E2E F51, pre-launch item 225).
     /// </summary>
     /// <remarks>
-    /// Carries the moment as <c>availableFrom</c>, so the console can say when instead of just "not
-    /// yet". Sent only to the rental office: the customer app never records a handover, and the code it
-    /// asks for is still issued at any time while the booking is confirmed (owner, 2026-10-06), because
-    /// refusing that request would break every installed build.
+    /// Carries the moment as <c>availableFrom</c>, so a client can say when instead of just "not yet".
+    /// Sent to the rental office recording a pickup too early, and since Wave 7 to the customer asking
+    /// for a pickup code too early (pre-launch item 225): one fact, one code, wherever it is met. A
+    /// customer app build older than 1.4.0 is still given an early code until the minimum refuses it
+    /// (a temporary bridge, item 239).
     /// </remarks>
     public static Error PickupTooEarly(DateTimeOffset availableFrom) =>
         Error.Conflict("booking.pickup_too_early", "The car cannot be collected yet.") with

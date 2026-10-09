@@ -294,6 +294,61 @@ void main() {
         expect(find.text(l10n.bookingPartyCustomer), findsWidgets);
         expect(find.text('عليك'), findsNothing);
       });
+
+      // Owner decision 3; pre-launch item 151 (Wave 7). From 1.4.0 the server sends a customer the basis and their
+      // own share only; the office's and the platform's shares, the charge to the office and the waiver flag come
+      // null. This build does not read them, so a share it was not sent never surfaces as a "0.000" row.
+      screenTest('a settled dispute shows the customer their own share and nobody else\'s, in $tag', (tester) async {
+        await pump(
+          tester,
+          Dispute.fromJson(disputeJson(
+            live: false,
+            held: 18,
+            resolution: {
+              'depositHeld': jod(18),
+              'refundToCustomer': jod(5),
+              'retainedByPlatform': null,
+              'transferredToDealer': null,
+              'dealerCharge': null,
+              'waivesEverything': null,
+              'note': 'Split after reading both sides.',
+              'resolvedByAdminId': null,
+              'resolvedByName': 'Khadra',
+              'resolvedByAccountClosed': false,
+              'resolvedAt': '2026-09-26T12:00:00Z',
+            },
+          )),
+          locale,
+        );
+
+        expect(tester.takeException(), isNull);
+        expect(find.text(l10n.bookingPartyCustomer), findsWidgets);
+        expect(find.textContaining('5.000'), findsOneWidget);
+        expect(find.text(l10n.bookingPartyDealer), findsNothing);
+        expect(find.text(l10n.bookingPartyAdmin), findsNothing);
+        expect(find.textContaining('13.000'), findsNothing, reason: "the office's share is not the customer's");
+        expect(find.textContaining(RegExp(r'(^|\D)0\.000')), findsNothing, reason: 'no share stands in as zero');
+        expect(find.text('Split after reading both sides.'), findsOneWidget);
+      });
     }
+  });
+
+  test('a resolution the server sent with the other shares withheld reads without them', () {
+    final dispute = Dispute.fromJson(disputeJson(
+      live: false,
+      resolution: {
+        'depositHeld': jod(18),
+        'refundToCustomer': jod(5),
+        'retainedByPlatform': null,
+        'transferredToDealer': null,
+        'dealerCharge': null,
+        'waivesEverything': null,
+        'note': '',
+        'resolvedAt': '2026-09-26T12:00:00Z',
+      },
+    ));
+
+    expect(dispute.resolution!.depositHeld.amount, 18);
+    expect(dispute.resolution!.refundToCustomer.amount, 5);
   });
 }

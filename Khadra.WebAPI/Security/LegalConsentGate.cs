@@ -28,9 +28,12 @@ public sealed class AllowWhileConsentPendingAttribute : Attribute;
 /// <para>
 /// <b>Who it never judges.</b> Anything anonymous — the catalogue, the legal texts themselves, <c>/app-config</c>, token
 /// refresh, the payment webhook, the sandbox pages, health — whether or not a bearer came with it. An endpoint marked
-/// <see cref="AllowWhileConsentPendingAttribute"/>. The customer app, by the version it declared (the advisor's review):
-/// no installed build knows to ask, an installed build cannot be patched, and the app's own prompt arrives in 1.4.0.
-/// Both BFFs drop the version header, so a browser can never pass itself off as the app. An administrator: the texts
+/// <see cref="AllowWhileConsentPendingAttribute"/>. A customer app build that declared a version OLDER than
+/// <see cref="MobileAppContract.ConsentAwareFrom"/> (1.4.0, the first build with its own prompt): it does not know to
+/// ask and cannot be patched, only refused, so it is spared until the minimum supported version refuses it outright.
+/// That is a temporary bridge, not a security boundary -- the version is whatever a caller declares -- and it is deleted
+/// once the minimum reaches 1.4.0 (pre-launch item 239). From 1.4.0 the app is judged like the website. Both BFFs drop
+/// the version header, so a browser can never pass itself off as an older app. An administrator: the texts
 /// address customers and rental offices, not Khadra's own staff, and no customer or office can claim the exemption —
 /// the role is in the token the API signs, an account holds one role, and the stamp check re-reads the account on
 /// every request. Background jobs make no HTTP requests at all.
@@ -86,7 +89,8 @@ internal sealed partial class LegalConsentGate(RequestDelegate next, IClock cloc
             || endpoint.Metadata.GetMetadata<AllowWhileConsentPendingAttribute>() is not null)
             return false;
 
-        if (MobileAppVersionGate.Identify(context.Request).DeclaresAVersion)
+        // The temporary bridge (item 239): only a DECLARED version older than the release that asks for consent.
+        if (MobileAppVersionGate.Identify(context.Request).Version is { } declared && declared < MobileAppContract.ConsentAwareFrom)
             return false;
 
         return actor.Role != UserRole.Admin;

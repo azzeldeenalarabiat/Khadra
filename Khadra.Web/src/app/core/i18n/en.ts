@@ -823,8 +823,6 @@ export const EN = {
   'dispute.noStatements': 'Nothing has been added yet.',
   'dispute.resolution': 'How it was settled',
   'dispute.refund': 'Refunded to you',
-  'dispute.dealerCharge': 'Charged to the rental office',
-  'dispute.waived': 'Nothing is owed by either side.',
   // What became of the refund this decision gave the customer (E2E F43: the page used to say it was never paid).
   'dispute.refundRequested': 'Your refund of {amount} has been requested and will go to your original payment method.',
   'dispute.refundOnItsWay': 'Your refund of {amount} is on its way to your original payment method. We started it on {date}; your bank may take additional time to show it.',

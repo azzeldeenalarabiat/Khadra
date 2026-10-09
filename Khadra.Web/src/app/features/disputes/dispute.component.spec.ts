@@ -150,3 +150,82 @@ describe('DisputeComponent, answering a live dispute (Wave 3 C4)', () => {
     expect(closed.button('Withdraw the dispute')).toBeUndefined();
   });
 });
+
+/**
+ * A settled dispute shows the customer their own figures and nothing of the other parties' (owner decision 3;
+ * pre-launch item 151). Since Wave 7 the server sends the office's and the platform's shares, the charge to the
+ * office and the waiver flag as null to a customer; the page used to read the flag and sum the decision up as
+ * "nothing is owed by either side", which was false whenever the office was charged.
+ */
+describe('DisputeComponent, a settled dispute (pre-launch item 151)', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  const jod = (amount: number) => ({ amount, currency: 'JOD' });
+  const settled = (refund: number, extra: object = {}) => ({
+    ...live,
+    status: 'Resolved',
+    isLive: false,
+    closedAt: '2026-10-06T09:00:00+00:00',
+    resolution: {
+      depositHeld: jod(18),
+      refundToCustomer: jod(refund),
+      retainedByPlatform: null,
+      transferredToDealer: null,
+      dealerCharge: null,
+      waivesEverything: null,
+      note: 'Split after reading both sides.',
+      resolvedAt: '2026-10-06T09:00:00+00:00',
+    },
+    ...extra,
+  });
+
+  async function render(dispute: object) {
+    TestBed.configureTestingModule({
+      imports: [DisputeComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    TestBed.inject(I18nService).use('en');
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(DisputeComponent);
+    fixture.componentRef.setInput('ticketId', TICKET);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http.match((request) => request.url === URL).forEach((read) => read.flush(dispute));
+    await settle();
+    const page = fixture.nativeElement as HTMLElement;
+    const rows = () =>
+      [...page.querySelectorAll('#resolution-title ~ dl > div')].map((row) => ({
+        term: row.querySelector('dt')?.textContent?.trim(),
+        value: row.querySelector('dd')?.textContent?.replace(/[⁨⁩]/g, '').trim(),
+      }));
+    return { rows, text: () => page.textContent ?? '' };
+  }
+
+  it("shows the customer's own refund, and nothing the office or the platform kept or was charged", async () => {
+    const { rows, text } = await render(settled(5));
+
+    expect(rows()).toEqual([{ term: 'Refunded to you', value: expect.stringMatching(/JOD\s*5/) }]);
+    expect(text()).toContain('Split after reading both sides.');
+    expect(text()).not.toContain('Charged to the rental office');
+    expect(text()).not.toContain('Nothing is owed by either side.');
+  });
+
+  it('shows a refund of nothing as a figure, never summed up for the other parties', async () => {
+    const { rows, text } = await render(settled(0));
+
+    expect(rows()).toEqual([{ term: 'Refunded to you', value: expect.stringMatching(/JOD\s*0/) }]);
+    expect(text()).not.toContain('Nothing is owed by either side.');
+  });
+
+  it('puts what earlier disputes decided beside the refund, in the server figure', async () => {
+    const { rows } = await render(settled(5, { decidedByEarlierTickets: jod(13) }));
+
+    expect(rows()).toEqual([
+      { term: 'Refunded to you', value: expect.stringMatching(/JOD\s*5/) },
+      { term: 'Decided by earlier disputes', value: expect.stringMatching(/JOD\s*13/) },
+    ]);
+  });
+});

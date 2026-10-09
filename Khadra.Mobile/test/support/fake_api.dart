@@ -38,10 +38,15 @@ class FakeApi extends KhadraApi {
   /// The cancellation reasons `/app-config` publishes; none unless a test needs to cancel.
   List<Map<String, dynamic>> cancellationReasons = const [];
 
+  /// The `legal` block `/app-config` answers with, or null to leave it out — which the
+  /// app reads as "not known", exactly as it reads an API that predates it.
+  Map<String, dynamic>? legal;
+
   static AppConfig fakeConfig({
     Map<String, dynamic>? mobileApp,
     String? paymentsMode,
     List<Map<String, dynamic>> cancellationReasons = const [],
+    Map<String, dynamic>? legal,
   }) =>
       AppConfig.fromJson({
         'timeZone': 'Asia/Amman',
@@ -59,11 +64,13 @@ class FakeApi extends KhadraApi {
         },
         if (mobileApp != null) 'mobileApp': mobileApp,
         if (paymentsMode != null) 'payments': {'mode': paymentsMode},
+        if (legal != null) 'legal': legal,
       });
 
   static AuthUser fakeUser({
     String name = 'Layla Odeh',
     bool verified = true,
+    List<LegalDocumentRef> pendingConsents = const [],
   }) =>
       AuthUser(
         id: '01a07e16-de7b-7673-b1a5-c47bc1d437f4',
@@ -74,6 +81,7 @@ class FakeApi extends KhadraApi {
         isEmailVerified: verified,
         mustChangePassword: false,
         createdAt: DateTime.utc(2026, 1, 5),
+        pendingConsents: pendingConsents,
       );
 
   static AuthTokens fakeTokens() => AuthTokens(
@@ -89,6 +97,7 @@ class FakeApi extends KhadraApi {
         mobileApp: mobileApp,
         paymentsMode: paymentsMode,
         cancellationReasons: cancellationReasons,
+        legal: legal,
       );
 
   /// The lookups, empty unless a test says otherwise.
@@ -116,7 +125,7 @@ class FakeApi extends KhadraApi {
   }
 
   @override
-  Future<AuthUser> me() async => fakeUser();
+  Future<AuthUser> me() async => fakeUser(pendingConsents: pendingConsents);
 
   /// The account the next `signIn` hands back. Settable because an UNVERIFIED one
   /// takes a different path off the form — it can sign in and still not book.
@@ -418,9 +427,15 @@ class FakeApi extends KhadraApi {
   List<HandoverCodeGrant> handoverGrants = [];
   int handoverCalls = 0;
 
+  /// When set, `handover-code` is refused with it, every time (a code asked for
+  /// before its window is refused until the window opens).
+  ApiFailure? handoverFailure;
+
   @override
   Future<HandoverCodeGrant> issueHandoverCode(String bookingId) async {
     handoverCalls++;
+    final failure = handoverFailure;
+    if (failure != null) throw failure;
     if (handoverGrants.isEmpty) throw StateError("no handover code was staged for $bookingId");
     return handoverGrants[(handoverCalls - 1).clamp(0, handoverGrants.length - 1)];
   }
@@ -578,6 +593,68 @@ class FakeApi extends KhadraApi {
 
   @override
   Future<void> revokeSession(String familyId) async => revokedFamilies.add(familyId);
+
+  // ── Registration and the legal texts (pre-launch item 238) ───────────────────
+
+  /// Every registration this phone sent: (email, accepted versions, language).
+  final List<(String, List<String>, String?)> registrations = [];
+
+  /// Refusals for the next registrations, in order; then they succeed.
+  final List<ApiFailure> registrationRefusals = [];
+
+  @override
+  Future<RegisteredUser> register({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+    DateTime? dateOfBirth,
+    bool isForeignNational = false,
+    List<String> acceptedLegalVersions = const [],
+    String? legalLanguage,
+  }) async {
+    registrations.add((email, acceptedLegalVersions, legalLanguage));
+    if (registrationRefusals.isNotEmpty) throw registrationRefusals.removeAt(0);
+    return RegisteredUser(userId: 'u-new', email: email, verificationEmailSent: true);
+  }
+
+  /// What `/auth/me` and `/auth/me/legal-consents` name as still to accept.
+  List<LegalDocumentRef> pendingConsents = const [];
+  int legalConsentReads = 0;
+
+  /// Every acceptance this phone sent: (version ids, language).
+  final List<(List<String>, String)> acceptances = [];
+
+  /// Refusals for the next acceptances, in order; then they are recorded.
+  final List<ApiFailure> acceptanceRefusals = [];
+
+  /// What is still pending once an acceptance is recorded: nothing, unless a text came
+  /// into force in between.
+  List<LegalDocumentRef> pendingAfterAcceptance = const [];
+
+  @override
+  Future<MyLegalConsents> myLegalConsents() async {
+    legalConsentReads++;
+    return MyLegalConsents(pending: pendingConsents);
+  }
+
+  @override
+  Future<MyLegalConsents> acceptLegalTexts({required List<String> versionIds, required String language}) async {
+    acceptances.add((versionIds, language));
+    if (acceptanceRefusals.isNotEmpty) throw acceptanceRefusals.removeAt(0);
+    pendingConsents = pendingAfterAcceptance;
+    return MyLegalConsents(pending: pendingConsents);
+  }
+
+  /// The public texts, by slug; a slug not here answers 404.
+  Map<String, PublicLegalDocument> legalTexts = const {};
+  final List<String> legalTextReads = [];
+
+  @override
+  Future<PublicLegalDocument> legalDocument(String slug) async {
+    legalTextReads.add(slug);
+    return legalTexts[slug] ?? (throw const ApiFailure(kind: ApiFailureKind.notFound, statusCode: 404));
+  }
 }
 
 /// The token store, in memory.

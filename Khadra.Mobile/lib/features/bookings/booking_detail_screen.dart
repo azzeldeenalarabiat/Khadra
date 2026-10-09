@@ -724,11 +724,95 @@ class _PaymentOptionCard extends StatelessWidget {
   }
 }
 
+/// The handover code, offered from the moment the server issues one (pre-launch item 225):
+/// the pickup code from `pickupAvailableFrom`, the return code from `returnAvailableFrom`.
+///
+/// Judged on the SERVER's clock (`ServerClock`): a phone running slow must not hide the code
+/// from a customer standing at the counter, and one running fast must not offer a code the
+/// server will refuse. Before the moment it says when, and it turns into the button at that
+/// moment without a refresh. The server stays the authority — a tap that is still a second
+/// early is refused with the time, and the code screen words that.
+class _HandoverCodeAction extends ConsumerStatefulWidget {
+  const _HandoverCodeAction({required this.booking, required this.onOpen});
+
+  final Booking booking;
+  final VoidCallback onOpen;
+
+  @override
+  ConsumerState<_HandoverCodeAction> createState() => _HandoverCodeActionState();
+}
+
+class _HandoverCodeActionState extends ConsumerState<_HandoverCodeAction> {
+  Timer? _opens;
+
+  bool get _pickup => widget.booking.status == 'Confirmed';
+
+  /// Null from an API older than the field: the code is offered, as it always was.
+  DateTime? get _availableFrom =>
+      _pickup ? widget.booking.pickupAvailableFrom : widget.booking.returnAvailableFrom;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HandoverCodeAction oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _schedule();
+  }
+
+  /// One timer, to the moment the code becomes available, so the notice turns into the button.
+  void _schedule() {
+    _opens?.cancel();
+    final from = _availableFrom;
+    if (from == null) return;
+    final wait = from.difference(ref.read(serverClockProvider).now());
+    if (wait > Duration.zero) {
+      _opens = Timer(wait + const Duration(milliseconds: 500), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _opens?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final from = _availableFrom;
+    final open = from == null || !ref.read(serverClockProvider).now().isBefore(from);
+
+    if (!open) {
+      final formats = ref.watch(formatsProvider);
+      if (formats == null) return const SizedBox.shrink();
+      final time = formats.dateTime(from);
+      return KhadraNotice(
+        key: const ValueKey('handover-code-later'),
+        title: _pickup ? l10n.handoverPickupAvailableFrom(time) : l10n.handoverReturnAvailableFrom(time),
+        tone: NoticeTone.neutral,
+        icon: Icons.schedule,
+      );
+    }
+
+    return FilledButton.icon(
+      key: const ValueKey('handover-code-button'),
+      onPressed: widget.onOpen,
+      icon: const Icon(Icons.qr_code_2, size: 20),
+      label: Text(_pickup ? l10n.handoverShowPickupCode : l10n.handoverShowReturnCode),
+    );
+  }
+}
+
 /// What a customer may do with this booking right now.
 ///
-/// (The handover code is the one control gated on the STATUS rather than on a server
-/// flag: the server issues a code for exactly Confirmed and PickedUp and refuses any
-/// other, so the two cannot disagree for longer than a refresh.)
+/// (The handover code is gated on the STATUS and on the moment the server will issue it:
+/// see [_HandoverCodeAction].)
 ///
 /// Every button here is gated on a SERVER flag — `cancellation.canCancel`,
 /// `canBeDisputed`, `canBeReviewed` — rather than on a status the app interprets.
@@ -757,16 +841,9 @@ class _Actions extends ConsumerWidget {
 
     // The handover code: what the customer shows at the counter to collect the car, and
     // again to give it back. First, because at the counter it is the only thing that matters.
-    // Offered for exactly the two statuses the server issues a code for.
+    // For exactly the two statuses the server issues a code for, and from the moment it does.
     if (booking.status == 'Confirmed' || booking.status == 'PickedUp') {
-      actions.add(
-        FilledButton.icon(
-          key: const ValueKey('handover-code-button'),
-          onPressed: () => _showHandoverCode(context, ref),
-          icon: const Icon(Icons.qr_code_2, size: 20),
-          label: Text(booking.status == 'Confirmed' ? l10n.handoverShowPickupCode : l10n.handoverShowReturnCode),
-        ),
-      );
+      actions.add(_HandoverCodeAction(booking: booking, onOpen: () => _showHandoverCode(context, ref)));
     }
 
     if (booking.cancellation.canCancel) {

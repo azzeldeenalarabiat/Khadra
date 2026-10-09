@@ -1,5 +1,13 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Money } from '../../core/api/common.api';
 import { AppConfigService } from '../../core/config/app-config.service';
@@ -12,8 +20,13 @@ import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { httpData } from '../../core/http/http-data';
-import { DisputeRefund, disputeParty, disputeRefundText, openedByText } from './dispute-presentation';
-import { decidedEarlier, earlierDecisionNotice, readsAsWaived } from './earlier-decisions';
+import {
+  DisputeRefund,
+  disputeParty,
+  disputeRefundText,
+  openedByText,
+} from './dispute-presentation';
+import { decidedEarlier, earlierDecisionNotice } from './earlier-decisions';
 import { DisputeApi } from './dispute-api';
 import { EvidenceDraft, evidenceRefusalText } from './evidence-draft';
 
@@ -36,10 +49,13 @@ interface Dispute {
     /** Signed, short-lived links to the files attached to it. Absent from an older API. */
     readonly evidence?: readonly { readonly fileName: string; readonly url: string }[];
   }[];
+  /**
+   * The decision as the customer may see it: the basis and their own share (owner decision 3; pre-launch item 151).
+   * The office's and the platform's shares, what the office was charged and the waiver flag read from those come
+   * null to a customer since Wave 7, and the page never read the shares; it read the flag, and no longer does.
+   */
   readonly resolution: {
     readonly refundToCustomer: Money;
-    readonly dealerCharge: Money | null;
-    readonly waivesEverything: boolean;
     readonly note: string;
     readonly resolvedAt: string;
   } | null;
@@ -86,16 +102,25 @@ export class DisputeComponent {
     const id = this.ticketId();
     return /^[0-9a-f-]{36}$/i.test(id) ? `/api/v1/disputes/${id}` : undefined;
   });
-  protected readonly problem = computed(() => (this.dispute.error() ? snapshotProblem(this.dispute.error()) : null));
+  protected readonly problem = computed(() =>
+    this.dispute.error() ? snapshotProblem(this.dispute.error()) : null,
+  );
   protected readonly notFound = computed(
-    () => !/^[0-9a-f-]{36}$/i.test(this.ticketId()) || this.problem()?.status === 404 || this.problem()?.status === 403,
+    () =>
+      !/^[0-9a-f-]{36}$/i.test(this.ticketId()) ||
+      this.problem()?.status === 404 ||
+      this.problem()?.status === 403,
   );
 
   /** On a live ticket, what earlier disputes on this booking already decided, in the server's figures. */
   protected readonly earlierNotice = computed(() => {
     const d = this.dispute.value();
     return d
-      ? earlierDecisionNotice(d, (key, params) => this.i18n.t(key, params), (value) => this.format.money(value))
+      ? earlierDecisionNotice(
+          d,
+          (key, params) => this.i18n.t(key, params),
+          (value) => this.format.money(value),
+        )
       : null;
   });
 
@@ -119,19 +144,15 @@ export class DisputeComponent {
       : null;
   });
 
-  /** "Nothing is owed by either side" — only where no earlier dispute makes that untrue. */
-  protected readonly waived = computed(() => {
-    const d = this.dispute.value();
-    return d ? readsAsWaived(d) : false;
-  });
-
   constructor() {
     const seo = inject(SeoService);
     effect(() => seo.set({ title: this.i18n.t('seo.dispute.title'), noindex: true }));
   }
 
   protected status(status: string): string {
-    return STATUSES.includes(status) ? this.i18n.t(`dispute.status.${status}` as TranslationKey) : status;
+    return STATUSES.includes(status)
+      ? this.i18n.t(`dispute.status.${status}` as TranslationKey)
+      : status;
   }
 
   protected party(party: string): string {
@@ -155,8 +176,11 @@ export class DisputeComponent {
   private readonly addProblem = signal<ProblemSnapshot | null>(null);
   protected readonly addProblemText = computed(() => {
     if (this.bodyMissing()) return this.i18n.t('dispute.add.required');
-    const refused = evidenceRefusalText(this.evidence.refused(), this.limits(), this.t, (bytes) =>
-      `${this.format.number(bytes / (1024 * 1024), 0)} MB`,
+    const refused = evidenceRefusalText(
+      this.evidence.refused(),
+      this.limits(),
+      this.t,
+      (bytes) => `${this.format.number(bytes / (1024 * 1024), 0)} MB`,
     );
     return refused ?? this.word(this.addProblem());
   });
@@ -219,7 +243,9 @@ export class DisputeComponent {
   }
 
   private word(problem: ProblemSnapshot | null): string | null {
-    return problem ? problemText(problem, this.t, this.i18n.language(), this.appConfig.config()) : null;
+    return problem
+      ? problemText(problem, this.t, this.i18n.language(), this.appConfig.config())
+      : null;
   }
 
   protected tone(status: string): string {

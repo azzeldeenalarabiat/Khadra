@@ -951,8 +951,6 @@ export const AR: Record<TranslationKey, Message> = {
   'dispute.noStatements': 'لم يُضف شيء بعد.',
   'dispute.resolution': 'كيف سُوّي',
   'dispute.refund': 'المسترد لك',
-  'dispute.dealerCharge': 'المحمّل على مكتب التأجير',
-  'dispute.waived': 'لا شيء مستحق على أي طرف.',
   'dispute.refundRequested': 'طُلب استرداد {amount} لك، وسيُرسل إلى وسيلة الدفع الأصلية.',
   'dispute.refundOnItsWay': 'استرداد {amount} في طريقه إلى وسيلة الدفع الأصلية. بدأنا العملية في {date}، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.',
   'dispute.refundSettled': 'تم استرداد {amount} إلى وسيلة الدفع الأصلية في {date}. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.',

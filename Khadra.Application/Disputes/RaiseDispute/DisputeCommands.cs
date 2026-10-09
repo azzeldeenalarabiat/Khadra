@@ -24,15 +24,19 @@ namespace Khadra.Application.Disputes.RaiseDispute;
 public sealed record RequestDisputeEvidenceUploadCommand(Id UserId, Id BookingId, string FileName, string ContentType)
     : ICommand<Result<EvidenceUploadDto, Error>>;
 
-public sealed record OpenDisputeCommand(Id UserId, Id BookingId, string Reason, IReadOnlyList<string> EvidenceKeys)
+// Client: who is reading the answer. Only an app build older than MobileAppContract.DisputeSharesWithheldFrom still gets
+// the other parties' shares of a decision on the customer's copy (a temporary bridge, pre-launch item 239); a path that
+// leaves it out gets the minimised copy, never the fuller one.
+
+public sealed record OpenDisputeCommand(Id UserId, Id BookingId, string Reason, IReadOnlyList<string> EvidenceKeys, ClientInfo? Client = null)
     : ICommand<Result<DisputeDto, Error>>;
 
-public sealed record AddDisputeStatementCommand(Id UserId, Id TicketId, string Body, IReadOnlyList<string> EvidenceKeys)
+public sealed record AddDisputeStatementCommand(Id UserId, Id TicketId, string Body, IReadOnlyList<string> EvidenceKeys, ClientInfo? Client = null)
     : ICommand<Result<DisputeDto, Error>>;
 
-public sealed record WithdrawDisputeCommand(Id UserId, Id TicketId) : ICommand<Result<DisputeDto, Error>>;
+public sealed record WithdrawDisputeCommand(Id UserId, Id TicketId, ClientInfo? Client = null) : ICommand<Result<DisputeDto, Error>>;
 
-public sealed record GetMyDisputeQuery(Id UserId, Id TicketId) : IQuery<Result<DisputeDto, Error>>;
+public sealed record GetMyDisputeQuery(Id UserId, Id TicketId, ClientInfo? Client = null) : IQuery<Result<DisputeDto, Error>>;
 
 public sealed class RequestDisputeEvidenceUploadCommandValidator : AbstractValidator<RequestDisputeEvidenceUploadCommand>
 {
@@ -150,7 +154,7 @@ public sealed class RaiseDisputeHandlers(
         await TellOfOpeningAsync(ticket.Value, booking, party.Value, request.UserId, now, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await composer.ComposeAsync(ticket.Value, booking, party.Value, cancellationToken);
+        return await composer.ComposeAsync(ticket.Value, booking, party.Value, request.Client ?? ClientInfo.Unknown, cancellationToken);
     }
 
     /// <summary>
@@ -207,7 +211,7 @@ public sealed class RaiseDisputeHandlers(
             return added.Error;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await composer.ComposeAsync(ticket, booking, party, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, party, request.Client ?? ClientInfo.Unknown, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(WithdrawDisputeCommand request, CancellationToken cancellationToken)
@@ -225,7 +229,7 @@ public sealed class RaiseDisputeHandlers(
             return withdrawn.Error;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await composer.ComposeAsync(ticket, booking, viewer, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, viewer, request.Client ?? ClientInfo.Unknown, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(GetMyDisputeQuery request, CancellationToken cancellationToken)
@@ -237,7 +241,7 @@ public sealed class RaiseDisputeHandlers(
             return loaded.Error;
         var (ticket, booking, viewer) = loaded.Value;
 
-        return await composer.ComposeAsync(ticket, booking, viewer, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, viewer, request.Client ?? ClientInfo.Unknown, cancellationToken);
     }
 
     /// <summary>A ticket plus its booking, for someone who is a party to that booking; not_found otherwise.</summary>

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/api/api_failure.dart';
+import 'package:khadra_mobile/core/api/server_clock.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
 import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
@@ -64,6 +65,8 @@ void main() {
     List<Map<String, dynamic>>? refunds,
     Map<String, dynamic>? refundedAmount,
     Map<String, dynamic>? refundOutstandingAmount,
+    DateTime? pickupAvailableFrom,
+    DateTime? returnAvailableFrom,
   }) =>
       Booking.fromJson({
         'bookingId': 'b-1',
@@ -130,10 +133,12 @@ void main() {
         if (refunds != null) 'refunds': refunds,
         if (refundedAmount != null) 'refundedAmount': refundedAmount,
         if (refundOutstandingAmount != null) 'refundOutstandingAmount': refundOutstandingAmount,
+        if (pickupAvailableFrom != null) 'pickupAvailableFrom': pickupAvailableFrom.toIso8601String(),
+        if (returnAvailableFrom != null) 'returnAvailableFrom': returnAvailableFrom.toIso8601String(),
       });
 
   Future<FakeApi> pump(WidgetTester tester, Booking booking,
-      {Locale locale = const Locale('en'), FakeApi? api, double width = 412}) async {
+      {Locale locale = const Locale('en'), FakeApi? api, double width = 412, ServerClock? clock}) async {
     tester.view.physicalSize = Size(width, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -144,6 +149,7 @@ void main() {
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
       sharedPreferencesProvider.overrideWithValue(null),
       isArabicProvider.overrideWithValue(locale.languageCode == 'ar'),
+      if (clock != null) serverClockProvider.overrideWithValue(clock),
     ]);
     addTearDown(container.dispose);
 
@@ -847,5 +853,132 @@ void main() {
         expect(find.byKey(const ValueKey('handover-code-button')), findsNothing);
       });
     }
+  });
+
+  // Pre-launch item 225 (Wave 7): the server issues the pickup code from `pickupAvailableFrom` and the return code
+  // from `returnAvailableFrom`, and refuses earlier. The app offers it from that moment, judged on the SERVER's clock
+  // read from its own answers: a phone's clock can be minutes out either way.
+  group('the handover code, from the moment the server issues it', () {
+    final later = find.byKey(const ValueKey('handover-code-later'));
+    final button = find.byKey(const ValueKey('handover-code-button'));
+
+    /// A clock whose device reading is [device] and whose server is [skew] ahead of it.
+    ServerClock clockAt(DateTime Function() device, Duration skew) =>
+        ServerClock(deviceNow: device)..observe(device().add(skew));
+
+    Future<void> reveal(WidgetTester tester, Finder target) =>
+        tester.scrollUntilVisible(target, 200, scrollable: find.byType(Scrollable).first);
+
+    screenTest('says when, before the window, and offers no button', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Confirmed',
+          history: pathTo('Confirmed'),
+          depositPaid: true,
+          pickupAvailableFrom: now.add(const Duration(hours: 2)),
+        ),
+        clock: clockAt(() => now, Duration.zero),
+      );
+
+      await reveal(tester, later);
+      expect(find.textContaining('Your pickup code will be available from'), findsOneWidget);
+      expect(button, findsNothing);
+    });
+
+    screenTest('is offered to a phone running slow, once the SERVER says the window is open', (tester) async {
+      // The device thinks there are ten minutes to go; the server is fifteen minutes ahead of it.
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Confirmed',
+          history: pathTo('Confirmed'),
+          depositPaid: true,
+          pickupAvailableFrom: now.add(const Duration(minutes: 10)),
+        ),
+        clock: clockAt(() => now, const Duration(minutes: 15)),
+      );
+
+      await reveal(tester, button);
+      expect(find.text(en.handoverShowPickupCode), findsOneWidget);
+      expect(later, findsNothing);
+    });
+
+    screenTest('is not offered to a phone running fast before the SERVER says the window is open', (tester) async {
+      // The device thinks the window opened five minutes ago; the server is twenty minutes behind it.
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Confirmed',
+          history: pathTo('Confirmed'),
+          depositPaid: true,
+          pickupAvailableFrom: now.subtract(const Duration(minutes: 5)),
+        ),
+        clock: clockAt(() => now, const Duration(minutes: -20)),
+      );
+
+      await reveal(tester, later);
+      expect(button, findsNothing);
+    });
+
+    screenTest('turns into the button at the moment the window opens, without a refresh', (tester) async {
+      var device = now;
+      final api = await pump(
+        tester,
+        bookingOf(
+          status: 'Confirmed',
+          history: pathTo('Confirmed'),
+          depositPaid: true,
+          pickupAvailableFrom: now.add(const Duration(minutes: 2)),
+        ),
+        clock: clockAt(() => device, Duration.zero),
+      );
+      await reveal(tester, later);
+      final reads = api.bookingReads;
+
+      device = device.add(const Duration(minutes: 2, seconds: 1));
+      await tester.pump(const Duration(minutes: 2, seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(button, findsOneWidget);
+      expect(later, findsNothing);
+      expect(api.bookingReads, reads, reason: 'the moment is the one the booking already carries');
+    });
+
+    screenTest('names the return code before the rental starts', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'PickedUp',
+          history: pathTo('PickedUp'),
+          depositPaid: true,
+          returnAvailableFrom: now.add(const Duration(hours: 1)),
+        ),
+        clock: clockAt(() => now, Duration.zero),
+      );
+
+      await reveal(tester, later);
+      expect(find.textContaining('Your return code will be available from'), findsOneWidget);
+      expect(button, findsNothing);
+    });
+
+    screenTest('in Arabic too', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Confirmed',
+          history: pathTo('Confirmed'),
+          depositPaid: true,
+          pickupAvailableFrom: now.add(const Duration(hours: 2)),
+        ),
+        locale: const Locale('ar'),
+        clock: clockAt(() => now, Duration.zero),
+      );
+
+      await reveal(tester, later);
+      // The words before the time, whatever the time reads as.
+      expect(find.textContaining(ar.handoverPickupAvailableFrom('{time}').split('{time}').first), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 }

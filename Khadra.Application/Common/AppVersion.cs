@@ -46,6 +46,12 @@ public readonly partial record struct AppVersion : IComparable<AppVersion>
 
     public bool IsPrerelease => Prerelease is not null;
 
+    /// <summary>A version written in this codebase, which must parse: a typo is a programming error, never a quiet null.</summary>
+    public static AppVersion Parse(string text) =>
+        TryParse(text, out var version)
+            ? version
+            : throw new FormatException($"\"{text}\" is not a MAJOR.MINOR.PATCH app version.");
+
     public static bool TryParse(string? text, out AppVersion version)
     {
         version = default;

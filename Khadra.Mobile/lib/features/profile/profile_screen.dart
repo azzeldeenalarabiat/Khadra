@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../api/dtos.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -9,6 +10,7 @@ import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/account_required.dart';
 import '../documents/document_providers.dart';
+import '../legal/legal_text_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -146,6 +148,17 @@ class ProfileScreen extends ConsumerWidget {
                         fontSize: 14, height: 1.55, color: KhadraColors.neutral700),
                   ),
                 ),
+                // The texts in force (Wave 2 G1; the app's half in 1.4.0), each in the
+                // version /app-config lists, and only those it lists: no link while a
+                // text has not been published, and none invented when the config
+                // could not say.
+                for (final document in ref.watch(appConfigProvider).valueOrNull?.legal?.documents ??
+                    const <LegalDocumentRef>[])
+                  _Row(
+                    icon: Icons.gavel_outlined,
+                    label: legalDocumentTitle(l10n, document.kind),
+                    onTap: () => LegalTextScreen.open(context, document),
+                  ),
                 // Open to a guest as well: About sits outside the account's groups.
                 _Row(
                   icon: Icons.article_outlined,

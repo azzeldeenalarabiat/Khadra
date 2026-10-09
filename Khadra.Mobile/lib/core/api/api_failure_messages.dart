@@ -101,7 +101,18 @@ extension ApiFailureMessages on ApiFailure {
         'auth.password_reset_email_not_sent' =>
           l10n.authEmailNotDelivered,
 
+        // ── Legal texts (pre-launch items 224 and 238) ───────────────────────
+        // The prompt and the registration form handle these themselves; a screen
+        // that meets one anyway (a call already in flight when the prompt went up)
+        // still says something true in the reader's language.
+        'legal.consent_pending' => l10n.consentPending,
+        'legal.consent_required' => l10n.consentRequired,
+        'legal.version_not_current' => l10n.consentVersionChanged,
+
         // ── Booking ──────────────────────────────────────────────────────────
+        // A handover code asked for before its window (item 225). The code screen
+        // names the moment from the refusal; without it, this.
+        'booking.pickup_too_early' || 'booking.return_too_early' => l10n.handoverNotAvailable,
         'booking.vehicle_unavailable' => l10n.errorBookingVehicleUnavailable,
         'booking.documents_incomplete' => l10n.errorBookingDocumentsIncomplete,
         'booking.email_not_verified' => l10n.errorBookingEmailNotVerified,

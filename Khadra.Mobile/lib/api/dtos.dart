@@ -122,6 +122,7 @@ class AppConfig {
     required this.payments,
     required this.vocabularies,
     this.mobileApp = MobileAppConfig.none,
+    this.legal,
   });
 
   /// The IANA zone every calendar answer on this platform is expressed in. The
@@ -157,6 +158,10 @@ class AppConfig {
 
   final Vocabularies vocabularies;
 
+  /// The legal texts in force. NULL means not known (see [LegalConfig]), and the
+  /// registration form then reloads before it asks rather than send no consent.
+  final LegalConfig? legal;
+
   static AppConfig fromJson(Map<String, dynamic> json) => AppConfig(
         timeZone: json['timeZone'] as String? ?? 'Asia/Amman',
         currency: CurrencyConfig.fromJson(
@@ -177,6 +182,7 @@ class AppConfig {
         vocabularies: Vocabularies.fromJson(
             json['vocabularies'] as Map<String, dynamic>? ?? const {}),
         mobileApp: MobileAppConfig.fromJson(json['mobileApp']),
+        legal: LegalConfig.maybe(json['legal']),
       );
 }
 
@@ -436,6 +442,7 @@ class AuthUser {
     required this.isEmailVerified,
     required this.mustChangePassword,
     required this.createdAt,
+    this.pendingConsents = const [],
   });
 
   final String id;
@@ -447,7 +454,26 @@ class AuthUser {
   final bool mustChangePassword;
   final DateTime createdAt;
 
+  /// The legal texts in force this person has still to accept. Only `/auth/me`
+  /// sends it (the sign-in and refresh answers do not), so the session re-reads
+  /// the account once it is signed in. Empty from an older API.
+  final List<LegalDocumentRef> pendingConsents;
+
   bool get isCustomer => role == 'Customer';
+
+  /// This account with [pending] as what it still has to accept: the answer an
+  /// acceptance gives, applied without waiting for `/auth/me`.
+  AuthUser withPendingConsents(List<LegalDocumentRef> pending) => AuthUser(
+        id: id,
+        email: email,
+        fullName: fullName,
+        phone: phone,
+        role: role,
+        isEmailVerified: isEmailVerified,
+        mustChangePassword: mustChangePassword,
+        createdAt: createdAt,
+        pendingConsents: pending,
+      );
 
   static AuthUser fromJson(Map<String, dynamic> json) => AuthUser(
         id: json['id'] as String? ?? '',
@@ -458,6 +484,7 @@ class AuthUser {
         isEmailVerified: json['isEmailVerified'] as bool? ?? false,
         mustChangePassword: json['mustChangePassword'] as bool? ?? false,
         createdAt: _requiredDateTime(json['createdAt']),
+        pendingConsents: LegalDocumentRef.listOf(json['pendingConsents']),
       );
 }
 
@@ -1816,6 +1843,8 @@ class Booking implements HasDealerLabel {
     this.refunds,
     this.refundedAmount,
     this.refundOutstandingAmount,
+    this.pickupAvailableFrom,
+    this.returnAvailableFrom,
   });
 
   final String bookingId;
@@ -1907,6 +1936,15 @@ class Booking implements HasDealerLabel {
   /// What is promised back and not there yet: the server's total.
   final Money? refundOutstandingAmount;
 
+  /// The earliest moment the office may record the pickup, and so the earliest the
+  /// pickup code is issued (pre-launch item 225): the rental start less the frozen
+  /// turnaround. Null from an API older than Wave 3.
+  final DateTime? pickupAvailableFrom;
+
+  /// The earliest moment the return may be recorded and its code issued: the
+  /// rental start. Null from an API older than Wave 3.
+  final DateTime? returnAvailableFrom;
+
   /// Whether any money was, or is being, given back.
   bool get hasRefunds => (refunds?.isNotEmpty ?? false) || depositRefund != null;
 
@@ -1971,6 +2009,8 @@ class Booking implements HasDealerLabel {
         refunds: Refund.listOrNull(json['refunds']),
         refundedAmount: Money.maybe(json['refundedAmount']),
         refundOutstandingAmount: Money.maybe(json['refundOutstandingAmount']),
+        pickupAvailableFrom: _dateTime(json['pickupAvailableFrom']),
+        returnAvailableFrom: _dateTime(json['returnAvailableFrom']),
       );
 }
 
@@ -2118,26 +2158,23 @@ class DisputeStatement {
       );
 }
 
-/// Khadra's decision, as money. RECORDED, not executed: nothing moves funds until
-/// the Payments context ships, and the app says so wherever it shows one.
+/// Khadra's decision, as the CUSTOMER may see it: the basis the decision split and
+/// the customer's own share (owner decision 3; pre-launch item 151, Wave 7).
+///
+/// The office's and the platform's shares, what the office was charged and the
+/// waiver flag read from those are not the customer's, and from 1.4.0 the server
+/// does not send them. This build therefore does not read them at all: a share it
+/// was not sent must never surface as a "0.000" row.
 class DisputeResolution {
   const DisputeResolution({
     required this.depositHeld,
     required this.refundToCustomer,
-    required this.retainedByPlatform,
-    required this.transferredToDealer,
-    required this.dealerCharge,
-    required this.waivesEverything,
     required this.note,
     required this.resolvedAt,
   });
 
   final Money depositHeld;
   final Money refundToCustomer;
-  final Money retainedByPlatform;
-  final Money transferredToDealer;
-  final Money? dealerCharge;
-  final bool waivesEverything;
   final String note;
   final DateTime resolvedAt;
 
@@ -2147,12 +2184,6 @@ class DisputeResolution {
               json['depositHeld'] as Map<String, dynamic>? ?? const {}),
           refundToCustomer: Money.fromJson(
               json['refundToCustomer'] as Map<String, dynamic>? ?? const {}),
-          retainedByPlatform: Money.fromJson(
-              json['retainedByPlatform'] as Map<String, dynamic>? ?? const {}),
-          transferredToDealer: Money.fromJson(
-              json['transferredToDealer'] as Map<String, dynamic>? ?? const {}),
-          dealerCharge: Money.maybe(json['dealerCharge']),
-          waivesEverything: json['waivesEverything'] as bool? ?? false,
           note: json['note'] as String? ?? '',
           resolvedAt: _requiredDateTime(json['resolvedAt']),
         )
@@ -2509,6 +2540,136 @@ class MyReview {
           createdAt: _requiredDateTime(json['createdAt']),
         )
       : null;
+}
+
+/// One legal text in force, as `/app-config`, `/auth/me` and `/auth/me/legal-consents`
+/// list it (Wave 4, W4-8; read by the app from 1.4.0).
+///
+/// [versionId] is what an acceptance names. It is never invented on the phone: a
+/// registration or a prompt accepts exactly the ids the server listed.
+class LegalDocumentRef {
+  const LegalDocumentRef({
+    required this.kind,
+    required this.slug,
+    required this.versionId,
+    required this.versionLabel,
+    this.effectiveFrom,
+    this.pageUrls,
+  });
+
+  /// `Terms` or `Privacy`.
+  final String kind;
+
+  /// The public read's key: `terms` or `privacy`.
+  final String slug;
+  final String versionId;
+  final String versionLabel;
+  final DateTime? effectiveFrom;
+
+  /// The public page in each language; null while the platform has not set the
+  /// website's address, and no link is invented then.
+  final LegalPageUrls? pageUrls;
+
+  bool get isTerms => kind == 'Terms';
+
+  static LegalDocumentRef? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final versionId = json['versionId'] as String? ?? '';
+    final kind = json['kind'] as String? ?? '';
+    if (versionId.isEmpty || kind.isEmpty) return null;
+    return LegalDocumentRef(
+      kind: kind,
+      slug: json['slug'] as String? ?? kind.toLowerCase(),
+      versionId: versionId,
+      versionLabel: json['versionLabel'] as String? ?? '',
+      effectiveFrom: _dateTime(json['effectiveFrom']),
+      pageUrls: LegalPageUrls.maybe(json['pageUrls']),
+    );
+  }
+
+  static List<LegalDocumentRef> listOf(dynamic json) => json is List
+      ? json.map(LegalDocumentRef.maybe).whereType<LegalDocumentRef>().toList()
+      : const [];
+}
+
+class LegalPageUrls {
+  const LegalPageUrls({required this.en, required this.ar});
+
+  final String en;
+  final String ar;
+
+  String forLanguage({required bool arabic}) => arabic ? ar : en;
+
+  static LegalPageUrls? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final en = json['en'] as String? ?? '';
+    final ar = json['ar'] as String? ?? '';
+    return en.isEmpty || ar.isEmpty ? null : LegalPageUrls(en: en, ar: ar);
+  }
+}
+
+/// The `legal` block of `/app-config`: the texts in force.
+///
+/// **Null on [AppConfig] means NOT KNOWN** — the server could not read its
+/// database — never "nothing published". An empty list means nothing is in force,
+/// and then nothing is asked.
+class LegalConfig {
+  const LegalConfig(this.documents);
+
+  final List<LegalDocumentRef> documents;
+
+  static LegalConfig? maybe(dynamic json) => json is Map<String, dynamic>
+      ? LegalConfig(LegalDocumentRef.listOf(json['documents']))
+      : null;
+}
+
+/// `GET /api/v1/auth/me/legal-consents`: what this person still has to accept.
+/// Read uncached, so the consent prompt names the versions in force NOW.
+class MyLegalConsents {
+  const MyLegalConsents({required this.pending});
+
+  final List<LegalDocumentRef> pending;
+
+  static MyLegalConsents fromJson(Map<String, dynamic> json) =>
+      MyLegalConsents(pending: LegalDocumentRef.listOf(json['pending']));
+}
+
+/// `GET /api/v1/legal-documents/{slug}/current`: a text in force, as anyone may
+/// read it, rendered by the server.
+///
+/// Cached publicly for five minutes, so right after a publish it can still be the
+/// previous version: the reader compares [versionId] with the one being accepted
+/// and never shows a text other than the one a customer is agreeing to.
+class PublicLegalDocument {
+  const PublicLegalDocument({
+    required this.kind,
+    required this.versionId,
+    required this.versionLabel,
+    required this.htmlEn,
+    required this.htmlAr,
+    this.effectiveFrom,
+  });
+
+  final String kind;
+  final String versionId;
+  final String versionLabel;
+  final DateTime? effectiveFrom;
+  final String htmlEn;
+  final String htmlAr;
+
+  String htmlFor({required bool arabic}) => arabic ? htmlAr : htmlEn;
+
+  static PublicLegalDocument fromJson(Map<String, dynamic> json) {
+    final html = json['html'] as Map<String, dynamic>? ?? const {};
+    return PublicLegalDocument(
+      kind: json['kind'] as String? ?? '',
+      versionId: json['versionId'] as String? ?? '',
+      versionLabel: json['versionLabel'] as String? ?? '',
+      effectiveFrom: _dateTime(json['effectiveFrom']),
+      htmlEn: html['en'] as String? ?? '',
+      htmlAr: html['ar'] as String? ?? '',
+    );
+  }
 }
 
 /// Turns a relative image path from the API into one this build can actually load.

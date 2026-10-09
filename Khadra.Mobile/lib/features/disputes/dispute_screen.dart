@@ -362,17 +362,11 @@ class _Resolution extends StatelessWidget {
               label: l10n.disputeDecidedEarlier,
               value: Text(formats.money(earlier)),
             ),
+          // The customer's own share and nothing else (owner decision 3; pre-launch
+          // item 151): what the office and the platform were given is theirs.
           KhadraDetailRow(
             label: l10n.bookingPartyCustomer,
             value: Text(formats.money(resolution.refundToCustomer)),
-          ),
-          KhadraDetailRow(
-            label: l10n.bookingPartyDealer,
-            value: Text(formats.money(resolution.transferredToDealer)),
-          ),
-          KhadraDetailRow(
-            label: l10n.bookingPartyAdmin,
-            value: Text(formats.money(resolution.retainedByPlatform)),
           ),
           if (resolution.note.isNotEmpty) ...[
             const SizedBox(height: Space.sm),

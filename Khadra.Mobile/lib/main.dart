@@ -13,7 +13,9 @@ import 'core/live/live_refresh.dart';
 import 'core/providers.dart';
 import 'core/push/push_actions.dart';
 import 'core/router.dart';
+import 'core/session/session_controller.dart';
 import 'core/theme/khadra_theme.dart';
+import 'features/legal/consent_prompt_screen.dart';
 import 'features/update/update_required_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -92,16 +94,20 @@ class KhadraApp extends ConsumerStatefulWidget {
   ConsumerState<KhadraApp> createState() => _KhadraAppState();
 }
 
-class _KhadraAppState extends ConsumerState<KhadraApp> {
+class _KhadraAppState extends ConsumerState<KhadraApp> with WidgetsBindingObserver {
   /// Set the first time an update is required, and never cleared for the life of
   /// the process. Swapping the router out disposes every screen under it, and a
   /// requirement that could flip back would put them all up again, half-loaded,
   /// on a build the server has already refused.
   UpdateRequirement? _blockedBy;
 
+  /// The consent prompt's own Navigator, while it stands in for the router.
+  final _consentNavigator = GlobalKey<NavigatorState>(debugLabel: 'consent-prompt');
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // One cold-start rotation, before the first screen decides what to show. Until
     // it answers the session is `unknown`, which is why that state exists: folding
     // it into "signed out" would flash the sign-in screen at somebody who is
@@ -110,6 +116,55 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
       ref.read(sessionProvider.notifier).restore();
       _startPush();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Android Back while the consent prompt stands in for the router: a text opened from it
+  /// closes, and the prompt is back. Nothing else answers it there — the router's back button
+  /// dispatcher went with the router — so without this Back closed the app from a text the
+  /// person was reading in order to accept. On the prompt itself it closes the app, as before.
+  /// Whenever the router is in the tree the key resolves to nothing and this declines.
+  @override
+  Future<bool> didPopRoute() async => await _consentNavigator.currentState?.maybePop() ?? false;
+
+  /// Raises the consent prompt when `/auth/me` names a text still to accept, and drops it when
+  /// nobody is signed in (pre-launch item 238).
+  void _syncConsent(SessionState session) {
+    final pending = session.user?.pendingConsents ?? const [];
+    if (!session.isSignedIn) {
+      ref.read(consentRequiredProvider.notifier).state = false;
+    } else if (pending.isNotEmpty) {
+      ref.read(consentRequiredProvider.notifier).state = true;
+    }
+    _holdLiveSurfaces();
+  }
+
+  /// Every live surface holds while the prompt is up: behind it each of their reads would only
+  /// be refused. Never raises the prompt — only the session and the interceptor do.
+  void _holdLiveSurfaces() => ref
+      .read(liveRefreshProvider)
+      .setHeld(ref.read(sessionProvider).isSignedIn && ref.read(consentRequiredProvider));
+
+  /// Nothing is pending any more: the app comes back where the router left it, the phone is
+  /// registered for push (refused while consent was pending, deliberately: no push before the
+  /// privacy notice is accepted), and the account is re-read.
+  ///
+  /// The acceptance's own answer is the authority, applied to the account FIRST. Waiting for
+  /// `/auth/me` instead let a re-read that failed leave the old list in place, and the prompt
+  /// went straight back up over texts already accepted. A text published since is still asked
+  /// for: the re-read below names it, and the session raises the prompt again.
+  Future<void> _consentAccepted() async {
+    final session = ref.read(sessionProvider.notifier);
+    final user = ref.read(sessionProvider).user;
+    if (user != null) session.applyUser(user.withPendingConsents(const []));
+    ref.read(consentRequiredProvider.notifier).state = false;
+    await session.reload();
+    await ref.read(pushCoordinatorProvider).signedIn(ref.read(appLanguageProvider));
   }
 
   /// Push notifications, for the life of the app. Off, silently, when this build has no
@@ -143,10 +198,15 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
       final push = ref.read(pushCoordinatorProvider);
       if (next.isSignedIn && previous?.isSignedIn != true) {
         push.signedIn(ref.read(appLanguageProvider));
+        // The sign-in and refresh answers do not say whether a legal text waits for
+        // this person; `/auth/me` does (pre-launch item 238). One read per session.
+        ref.read(sessionProvider.notifier).reload();
       } else if (!next.isSignedIn && previous?.isSignedIn == true) {
         push.sessionEnded();
       }
+      _syncConsent(next);
     });
+    ref.listen(consentRequiredProvider, (_, __) => _holdLiveSurfaces());
     ref.listen(appLanguageProvider, (_, language) {
       ref.read(pushCoordinatorProvider).languageChanged(language);
     });
@@ -154,6 +214,12 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
     final router = ref.watch(routerProvider);
     final locale = ref.watch(localeProvider);
     final blockedBy = _blockedBy ??= ref.watch(updateRequirementProvider);
+    // The consent prompt stands in for the app while a signed-in person has a text to
+    // accept. An update requirement outranks it: a build the server no longer serves
+    // cannot be asked anything, and the new build asks again.
+    final consenting = blockedBy == null &&
+        ref.watch(consentRequiredProvider) &&
+        ref.watch(sessionProvider.select((session) => session.isSignedIn));
 
     return MaterialApp.router(
       // The name Android shows in the task switcher and the web tab, in the
@@ -209,7 +275,16 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
                     builder: (_) => UpdateRequiredScreen(requirement: blockedBy),
                   ),
                 )
-              : child ?? const SizedBox.shrink(),
+              // The same way, for the same reason: no tab, route or deep link behind it
+              // (pre-launch item 238). Its own Navigator also carries the texts it opens.
+              : consenting
+                  ? Navigator(
+                      key: _consentNavigator,
+                      onGenerateRoute: (_) => MaterialPageRoute<void>(
+                        builder: (_) => ConsentPromptScreen(onAccepted: _consentAccepted),
+                      ),
+                    )
+                  : child ?? const SizedBox.shrink(),
         );
       },
     );

@@ -327,7 +327,7 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> IssueHandoverCode(Guid bookingId, CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new IssueHandoverCodeCommand(Id.From(bookingId)), cancellationToken);
+        var result = await Mediator.Send(new IssueHandoverCodeCommand(Id.From(bookingId), Client), cancellationToken);
         return FromResult(result);
     }
 

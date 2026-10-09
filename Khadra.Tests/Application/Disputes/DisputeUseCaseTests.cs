@@ -1427,7 +1427,7 @@ public sealed class DisputeUseCaseTests
 
         var decision = office.Resolution!;
         Assert.Equal(held, decision.DepositHeld.Amount);
-        Assert.Equal(toOffice, decision.TransferredToDealer.Amount);
+        Assert.Equal(toOffice, decision.TransferredToDealer!.Amount);
         Assert.Null(decision.DealerCharge);
         Assert.Null(decision.RefundToCustomer);
         Assert.Null(decision.RetainedByPlatform);
@@ -1488,7 +1488,7 @@ public sealed class DisputeUseCaseTests
         Assert.True(office.IsSuccess, office.IsFailure ? office.Error.Code : null);
         Assert.Null(office.Value.Resolution!.RefundToCustomer);
         Assert.Null(office.Value.Resolution.RetainedByPlatform);
-        Assert.Equal(held - (held / 2) - 2m, office.Value.Resolution.TransferredToDealer.Amount);
+        Assert.Equal(held - (held / 2) - 2m, office.Value.Resolution.TransferredToDealer!.Amount);
         Assert.Equal(held / 2, customer.Value.Resolution!.RefundToCustomer!.Amount);
     }
 
@@ -1509,34 +1509,118 @@ public sealed class DisputeUseCaseTests
         var decision = (await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None)).Resolution!;
 
         Assert.Equal(charge, decision.DealerCharge!.Amount);
-        Assert.Equal(0m, decision.TransferredToDealer.Amount);
+        Assert.Equal(0m, decision.TransferredToDealer!.Amount);
         Assert.Null(decision.RefundToCustomer);
     }
 
+    private static ClientInfo App(string version) => new("1.2.3.4", "Dart/3.5", AppVersion.Parse(version));
+
+    /// <summary>
+    /// Owner decision 3, carried to the customer's dispute page (pre-launch item 151; Wave 7): the customer is shown the
+    /// basis and their own share, never the office's or the platform's, nor what the office was charged or the waiver
+    /// flag read from those. The website declares no version and the app from 1.4.0 knows not to expect them.
+    /// </summary>
     [Fact]
-    public async Task The_customers_and_the_administrators_copies_still_carry_every_share()
+    public async Task The_customer_is_shown_only_their_own_share_of_a_decision()
     {
-        var (context, booking, ticket, held, toOffice) = await SplitThreeWaysAsync();
+        var (context, booking, ticket, held, _) = await SplitThreeWaysAsync();
 
-        var customer = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
-        var admin = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
-
-        foreach (var decision in new[] { customer.Resolution!, admin.Resolution! })
+        foreach (var client in new[] { ClientInfo.Unknown, App("1.4.0"), App("1.4.0+7"), App("1.10.0") })
         {
+            var decision = (await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, client, CancellationToken.None)).Resolution!;
+
+            Assert.Equal(held, decision.DepositHeld.Amount);
             Assert.Equal(held / 2, decision.RefundToCustomer!.Amount);
-            Assert.Equal(2m, decision.RetainedByPlatform!.Amount);
-            Assert.Equal(toOffice, decision.TransferredToDealer.Amount);
-            Assert.False(decision.WaivesEverything);
+            Assert.Null(decision.RetainedByPlatform);
+            Assert.Null(decision.TransferredToDealer);
+            Assert.Null(decision.DealerCharge);
+            Assert.Null(decision.WaivesEverything);
+            Assert.Equal("Both sides partly at fault.", decision.Note);
         }
     }
 
     /// <summary>
-    /// A decision that gives the customer everything and charges nobody: its waiver flag would tell the
-    /// office the customer's share, so the office reads null there too. The customer's JSON keeps every
-    /// name and type the installed app parses.
+    /// An installed build older than 1.4.0 renders the office's and the platform's rows and would show a share it was no
+    /// longer sent as zero, so it is still sent them until the minimum refuses it outright (a temporary bridge; item 239).
+    /// The administrator's copy carries every share, always.
     /// </summary>
     [Fact]
-    public async Task On_the_wire_the_office_reads_null_where_the_customer_still_reads_the_figures()
+    public async Task An_app_build_older_than_the_release_and_the_administrator_still_read_every_share()
+    {
+        var (context, booking, ticket, held, toOffice) = await SplitThreeWaysAsync();
+
+        var older = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, App("1.3.0"), CancellationToken.None);
+        var admin = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
+
+        foreach (var decision in new[] { older.Resolution!, admin.Resolution! })
+        {
+            Assert.Equal(held / 2, decision.RefundToCustomer!.Amount);
+            Assert.Equal(2m, decision.RetainedByPlatform!.Amount);
+            Assert.Equal(toOffice, decision.TransferredToDealer!.Amount);
+        }
+
+        Assert.False(admin.Resolution!.WaivesEverything);
+    }
+
+    /// <summary>What the office was charged is never the customer's, on any build: none renders it.</summary>
+    [Fact]
+    public async Task The_customer_is_never_told_what_the_office_was_charged()
+    {
+        var context = new Context();
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        var held = booking.Pricing.DepositAmount.Amount;
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, booking.Penalty!.MinAmount.Amount, "The office cancelled late."),
+            CancellationToken.None)).IsSuccess);
+
+        foreach (var client in new[] { ClientInfo.Unknown, App("1.3.0"), App("1.4.0+7") })
+        {
+            var decision = (await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, client, CancellationToken.None)).Resolution!;
+
+            Assert.Null(decision.DealerCharge);
+            Assert.Null(decision.WaivesEverything);
+            Assert.Equal(held, decision.RefundToCustomer!.Amount);
+        }
+    }
+
+    /// <summary>Through the handlers, which pass the reader's client, so the controller's version reaches the copy.</summary>
+    [Fact]
+    public async Task Reading_their_dispute_the_customer_gets_the_copy_their_build_can_read()
+    {
+        var context = new Context();
+        var booking = Build.Booking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        booking.Approve(Id.New(), Build.Now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
+        booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", Build.Now.AddHours(3));
+        context.GivenBooking(booking);
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held / 2, 2m, held - (held / 2) - 2m, null, "Both sides partly at fault."),
+            CancellationToken.None)).IsSuccess);
+
+        var current = await context.Raise().Handle(new GetMyDisputeQuery(CustomerId, ticket.Id, App("1.4.0+7")), CancellationToken.None);
+        var website = await context.Raise().Handle(new GetMyDisputeQuery(CustomerId, ticket.Id), CancellationToken.None);
+        var older = await context.Raise().Handle(new GetMyDisputeQuery(CustomerId, ticket.Id, App("1.3.0")), CancellationToken.None);
+
+        Assert.Null(current.Value.Resolution!.RetainedByPlatform);
+        Assert.Null(current.Value.Resolution.TransferredToDealer);
+        Assert.Null(website.Value.Resolution!.RetainedByPlatform);
+        Assert.Equal(2m, older.Value.Resolution!.RetainedByPlatform!.Amount);
+        Assert.Equal(held / 2, current.Value.Resolution.RefundToCustomer!.Amount);
+    }
+
+    /// <summary>
+    /// A decision that gives the customer everything and charges nobody: its waiver flag would tell the office the
+    /// customer's share, so the office reads null there. The customer's copy reads null for every share but their own,
+    /// keeping each name the installed app parses; an older build still reads the figures (item 239).
+    /// </summary>
+    [Fact]
+    public async Task On_the_wire_each_reader_gets_null_where_a_share_is_not_theirs()
     {
         var context = new Context();
         var booking = context.GivenBooking(CancelledBooking(Build.Now));
@@ -1548,7 +1632,8 @@ public sealed class DisputeUseCaseTests
         JsonElement WireOf(Khadra.Application.Disputes.Dtos.DisputeDto view) =>
             JsonDocument.Parse(JsonSerializer.Serialize(view, WireOptions)).RootElement.GetProperty("resolution").Clone();
         var office = WireOf(await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None));
-        var customer = WireOf(await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None));
+        var customer = WireOf(await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, App("1.4.0+7"), CancellationToken.None));
+        var older = WireOf(await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, App("1.3.0"), CancellationToken.None));
 
         Assert.Equal(JsonValueKind.Null, office.GetProperty("refundToCustomer").ValueKind);
         Assert.Equal(JsonValueKind.Null, office.GetProperty("retainedByPlatform").ValueKind);
@@ -1557,8 +1642,14 @@ public sealed class DisputeUseCaseTests
         Assert.Equal(0m, office.GetProperty("transferredToDealer").GetProperty("amount").GetDecimal());
 
         Assert.Equal(held, customer.GetProperty("refundToCustomer").GetProperty("amount").GetDecimal());
-        Assert.Equal(0m, customer.GetProperty("retainedByPlatform").GetProperty("amount").GetDecimal());
-        Assert.Equal(JsonValueKind.True, customer.GetProperty("waivesEverything").ValueKind);
+        Assert.Equal(held, customer.GetProperty("depositHeld").GetProperty("amount").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, customer.GetProperty("retainedByPlatform").ValueKind);
+        Assert.Equal(JsonValueKind.Null, customer.GetProperty("transferredToDealer").ValueKind);
+        Assert.Equal(JsonValueKind.Null, customer.GetProperty("dealerCharge").ValueKind);
+        Assert.Equal(JsonValueKind.Null, customer.GetProperty("waivesEverything").ValueKind);
+
+        Assert.Equal(0m, older.GetProperty("retainedByPlatform").GetProperty("amount").GetDecimal());
+        Assert.Equal(0m, older.GetProperty("transferredToDealer").GetProperty("amount").GetDecimal());
     }
     // ── The decision's preview (Wave 2 C1; E2E F37) ──────────────────────────────────────────────
 
