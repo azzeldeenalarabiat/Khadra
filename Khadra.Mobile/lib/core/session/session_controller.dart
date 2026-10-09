@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
@@ -97,6 +99,7 @@ class SessionController extends StateNotifier<SessionState> {
   }
 
   Future<void> _safeClear() async {
+    _epoch++;
     try {
       await _store.clear();
     } on Object {
@@ -145,22 +148,65 @@ class SessionController extends StateNotifier<SessionState> {
     }
   }
 
+  /// The rotation in flight, which every caller of [refresh] joins.
+  Completer<bool>? _rotation;
+
   /// One rotation. True when a fresh access token is installed.
   ///
-  /// Never call this concurrently — `AuthInterceptor` is what serialises it, and
-  /// two rotations of one token is the replay the server revokes a family for.
-  Future<bool> refresh() async {
-    final token = await _store.readRefreshToken();
+  /// **Single flight, here** (pre-launch item 95). Two presentations of one refresh
+  /// token are the replay the server revokes a family for, and the token has more
+  /// than one presenter: the cold-start [restore], and `AuthInterceptor`'s proactive
+  /// and reactive paths. The interceptor's own gate covered only its callers, so a
+  /// screen that asked for something while the launch rotation was still on its way
+  /// started a second one. Every caller now waits on the same answer, and an
+  /// exception reaches every one of them, as it reached the single caller before.
+  Future<bool> refresh() {
+    final running = _rotation;
+    if (running != null) return running.future;
+
+    final rotation = Completer<bool>();
+    _rotation = rotation;
+    unawaited(() async {
+      try {
+        final installed = await _rotate();
+        _rotation = null;
+        rotation.complete(installed);
+      } catch (error, stack) {
+        _rotation = null;
+        rotation.completeError(error, stack);
+      }
+    }());
+    return rotation.future;
+  }
+
+  Future<bool> _rotate() async {
+    // The session this rotation is FOR. Its answer can take forty seconds and more
+    // (a connect and a receive timeout, twice with the retry below), and in that time
+    // the customer can sign out, sign in as somebody else, or change their password.
+    // An answer for a session that has since ended or been replaced is applied to
+    // nothing: installed, it signed a customer back in moments after they signed out,
+    // and as a verdict, it ended the session a password change had just begun.
+    final epoch = _epoch;
+
+    // Only a store that ANSWERED "no token" ends the session. One that timed out or
+    // threw has said nothing either way, and ending here would discard a valid
+    // session over a keystore that unlocks a moment later — the rule `_restore`
+    // already keeps.
+    final stored = await _store.readRefreshTokenOutcome();
+    if (epoch != _epoch) return false;
+    final token = stored.token;
     if (token == null) {
-      await _end(SessionEndReason.expired);
+      if (stored.answered) await _end(SessionEndReason.expired);
       return false;
     }
 
     try {
-      final tokens = await _api.refresh(token);
-      await _install(tokens);
-      return true;
+      final tokens = await _present(token);
+      if (epoch != _epoch) return false;
+      return await _install(tokens, epoch: epoch);
     } on ApiFailure catch (failure) {
+      if (epoch != _epoch) return false;
+
       // Transport trouble says nothing about whether the session is valid. Ending
       // it here would sign people out every time they went through a tunnel.
       //
@@ -184,7 +230,39 @@ class SessionController extends StateNotifier<SessionState> {
     }
   }
 
+  /// Presents [token], and once more AT ONCE when the first attempt timed out
+  /// (pre-launch item 128).
+  ///
+  /// A timeout is the one failure after which the server may well have rotated
+  /// without the phone hearing: its answer, carrying the only copy of the new
+  /// token, was lost on the way back. The token on the phone is then consumed, and
+  /// the next presentation — minutes later, at the next stale access token — is
+  /// replay outside the sixty-second grace, and the end of the session. Presented
+  /// again straight away, inside this rotation's gate, it is certainly inside the
+  /// grace, and the server answers an in-grace presentation with a NEW pair and
+  /// retires the one the lost answer carried.
+  ///
+  /// Never after anything else. A 401 is a verdict, and presenting again is exactly
+  /// the replay that revokes the family. A 5xx, a 429 or a dropped connection is
+  /// left to the next rotation, as before. Nor after a timeout spent CONNECTING:
+  /// that request never reached the server, so nothing was consumed, and a second
+  /// wait would only hold every request queued behind this rotation as long again.
+  Future<AuthTokens> _present(String token) async {
+    try {
+      return await _api.refresh(token);
+    } on ApiFailure catch (failure) {
+      if (failure.kind != ApiFailureKind.timeout || failure.neverConnected) rethrow;
+      return _api.refresh(token);
+    }
+  }
+
+  /// Which session this controller is on. Moved on by everything that begins a
+  /// session anew or ends one, so a rotation already on its way can tell its answer
+  /// belongs to a session that no longer exists. See [_rotate].
+  int _epoch = 0;
+
   Future<AuthUser> signIn(String email, String password) async {
+    _epoch++;
     final tokens = await _api.signIn(email, password);
     await _install(tokens);
     return tokens.user;
@@ -196,9 +274,13 @@ class SessionController extends StateNotifier<SessionState> {
   /// every other family, so the token the app is holding stops working on its very
   /// next request. Without this the customer is signed out for changing their own
   /// password.
-  Future<void> adoptTokens(AuthTokens tokens) => _install(tokens);
+  Future<void> adoptTokens(AuthTokens tokens) async {
+    _epoch++;
+    await _install(tokens);
+  }
 
   Future<void> signOut({bool allDevices = false}) async {
+    _epoch++;
     // Never allowed to stop a sign-out: the hook is best effort by contract.
     try {
       await _beforeSignOut?.call();
@@ -229,7 +311,12 @@ class SessionController extends StateNotifier<SessionState> {
   Future<void> reload() async {
     if (!state.isSignedIn) return;
     try {
-      state = SessionState(status: SessionStatus.signedIn, user: await _api.me());
+      final user = await _api.me();
+      // The session may have ended, or become somebody else's, while the account was
+      // being read. Since 1.4.0 re-reads it on every sign-in, a sign-out moments
+      // later would otherwise be undone by the answer.
+      if (!state.isSignedIn || state.user?.id != user.id) return;
+      state = SessionState(status: SessionStatus.signedIn, user: user);
     } on ApiFailure {
       // A failure here is not a reason to throw the session away; the interceptor
       // owns that decision and has better information.
@@ -244,14 +331,19 @@ class SessionController extends StateNotifier<SessionState> {
   /// Called by the interceptor when the server has definitively refused.
   Future<void> endSession() => _end(SessionEndReason.expired);
 
-  Future<void> _install(AuthTokens tokens) async {
+  /// True when the pair is installed. A rotation passes its [epoch]: the disk write
+  /// can take seconds, and a session ended or replaced meanwhile keeps what it has.
+  Future<bool> _install(AuthTokens tokens, {int? epoch}) async {
     // Disk first. See the class comment.
     await _store.saveRefreshToken(tokens.refreshToken, tokens.refreshTokenExpiresAt);
+    if (epoch != null && epoch != _epoch) return false;
     _store.setAccessToken(tokens.accessToken, tokens.accessTokenExpiresAt);
     state = SessionState(status: SessionStatus.signedIn, user: tokens.user);
+    return true;
   }
 
   Future<void> _end(SessionEndReason reason) async {
+    _epoch++;
     await _store.clear();
     // A licence fetched while signed in must not still be in the cache for
     // whoever signs in next on the same phone. Clearing the token without

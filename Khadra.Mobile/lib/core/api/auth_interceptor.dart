@@ -24,9 +24,12 @@ import '../session/session_store.dart';
 /// minutes after each sign-in, for as long as the app stayed open.
 ///
 /// The queue was buying ORDERING. What this actually needs is SINGLE FLIGHT, and
-/// [_refreshOnce] is what provides it: every caller that arrives while a rotation
-/// is running waits on the same completer, so one token is presented once however
-/// many requests noticed at once. `token_rotation_test` holds this down.
+/// [_refreshOnce] provides it for this interceptor's callers: every one that arrives
+/// while a rotation is running waits on the same completer, so one token is
+/// presented once however many requests noticed at once. `token_rotation_test`
+/// holds this down. The gate that ALSO covers callers outside it — the cold-start
+/// restore — is `SessionController.refresh` itself (pre-launch item 95), which the
+/// `refresh` passed in here is.
 ///
 /// The rules this follows, and why each one is here:
 ///
@@ -154,8 +157,11 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    if (await _store.readRefreshToken() == null) {
-      await _onSessionEnded();
+    // Only a store that ANSWERED "no token" means the session is over. One that timed
+    // out or threw has said nothing, and the refusal goes back to its caller as it is.
+    final stored = await _store.readRefreshTokenOutcome();
+    if (stored.token == null) {
+      if (stored.answered) await _onSessionEnded();
       handler.next(error);
       return;
     }
@@ -176,13 +182,21 @@ class AuthInterceptor extends Interceptor {
 
     try {
       final retry = await _resend(request.copyWith(
+        // A multipart body is a stream, and the first send spent it (pre-launch item
+        // 127): re-sent as it was, an upload failed as "offline" after a rotation that
+        // had worked. Its clone is the same bytes under the same boundary.
+        data: request.data is FormData ? (request.data as FormData).clone() : request.data,
         extra: {...request.extra, retriedExtra: true},
       ));
       handler.resolve(retry);
     } on DioException catch (retryError) {
       // A second 401 is the security stamp having moved under us. Nothing a token
-      // can fix.
-      if (retryError.response?.statusCode == 401) {
+      // can fix — unless the token moved again while the retry was out (a password
+      // change installs a new pair): then the refusal is about a token already
+      // replaced, as the first one may have been, and the session it would end is
+      // not the one it refused.
+      if (retryError.response?.statusCode == 401 &&
+          _bearerOf(retryError.requestOptions.headers) == 'Bearer ${_store.accessToken}') {
         await _onSessionEnded();
       }
       handler.next(retryError);

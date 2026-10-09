@@ -21,9 +21,17 @@ final class ApiFailure implements Exception {
     this.statusCode,
     this.fieldErrors = const <String, List<String>>{},
     this.extensions = const <String, Object?>{},
+    this.neverConnected = false,
   });
 
   final ApiFailureKind kind;
+
+  /// True for a timeout spent CONNECTING: the request never reached the server, so
+  /// nothing it asked for can have happened there. Every other timeout may have been
+  /// answered on the server and lost on the way back — the distinction the token
+  /// rotation's one retry turns on (pre-launch item 128). The kind is [ApiFailureKind.timeout]
+  /// either way, so every screen words both the same.
+  final bool neverConnected;
 
   /// The platform's stable code, e.g. `booking.vehicle_unavailable`.
   final String? code;
@@ -76,6 +84,7 @@ final class ApiFailure implements Exception {
 
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
+        return const ApiFailure(kind: ApiFailureKind.timeout, neverConnected: true);
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return const ApiFailure(kind: ApiFailureKind.timeout);

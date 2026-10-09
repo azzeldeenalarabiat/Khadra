@@ -134,6 +134,27 @@ class SessionStore {
   String? _accessToken;
   DateTime? _accessExpiresAt;
 
+  /// The refresh token as THIS PROCESS last wrote or cleared it (pre-launch item 126).
+  ///
+  /// The disk is where a token survives a cold start, and it is not where the app
+  /// should learn which token is newest. A write can fail or never answer — [_bounded]
+  /// swallows both — and by then the server has consumed the token still on disk:
+  /// presenting that one again is replay, forgiven for sixty seconds and then the end
+  /// of the family, which is this phone's session. So [saveRefreshToken] sets this
+  /// BEFORE it touches the disk, [clear] empties it before anything else, and every
+  /// read prefers it. Only a process that has written or cleared nothing yet — a cold
+  /// start — asks the disk.
+  ///
+  /// What it cannot cover: a write that failed on the last rotation before the
+  /// process died. The next cold start reads the consumed token, and only the
+  /// server's grace can save it. The item records that residue.
+  String? _refreshToken;
+  DateTime? _refreshExpiresAt;
+
+  /// Whether [_refreshToken] is this process's answer: false until the first write
+  /// or clear.
+  bool _refreshKnown = false;
+
   String? get accessToken => _accessToken;
 
   /// Whether the access token is close enough to expiry to refresh before using.
@@ -205,6 +226,9 @@ class SessionStore {
   /// like a token that is not there, and [disownSession] would throw away a
   /// perfectly good session over a transient fault.
   Future<({String? token, bool answered})> readRefreshTokenOutcome() async {
+    // What this process wrote or cleared, whatever the disk managed. See [_refreshToken].
+    if (_refreshKnown) return (token: _refreshToken, answered: true);
+
     // Not merely ignored — not even read. A guest's every request asks for this
     // through `AuthInterceptor`, and a bounded platform-channel round trip per
     // call is worth avoiding for somebody who has no token at all. Disowned IS a
@@ -223,6 +247,7 @@ class SessionStore {
   /// The refresh token's own deadline, so a cold start can tell a dead session
   /// from a live one without spending a request to find out.
   Future<DateTime?> readRefreshExpiry() async {
+    if (_refreshKnown) return _refreshExpiresAt;
     if (!sessionIsOwned) return null;
     final raw = await _bounded(() => _secure.read(key: _refreshExpiresKey), null);
     if (raw == null) return null;
@@ -237,7 +262,15 @@ class SessionStore {
   /// only the server's 60-second reuse grace saves the session, and only if the
   /// next attempt comes promptly. Installing the access token first would widen
   /// that window for no benefit.
+  ///
+  /// The memory copy is the exception, and goes FIRST: from this moment the new
+  /// token is the one presented, whether or not the write below lands (pre-launch
+  /// item 126; see [_refreshToken]).
   Future<void> saveRefreshToken(String token, DateTime expiresAt) async {
+    _refreshToken = token;
+    _refreshExpiresAt = expiresAt.toUtc();
+    _refreshKnown = true;
+
     await _bounded(
       () => _secure.write(key: _refreshTokenKey, value: token),
       null,
@@ -255,8 +288,14 @@ class SessionStore {
 
   Future<void> clear() async {
     clearAccessToken();
-    // FIRST, and this is the line that makes a sign-out stick. Everything below it
-    // is allowed to fail.
+    // Before anything that can fail or wait: this process presents nothing from here
+    // on, even where neither the marker below nor the deletes can take (a device with
+    // no preferences, a keystore that will not delete).
+    _refreshToken = null;
+    _refreshExpiresAt = null;
+    _refreshKnown = true;
+    // FIRST on the device, and this is the line that makes a sign-out stick.
+    // Everything below it is allowed to fail.
     await _setOwned(false);
     await _bounded(() => _secure.delete(key: _refreshTokenKey), null);
     await _bounded(() => _secure.delete(key: _refreshExpiresKey), null);
@@ -269,6 +308,10 @@ class SessionStore {
   /// Keystore key does not travel with them, so `resetOnError` discards the entry
   /// it cannot decrypt. The marker would then promise a session that is not there.
   Future<void> disownSession() async {
+    // Called only on a definite "no token", so this process has none either.
+    _refreshToken = null;
+    _refreshExpiresAt = null;
+    _refreshKnown = true;
     if (!sessionIsOwned) return;
     await _setOwned(false);
   }
