@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -62,6 +63,15 @@ public sealed class LegalConsentGateTests : IDisposable
                 builder.UseSetting("Database:AutoMigrate", "false");
                 builder.UseSetting("Email:Provider", "Logging");
                 builder.UseSetting("KnownProxies:0", "10.255.255.1");
+                // A host that has not raised its minimum to 1.4.0 yet, as Staging has not until the phone check (owner,
+                // 2026-10-09). Under the tracked 1.4.0 the version gate refuses a declared 1.3.0 before this gate runs,
+                // and the bridge under test is inert (MobileAppMinimumVersionTests pins that). Appended rather than
+                // UseSetting, as in MobileAppVersionGateTests: appsettings.json outranks a host setting.
+                builder.ConfigureAppConfiguration(configuration =>
+                    configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["MobileApp:MinimumSupportedVersion"] = "1.2.0",
+                    }));
                 // No database: the accounts as the stamp check reads them, the consents and texts as the gate and the
                 // prompt read them, and a unit of work that saves nothing.
                 builder.ConfigureTestServices(services =>

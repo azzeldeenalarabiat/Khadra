@@ -106,6 +106,7 @@ every deploy), so **Production refuses to boot on either default**.
 | `Documents__Supabase__ServiceKey` | A project **secret** key. Bypasses RLS — see §5 |
 | `KnownProxies__0..3` | The forwarded-header trust list (§7) |
 | `ForwardedHeaders__ForwardLimit` | `3` (§7) |
+| `MobileApp__MinimumSupportedVersion` | The oldest customer-app build this host serves. **Always set it explicitly**: from Wave 7 the image carries 1.4.0, and a host without the variable refuses every older phone at once. Today's value is in the running instance's boot line, `Customer app: builds older than X are REFUSED…`, or `Customer app: no minimum version is set…`. Raise it only by the order in §11 |
 
 ### Push notifications, reminders and handovers
 
@@ -542,6 +543,26 @@ audited and flagged to the admin). The order that keeps 1.1.0 customers able to 
 2. Publish the 1.2.0 APK and confirm it against the live API.
 3. Only then set `Handover__RequireVerification=true` AND `MobileApp__MinimumSupportedVersion=1.2.0`,
    together. A dealer can still record an unverified handover for anyone who cannot show a code.
+
+### 1.4.0: consent, dispute shares and the handover window (Wave 7)
+
+The tracked `MobileApp:MinimumSupportedVersion` is **1.4.0** from Wave 7. An API deployed from it with no override
+refuses every 1.3.0 and older phone at once, with nothing to update to unless 1.4.0 is already published. Until the
+minimum is raised, the API spares a build declaring a version older than 1.4.0 the three rules 1.4.0 answers
+([contracts/README.md](contracts/README.md); pre-launch item 239), so the order is:
+
+1. **Before** deploying the API, set the host's `MobileApp__MinimumSupportedVersion` to the minimum in force now,
+   so the deploy does not raise it. Read it from the running instance's boot line, `Customer app: builds older than X are REFUSED…`, or `Customer app: no minimum version is set…`: on Staging 1.2.0; on
+   a host never overridden, the image's old 1.1.0; on one that did the 1.2.0 handover step above, 1.2.0.
+2. Deploy the API. Installed builds keep working, spared the three rules.
+3. Publish the 1.4.0 APK (same key) and confirm it against the live API: the consent prompt, a dispute, a handover
+   code before and inside its window.
+4. Only then raise `MobileApp__MinimumSupportedVersion` to 1.4.0, or remove the override so the tracked 1.4.0
+   applies. Confirm on an emulator or a second device that 1.3.0 gets the update screen, and that 1.4.0 is served.
+5. Then pre-launch item 239: delete the bridge.
+
+A host that never did the 1.2.0 handover step above can do both runbooks in one: a minimum of 1.4.0 satisfies that
+step's precondition, so `Handover__RequireVerification=true` can go with step 4.
 
 ### The key
 

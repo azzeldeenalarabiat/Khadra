@@ -113,6 +113,36 @@ forward (`ProxyRequestHeaders`), and `BffProxyRequestHeadersTests` pins it. A ca
 calling the API directly can still declare a version and skip the gate; pre-launch item 238 records that, and it
 closes in the release that raises `MobileApp:MinimumSupportedVersion` to 1.4.0 — published first, as always.
 
+**Since Wave 7 the exemption is for builds older than 1.4.0 only** — see the next section.
+
+## 1.4.0: three rules, and the bridge that keeps older builds working until the minimum (Wave 7)
+
+App 1.4.0 (`1.4.0+7`) answers three rules the API now holds every caller to:
+
+| Rule | Server | What a caller that is held to it gets |
+|---|---|---|
+| Consent (pre-launch items 224, 238) | `LegalConsentGate`; `RegisterCustomerHandler` | 403 `legal.consent_pending` on a signed-in call with a text in force still to accept; a registration without `acceptedLegalVersions` refused 400 `legal.consent_required` (409 `legal.version_not_current` for a version no longer in force) |
+| A customer's copy of a decided dispute (item 151) | `DisputeResolutionDto.ForCustomer` | `retainedByPlatform` and `transferredToDealer` null: only the basis (`depositHeld`) and the customer's own `refundToCustomer` |
+| A handover code only in its window (item 225) | `IssueHandoverCodeHandler` | 409 `booking.pickup_too_early` / `booking.return_too_early`, `availableFrom` top-level, before `pickupAvailableFrom` / `returnAvailableFrom` |
+
+Each is breaking for 1.3.0 and older: they cannot ask for consent, they render the two shares and would show one
+they were not sent as zero, and they ask for a code at any time. So **a request that declares a version older than
+1.4.0 is spared each of the three**, keyed on `ClientInfo.PredatesRule` against the constants in
+`MobileAppContract` (`ConsentAwareFrom`, `DisputeSharesWithheldFrom`, `HandoverWindowAwareFrom`, all 1.4.0). The
+website, the consoles and every caller that declares nothing are held to all three. The owner's words, 2026-10-09:
+"a temporary backward-compatibility bridge only, not a security boundary". `dealerCharge` and `waivesEverything` are
+null to every customer, whatever it declares: no build renders them.
+
+The bridge is inert wherever the minimum is 1.4.0, because the version gate refuses a declared 1.3.0 with 426 before
+any of the three runs. The tracked minimum is 1.4.0, and `MobileAppMinimumVersionTests` pins it at or above every rule
+and every rule at or below the app's own version. A host's own override may hold it lower until the new build is on
+phones: Staging keeps 1.2.0 until the phone check passes (owner, 2026-10-09). Pre-launch item 239 deletes the bridge
+once 1.4.0 is the minimum everywhere.
+
+**Rollback while the bridge exists:** clearing a host's minimum (step 4 below) brings 1.3.0 back to a working app,
+because the API still spares it. Once item 239 has removed the bridge, it no longer does: the API it reaches asks
+what 1.3.0 cannot answer.
+
 ## Version order
 
 [Semantic Versioning 2.0.0](https://semver.org/#spec-item-11) precedence, never text comparison:

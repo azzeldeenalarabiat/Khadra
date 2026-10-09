@@ -71,10 +71,24 @@ its final working tree:
 | Website: `ng test` · production build | 57 files, 373 tests · clean |
 | App | not run: no file under `Khadra.Mobile/` changed |
 
+### Wave 7 final regression on `fix/polish-wave7` (2026-10-10)
+
+Wave 7 starts at `59abeff`, the end of Wave 6. It is the customer-app release, 1.4.0+7, and carries pre-launch items 95,
+101, 103, 126, 127, 128, 151, 208, 225 and 238, the 1.4.0 app-change ledger (section 3) and the owner's 208 and F26
+wording. It was measured on a Windows worktree, `core.autocrlf=true`, with the working files in CRLF, and every failure
+listed below comes from that alone:
+
+| Suite | Result |
+|---|---|
+| Backend: `dotnet test Khadra.slnx`, run alone, WITHOUT `KHADRA_TEST_POSTGRES` | 3,118 passed, 65 skipped (the opt-in PostgreSQL proofs), 5 failed: `FontLicenceTests`, whose notice regex does not match a CRLF `FONTS.md`. All 6 pass with the two notices in LF; neither the notices nor the test changed since `59abeff` |
+| Website: `ng test` · production build | 59 files, 384 tests: 382 passed, 2 failed (`site-header.component.spec.ts`, F92, which looks for `\n.site-drawer {\n` in a CRLF `_layout.scss`; 6 of 6 pass with it in LF; unchanged since Wave 6) · production build clean |
+| App: `flutter analyze` · `flutter test` · `flutter build web --release` | no issues · 888 passed · built. No Android release APK: signing waits on item 134 |
+| Console | not run: no file under `Khadra.Dashboard/` changed |
+
 ## 2. Contract ledger — what the API serves or accepts
 
 Installed builds: 1.2.0+3 and 1.3.0+4. The tracked minimum (`MobileApp:MinimumSupportedVersion`) is not raised in
-this batch (decision D6).
+Waves 1 to 6 (decision D6). Wave 7 raises it to 1.4.0; the phone used for its checks has 1.3.0+6.
 
 | Wave | Change | Kind | Effect on installed apps |
 |---|---|---|---|
@@ -138,6 +152,10 @@ this batch (decision D6).
 | 6 | The invitation answer of `POST /dealers/me/employees` gains `invitationEmailSent`; two administrators adding the same offered city or car-type name at once now both get 409 `lookup.name_taken`, which one alone always got (a database index closes the race) (items 47, 52) | additive, behavioural | none: office and administrator endpoints |
 | 6 | `GET /api/v1/dealers/me/vehicles/{id}/calendar?year=&month=`: one car's month in the platform's calendar, from the catalogue's own holds (item 54) | new endpoint | none: office endpoint |
 | 6 | The console BFF sends `X-Khadra-Idle-Seconds` handling to itself only (never forwarded) and ends a session idle for 30 minutes on its own clock; both BFFs accept bodies up to 32 MiB explicitly; the renderer strips the forwarding headers it does not trust (items 129, 33, 223) | none | none: the app calls the API directly |
+| 7 | Consent: `LegalConsentGate` judges a request that declares an app version of 1.4.0 or later, and an app registration from 1.4.0 must carry `acceptedLegalVersions` (items 224, 238). Any declared version used to be exempt | behavioural, bridged | none for 1.3.0 and older: a request declaring a version below 1.4.0 is still spared both (a temporary bridge, item 239) |
+| 7 | A customer's copy of a decided dispute: `retainedByPlatform` and `transferredToDealer` null to a declared 1.4.0 or later, the website and every undeclared caller; `dealerCharge` and `waivesEverything` null to every customer (item 151) | value (null), bridged | none for 1.3.0 and older: still sent the two shares they render; no build renders the other two |
+| 7 | `POST /bookings/{id}/handover-code` refuses a pickup code before `pickupAvailableFrom` and a return code before `returnAvailableFrom`: 409 `booking.pickup_too_early` / `booking.return_too_early` with `availableFrom` (item 225) | behavioural, bridged | none for 1.3.0 and older: still issued a code at any time |
+| 7 | The tracked `MobileApp:MinimumSupportedVersion` is 1.4.0 (it was 1.1.0) | minimum | wherever the tracked setting is in force, 1.3.0 and older get 426 and the update screen. Publish 1.4.0 first; Staging keeps its own 1.2.0 until the phone check (owner, 2026-10-09) |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -159,3 +177,17 @@ this batch (decision D6).
 | F7 (W4-8) | Ask for consent: a required checkbox on registration naming the texts in `/app-config.legal.documents`, sending `acceptedLegalVersions` and `legalLanguage`; and, for a signed-in customer with `pendingConsents` on `/auth/me` or a 403 `legal.consent_pending`, a prompt in place of the app that offers the texts, the acceptance (`POST /auth/me/legal-consents`) and sign-out, as the website does. A 409 `legal.version_not_current` reloads `/app-config` and asks again. Then the minimum rises to 1.4.0, and the server stops sparing the app (pre-launch item 238). |
 | 103 (W6) | Word a notification whose `actorStandIn` is `RentalOffice` in the reader's language ("The rental office" / «مكتب التأجير»), as the website does, instead of printing `actorName`'s English phrase. Rare: only an office that left the platform before the notification was raised. |
 | W4-9 | **Done on `fix/polish-wave4` (Staging finding, 2026-10-07)**, in the app's code and in no API: `YourDocumentRejected` is worded in Alerts, and a tap on it (its row, or its push from the foreground, the background or a closed app) opens My Documents (`notificationRoute`); the reason reads in its own direction under "Why:", with "Upload a new one". A push tap that launches a closed app is no longer lost while the session restores (`openForPush`, every kind). The Alerts row opens before its read is recorded, so a token rotation can no longer drop the tap (second device finding). It reaches phones only with the next app build. The temporary `PushTrace` that helped verify it on a phone was deleted in Wave 5 (pre-launch item 27), so a build from `fix/polish-wave5` onward has no "push trace (staging)" row. **Still for 1.4.0:** on `booking.documents_incomplete`, name the `rejectedDocumentTypes`, as the website does. |
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10) does every row above**, as each row describes, with these
+notes:
+
+- F50 is item 151's customer half, on the server too (section 2).
+- D4 goes further than its row: the server no longer issues an early code to 1.4.0 either.
+- F48 needed nothing.
+- W4-9's rest is done: `booking.documents_incomplete` names the `rejectedDocumentTypes`.
+- F7 is the consent checkbox, the prompt, and the legal texts on Profile.
+- 101 needed nothing in the app. Its dispute screen names every party by role and prints no name, so no closed party's
+  stand-in can reach it.
+
+Beyond the table: the owner's 208 and F26 wording (2026-10-09), and the session's pre-launch items 95, 126, 127 and
+128, with the advisor's further findings on them.

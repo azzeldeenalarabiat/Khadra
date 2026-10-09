@@ -3160,7 +3160,14 @@ authentication and storage tests.
 
 ### 95. The cold-start rotation is not single-flight with the interceptor's
 
-**Status:** open · **Raised:** 2026-09-12 · **Pre-existing; found while building the Get Started flow**
+**Status:** closed · **Raised:** 2026-09-12 · **Closed:** 2026-10-10 (Fix & Polish Wave 7; reaches phones with app 1.4.0)
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** Neither of the two closes below: the single flight moved into `SessionController.refresh()` itself (the
+advisor's design), so the cold-start restore and both of the interceptor's paths join one rotation and present the
+token once. A rotation also carries a session epoch now, moved by every sign-in, adopted pair, sign-out and ending, so
+an answer that arrives after its session ended or changed hands is applied to nothing: it can no longer sign a
+customer back in moments after a sign-out, nor end the session a password change had just begun.
+`session_robustness_test` (95-A to 95-E) failed on the old code first.
 
 `SessionController._restore` calls `refresh()` directly, and `AuthInterceptor._refreshOnce` is the
 thing that serialises rotations. They do not share that gate, so the two CAN present the same refresh
@@ -3326,7 +3333,15 @@ which is why it was not done here.
 
 ### 101. The customer app does not yet read the new "account closed" facts
 
-**Status:** open, BOOKINGS HALF CLOSED 2026-09-21 · **Raised:** 2026-09-18
+**Status:** closed · **Raised:** 2026-09-18 · **Bookings half closed:** 2026-09-21 · **Closed:** 2026-10-10 (Fix &
+Polish Wave 7: nothing left to change)
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7).** The rest needed no change, because the stand-in it describes cannot
+reach a screen. The dispute screen names every party by its role ("You", "The rental office", "Khadra") and prints no
+name at all. `openedByName` and `resolvedByName` are not parsed. `authorName` is parsed and rendered nowhere. So the
+three dispute flags have no name to qualify. The customer's copy also replaces a staff name with the office's, and the
+administrator's with "Khadra", since Wave 3 (D5). `customerAccountClosed` is the customer's own name, which they are
+never shown as a party. Should a later build print any of these names, it reads the flag beside it, as below.
 
 **The bookings half is done.** `Booking` and `BookingListItem` parse `dealerRemoved`, and every
 screen that names an office — the bookings list, the booking detail, Home's next-booking card and
@@ -4027,7 +4042,13 @@ Both are the same shape as item 124: a value quietly thrown away and fetched aga
 
 ### 126. A failed Keystore write leaves a consumed refresh token on disk
 
-**Status:** open · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review)
+**Status:** closed · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review) · **Closed:** 2026-10-10 (Fix &
+Polish Wave 7; reaches phones with app 1.4.0)
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** As below, with the advisor's ordering: the memory copy of the refresh token and its expiry is set BEFORE the
+disk write and emptied first by `clear()`, and every read prefers it once this process has written or cleared; a cold
+start still reads the disk. **What it cannot cover, stated:** a write that fails on the last rotation before the
+process dies. The next cold start reads the consumed token, and only the server's sixty-second grace can save it.
 
 `SessionStore.saveRefreshToken` goes through `_bounded`, which swallows a failure or a five-second
 silence by design, and `SessionController._install` proceeds regardless. If that write fails, disk
@@ -4044,7 +4065,12 @@ to learn whether a refresh token exists; memory answers that for free.
 
 ### 127. A document upload that meets a 401 tells the customer they are offline
 
-**Status:** open · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review)
+**Status:** closed · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review) · **Closed:** 2026-10-10 (Fix &
+Polish Wave 7; reaches phones with app 1.4.0)
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** Not as below: the premise was false on dio 5.11.1. `FormData.clone()` copies the files and keeps the boundary,
+so an upload refused 401 is rotated and re-sent once, byte for byte (owner, 2026-10-09: rotate and retry with
+`FormData.clone()`). A test with a real multipart body over a socket proves the two bodies identical.
 
 `FormData.finalize()` throws `StateError` on a second send, so a multipart body cannot be retried.
 `AuthInterceptor` retries any 401 once. An upload has a 120-second send timeout against a
@@ -4059,7 +4085,14 @@ a real multipart body, because the defect is in `finalize`, not in the intercept
 
 ### 128. A refresh that times out waits for the next request instead of retrying
 
-**Status:** open · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review) · low priority
+**Status:** closed · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review) · **Closed:** 2026-10-10 (Fix &
+Polish Wave 7; reaches phones with app 1.4.0)
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** As below, inside the rotation's single flight: one immediate second presentation of the same token after a
+timeout that may have reached the server. Not after a timeout spent connecting (`ApiFailure.neverConnected`): that
+request never reached the server. A 401, a 5xx, a 429 and a dropped connection are presented once, as before. One
+correction to the text below, from `RefreshTokensHandler`: an in-grace retry is handed a NEW pair, and the winner's
+replacement is retired, not given back. Item 240 records the one case the retry cannot save.
 
 `SessionController.refresh` correctly treats a transport failure as "not a verdict" and returns
 false without ending the session. But the rotation may well have REACHED the server and had its
@@ -4539,7 +4572,14 @@ is 1.1.0. **To close, in this order** (`docs/deployment.md`):
 
 ### 151. A customer's dispute payload carries more than a customer should hold
 
-**Status:** open · **Raised:** 2026-09-24
+**Status:** built in Wave 7; closes once `MobileApp:MinimumSupportedVersion` is 1.4.0 · **Raised:** 2026-09-24
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** The customer's half (owner decision 3): a customer's copy of a decided dispute carries the basis and their own
+share. The office's and the platform's shares are null to every customer except a build declaring a version older
+than 1.4.0, which renders them and would show one it was not sent as zero (a temporary bridge, item 239). The charge
+to the office and the waiver flag are null to every customer: no build renders them. App 1.4.0 reads neither share,
+and the website shows the customer's refund and nothing else. `DisputeUseCaseTests` pins every party's copy, the
+customer's JSON included. The identity half was done in Wave 3 (D5).
 
 `GET /api/v1/disputes/{id}` answers a customer with the admin-facing `DisputeDto`: the assigned
 administrator's id and name, `OpenedByUserId`, each statement's `AuthorUserId` and `AuthorName` (for a
@@ -5587,7 +5627,18 @@ That is the rule as built; the cost above is accepted, and a refund refused for 
 
 ### 208. Installed apps still tell a cancelling customer that nothing is charged without a dispute
 
-**Status:** open · **Raised:** 2026-09-29 (payments Phase 8) · **A precondition of closing item 76 — a launch gate, not a follow-up**
+**Status:** built in Wave 7; closes once app 1.4.0 is published and `MobileApp:MinimumSupportedVersion` is 1.4.0 ·
+**Raised:** 2026-09-29 (payments Phase 8) · **A precondition of closing item 76 — a launch gate, not a follow-up**
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** The owner signed both sentences off in both languages on 2026-10-09, and app 1.4.0 and the website carry them
+word for word: the cancel sheet, "Cancelling now incurs a penalty of {amount}. It will be deducted from your deposit
+when the dispute window closes, unless the dispute outcome changes this." / «الإلغاء الآن يترتب عليه غرامة قدرها
+{amount}. سيتم حسمها من عربونك عند انتهاء مهلة النزاع، إلا إذا صدر قرار مختلف في النزاع.»; and the booking terms,
+"Cancelling after that incurs a penalty of {percent} of the deposit. It will be deducted from your deposit when the
+dispute window closes, unless the dispute outcome changes this." / «الإلغاء بعد ذلك يترتب عليه غرامة قدرها {percent} من
+العربون. سيتم حسمها من عربونك عند انتهاء مهلة النزاع، إلا إذا صدر قرار مختلف في النزاع.» Both are pinned by tests in
+the app and on the website. What remains is the release order below; item 243 records the one sentence it does not
+cover.
 
 Since item 164 closed, a customer's uncontested penalty is kept from the deposit when the window closes. The apps
 already installed (1.1.0, 1.2.x) say otherwise, in words built into them: their cancel sheet reads "Cancelling now
@@ -5956,7 +6007,7 @@ Still open, so the item stays open:
 
 ### 225. A pickup and its code are allowed at any time before the rental starts
 
-**Status:** open, High · **Raised:** 2026-10-05 (E2E F51; Fix & Polish D4, Wave 3) · **Owner, 2026-10-05:** the
+**Status:** built in Wave 7; closes once `MobileApp:MinimumSupportedVersion` is 1.4.0 · was open, High · **Raised:** 2026-10-05 (E2E F51; Fix & Polish D4, Wave 3) · **Owner, 2026-10-05:** the
 earliest pickup is the rental start minus the existing 120-minute turnaround — `Booking.HoldStart`
 
 `Booking.RecordPickup` checks only that the booking is Confirmed, `RecordReturn` only that it is PickedUp, and a
@@ -5974,6 +6025,13 @@ of the original wording is not done, by the owner's decision A2 (2026-10-06):** 
 `POST /bookings/{id}/handover-code` where installed apps used to have it answered would be breaking; an early code is
 useless, because the office cannot record anything with it, and it expires within minutes. The website and the console
 wait for the moment instead, and app 1.4.0 will.
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** The rest is done. `POST /bookings/{id}/handover-code` issues a pickup code only from `pickupAvailableFrom`
+and a return code only from `returnAvailableFrom`, refusing earlier with the same `booking.pickup_too_early` /
+`booking.return_too_early` and `availableFrom`, except to a build declaring a version older than 1.4.0 (a temporary
+bridge, item 239). App 1.4.0 offers the code from that moment, judged on the server's clock (the `Date` of its own
+answers), says when before it, and words a refusal a second early with the server's moment; the website words the
+refusal too. Item 242 records the website's own clock.
 
 ### 226. The office is told nothing when its money changes
 
@@ -6188,7 +6246,8 @@ within Staging's 15. **To close:** confirm Production's session-pooler limit for
 
 ### 238. The customer app is not asked for consent, and anything that declares an app version is not judged
 
-**Status:** open, launch blocker with item 224 · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's
+**Status:** built in Wave 7; closes once app 1.4.0 is published and `MobileApp:MinimumSupportedVersion` is 1.4.0 ·
+was open, launch blocker with item 224 · **Raised:** 2026-10-07 (advisor's review of Fix & Polish Wave 4's
 consent design)
 
 Since Wave 4 the API refuses a signed-in website or console request from somebody who has not accepted a legal text
@@ -6204,6 +6263,12 @@ and the prompt on `pendingConsents` or 403 `legal.consent_pending` (the 1.4.0 le
 `docs/fix-and-polish-ledger.md`). Publish 1.4.0 first; then deploy the API with `MobileApp:MinimumSupportedVersion`
 raised to 1.4.0, consent required of the app's registration, and the gate's exemption for a declared version removed —
 every build the minimum still admits can answer it then. `docs/contracts/README.md` describes the exemption.
+
+**Wave 7 (`fix/polish-wave7`, app 1.4.0+7, 2026-10-10).** The app shows the checkbox on registration and the prompt in place of the app, as above. The exemption is no
+longer for every declared version: only a build declaring a version older than 1.4.0 is spared the gate and
+registration's consent (a temporary bridge, item 239), and from the moment the minimum is 1.4.0 the version gate
+refuses such a build before either runs. The tracked minimum is 1.4.0; Staging keeps its own 1.2.0 until the phone
+check passes (owner, 2026-10-09).
 
 ### 239. The pre-1.4.0 bridges stay in the code until they are removed
 
@@ -6228,6 +6293,53 @@ tests pin the older build's exemption beside the newer build's rule.
 
 **To close, once the minimum is 1.4.0 on Staging and on Production and verified (an emulator or second device on 1.3.0
 gets the update screen):** delete all of the above and the older-build tests, so every caller is held to all three
-rules unconditionally. Pin "tracked minimum ≥ 1.4.0" in `MobileAppMinimumVersionTests`. Then amend the rollback in
+rules unconditionally. (`MobileAppMinimumVersionTests` already pins the tracked minimum at or above every rule, and
+every rule at or below the app's own version.) Then amend the rollback in
 `docs/contracts/README.md`: clearing the minimum no longer brings 1.3.0 back to a working app, because the API it
 would reach asks what 1.3.0 cannot answer.
+
+### 240. Two presentations of one refresh token that arrive together can end a live session
+
+**Status:** open · **Raised:** 2026-10-10 (Fable advisor's review of Fix & Polish Wave 7's session changes)
+
+`RefreshTokensHandler` turns the loser of a concurrent rotation of the same token into a 401
+(`ConcurrencyConflictException`, `auth.invalid_refresh_token`), and its own comment expects the client to retry and be
+handed the winner's replacement inside the grace. The app treats every 401 from the refresh endpoint as a verdict, and
+the two codes are the same, so it cannot tell. It is reachable whenever both presentations are inside the handler at
+once: a stalled database, or a cold host that queued two requests and then ran them together (Render does this after
+a 25-second receive timeout). Since Wave 7 the app presents at most twice, and only after a timeout (item 128). If
+the first attempt is still in the handler when the retry lands, the retry loses and the session ends with its family
+alive and an unused replacement. Before Wave 7 the same lost answer ended the session at the next rotation anyway.
+**To close, on the server (no contract change, no minimum):** in the conflict's catch, clear the change tracker,
+re-read the token and answer through `RetryOrRevokeFamilyAsync`. The winner has committed, so the grace path hands
+the loser the replacement as a 200. With a test in `SessionHandlerTests`.
+
+### 241. A garbled answer to the cold-start rotation signs the customer out
+
+**Status:** open, logged only (owner, 2026-10-09) · **Raised:** 2026-10-09 (Fable advisor, Wave 7 planning)
+
+`SessionController.restore()` clears the stored session on any exception that is not an `ApiFailure`, and a 200 whose
+body is not the token pair (a captive portal, a proxy's page) is one. The customer is signed out of a session the
+server still holds. Unchanged in Wave 7 by the owner's decision. **To close:** treat a body that does not parse as a
+transport failure (keep the token, show signed-out for now), as a timeout is treated.
+
+### 242. The website hides the handover code on the browser's clock
+
+**Status:** open · **Raised:** 2026-10-10 (Fable advisor's review of Fix & Polish Wave 7)
+
+The website offers the pickup code from `pickupAvailableFrom` judged on `Date.now()`
+(`features/bookings/handover-window.ts`). A laptop whose clock is behind the server's hides the code from a customer
+standing at the counter, and offers no way to ask until the page's clock catches up; one ahead offers a code the
+server refuses, which the panel words with the server's moment. Since Wave 3 for the button; since Wave 7 the server
+refuses an early code too. The app corrects its clock by the API's `Date` header (Wave 7). **To close:** the same
+correction on the website, from the `Date` of its own same-origin BFF answers.
+
+### 243. The website's range wording for a cancellation penalty still promises nothing is charged
+
+**Status:** open, unreachable today · **Raised:** 2026-10-10 (Fix & Polish Wave 7, while replacing item 208's wording)
+
+`cancel.penaltyRange` — shown on the website's cancel sheet only when the penalty is a range — still reads
+"Cancelling now assesses between {min} and {max} against you. Nothing is charged unless a dispute is opened and
+settled.", the promise item 208 removed. A customer's cancellation penalty is the whole deposit today, never a range,
+so nobody reads it, and the app has no range variant. **To close, before any customer penalty can be a range:** the
+owner words it in both languages, as for item 208.

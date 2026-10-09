@@ -76,6 +76,50 @@ public sealed partial class MobileAppMinimumVersionTests
             "1.0.0 cannot read { text, language } and must stay refused until it is gone from phones.");
     }
 
+    /// <summary>The rules a build learned (MobileAppContract), each with the first version that answers it.</summary>
+    public static TheoryData<string, string> RulesABuildLearned() => new()
+    {
+        { nameof(MobileAppContract.ConsentAwareFrom), MobileAppContract.ConsentAwareFrom.ToString() },
+        { nameof(MobileAppContract.HandoverWindowAwareFrom), MobileAppContract.HandoverWindowAwareFrom.ToString() },
+        { nameof(MobileAppContract.DisputeSharesWithheldFrom), MobileAppContract.DisputeSharesWithheldFrom.ToString() },
+    };
+
+    /// <remarks>
+    /// The temporary bridge spares an app that DECLARES a version older than the rule (pre-launch item 239). A rule
+    /// set above the app in this repository would spare the very build written to answer it, and every phone-side
+    /// test of that rule would pass against an API that never asks.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(RulesABuildLearned))]
+    public void The_app_in_this_repository_is_never_spared_a_rule_it_was_built_to_answer(string rule, string from)
+    {
+        Assert.True(AppVersion.TryParse(from, out var threshold));
+        var app = AppBuildVersion();
+        Assert.True(threshold <= app,
+            $"MobileAppContract.{rule} is {threshold}, above Khadra.Mobile/pubspec.yaml's {app}: the app in this "
+            + "repository declares an older version than the rule and is spared it.");
+    }
+
+    /// <remarks>
+    /// With the tracked minimum at or above every rule, no build the API admits is spared any of them: the bridge is
+    /// inert wherever the tracked setting is in force, and only a host's own lower override (Staging until the phone
+    /// check, owner 2026-10-09) keeps it open.
+    /// </remarks>
+    [Theory]
+    [MemberData(nameof(RulesABuildLearned))]
+    public void The_tracked_minimum_admits_no_build_older_than_the_rules(string rule, string from)
+    {
+        using var settings = JsonDocument.Parse(
+            File.ReadAllText(RepositoryRoot.File("Khadra.WebAPI", "appsettings.json")), Relaxed);
+        var configured = settings.RootElement.GetProperty("MobileApp").GetProperty("MinimumSupportedVersion").GetString();
+
+        Assert.True(AppVersion.TryParse(configured, out var minimum));
+        Assert.True(AppVersion.TryParse(from, out var threshold));
+        Assert.True(minimum >= threshold,
+            $"The tracked minimum {minimum} admits builds older than MobileAppContract.{rule} ({threshold}), which the "
+            + "API spares that rule.");
+    }
+
     [GeneratedRegex(@"^version:\s*(?<version>\S+)\s*$", RegexOptions.Multiline)]
     private static partial Regex PubspecVersion();
 }

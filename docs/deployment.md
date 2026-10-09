@@ -74,6 +74,12 @@ KnownProxies__2="<the 15 ranges from cloudflare.com/ips-v4, comma-separated>"
 KnownProxies__3="<the 7 ranges from cloudflare.com/ips-v6, comma-separated>"
 ForwardedHeaders__ForwardLimit="3"
 
+# Required from Wave 7 — the oldest customer-app build this host serves. The image
+# carries 1.4.0; a host without this refuses every older phone at once. Keep the
+# value in force (the boot line "Customer app: builds older than X are REFUSED")
+# and raise it only by the order in docs/production.md, "1.4.0".
+MobileApp__MinimumSupportedVersion="<the minimum in force on this host>"
+
 # Only for the very first boot, to invite the first administrator
 Admin__Bootstrap__Email="…"
 Admin__Bootstrap__FullName="…"
