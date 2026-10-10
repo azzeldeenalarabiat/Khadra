@@ -31,7 +31,7 @@ JWT claims: `sub`, `email`, `name`, `role`, `email_verified`, `khadra:security_s
 
 **Login** → `POST /api/v1/auth/login`. Unknown email, wrong password and deleted accounts all return 401 `auth.invalid_credentials` (constant-time via a dummy hash). Suspended → 403 `auth.account_suspended`; unverified → 403 `auth.email_not_verified`. Success starts a new refresh-token family.
 
-**Refresh** → `POST /api/v1/auth/refresh`. The presented token is consumed and replaced inside the same family (same absolute deadline). Presenting an already-consumed token is treated as replay: the entire family is revoked. Concurrent refreshes of the same token are detected with the PostgreSQL `xmin` concurrency token.
+**Refresh** → `POST /api/v1/auth/refresh`. The presented token is consumed and replaced inside the same family (same absolute deadline). Presenting an already-consumed token is treated as replay: the entire family is revoked. Concurrent refreshes of the same token are detected with the PostgreSQL `xmin` concurrency token. The loser is answered 503 `auth.refresh_conflict`, never 401: nothing is revoked, the winner's replacement stands, and a client keeps the token it holds and presents again, where the reuse grace hands it the winner's replacement (pre-launch item 240).
 
 **Logout** → `POST /api/v1/auth/logout {refreshToken, allDevices}` revokes the family (or all families).
 

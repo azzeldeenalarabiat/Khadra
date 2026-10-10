@@ -126,17 +126,29 @@ public sealed class RefreshTokensHandlerTests
     }
 
     /// <summary>
-    /// The loser of a race is refused, and the family survives.
+    /// The loser of a race is told to try again, never that the session is over, and the family survives.
     /// </summary>
     /// <remarks>
-    /// This used to kill the family, and that was backwards. Two refreshes of one token can only
-    /// race because a client sent both; the WINNER committed first and is holding a perfectly good
-    /// replacement, so revoking the family destroys a token the customer legitimately has, over a
-    /// bug on their own device. The loser is simply refused, and on its retry the reuse grace hands
-    /// it the winner's replacement.
+    /// <para>
+    /// Killing the family here was backwards: two refreshes of one token can only race because a client sent both,
+    /// and the WINNER committed first holding a perfectly good replacement.
+    /// </para>
+    /// <para>
+    /// Refusing the loser with 401 <c>auth.invalid_refresh_token</c> was the same mistake one step later (pre-launch
+    /// item 240). Every client reads a 401 from the refresh endpoint as a verdict and ends the session, and the app
+    /// never presents again after one. A loser whose answer the client WAS waiting for — the app's second
+    /// presentation after a timeout, while the first is still in the handler — signed the customer out of a live
+    /// family. The loser is answered 503 <c>auth.refresh_conflict</c> instead. Every build from 1.1.0 keeps its token
+    /// on a 5xx, so a client holding the winner's answer keeps it, and one that is not presents again later, where the
+    /// reuse grace hands it the winner's replacement.
+    /// </para>
+    /// <para>
+    /// Not a fresh pair issued to the loser through that grace path: when the client is listening to the WINNER, that
+    /// would retire the very token it was just handed, and its next rotation would be a replay.
+    /// </para>
     /// </remarks>
     [Fact]
-    public async Task A_lost_race_refuses_the_loser_without_killing_the_winners_session()
+    public async Task A_lost_race_tells_the_loser_to_try_again_and_never_ends_the_session()
     {
         var context = new AuthHandlerTestContext();
         var user = context.KnownUser(Users.Customer());
@@ -146,9 +158,31 @@ public sealed class RefreshTokensHandlerTests
 
         var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
 
-        Assert.Equal("auth.invalid_refresh_token", result.Error.Code);
+        Assert.Equal("auth.refresh_conflict", result.Error.Code);
+        Assert.Equal(ErrorKind.Unavailable, result.Error.Kind);
+        Assert.NotEqual(ErrorKind.Unauthorized, result.Error.Kind);
         await context.RefreshTokens.DidNotReceive()
             .RevokeFamilyAsync(current.FamilyId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        context.UnitOfWork.Received(1).DiscardChanges();
+    }
+
+    /// <summary>The loser issues nothing of its own: the winner's replacement is the only live token.</summary>
+    [Fact]
+    public async Task A_lost_race_retires_nothing_and_hands_out_nothing()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        Stored(context, user, out var raw);
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(_ => throw new ConcurrencyConflictException("xmin changed"));
+
+        var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        // One save attempted, the one that lost. No second pass through the grace path that would issue a pair
+        // from, and so retire, the winner's replacement.
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await context.RefreshTokens.DidNotReceive().GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>());
     }
 
     /// <summary>
@@ -180,6 +214,36 @@ public sealed class RefreshTokensHandlerTests
         // The session is intact: nothing was revoked wholesale.
         await context.RefreshTokens.DidNotReceive()
             .RevokeFamilyAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Two in-grace retries that race on the replacement: the loser is told to try again, as on the direct path.
+    /// </summary>
+    /// <remarks>
+    /// Both find the same unused replacement and both rotate it; the second save loses on its <c>xmin</c>. The answer
+    /// comes from the same place as the direct path's (the conflict is caught where both issue), so it is 503
+    /// <c>auth.refresh_conflict</c> and the family stands (pre-launch item 240).
+    /// </remarks>
+    [Fact]
+    public async Task Two_retries_that_race_inside_the_grace_tell_the_loser_to_try_again()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        var current = Stored(context, user, out var raw);
+        var replacement = Users.ActiveRefreshToken(user, context.OpaqueTokens, Users.Now, out _);
+        current.Rotate(Users.Now, replacement.Id);
+        context.RefreshTokens.GetByIdAsync(replacement.Id, Arg.Any<CancellationToken>()).Returns(replacement);
+        context.Clock.UtcNow = Users.Now.AddSeconds(5);
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<int>(_ => throw new ConcurrencyConflictException("xmin changed"));
+
+        var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
+
+        Assert.Equal("auth.refresh_conflict", result.Error.Code);
+        Assert.Equal(ErrorKind.Unavailable, result.Error.Kind);
+        await context.RefreshTokens.DidNotReceive()
+            .RevokeFamilyAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        context.UnitOfWork.Received(1).DiscardChanges();
     }
 
     /// <summary>

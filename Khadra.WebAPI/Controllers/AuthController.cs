@@ -87,6 +87,8 @@ public sealed class AuthController(ICurrentActor currentActor) : ApiControllerBa
     [HttpPost("refresh")]
     [ProducesResponseType<AuthTokensDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    // auth.refresh_conflict: this presentation lost a race with another of the same token. Try again (pre-launch item 240).
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult> Refresh(RefreshRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

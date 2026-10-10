@@ -156,10 +156,25 @@ public sealed class RefreshTokensHandler(
         {
             // Two refreshes raced on one token and this one lost. The winner committed first and
             // holds a perfectly good replacement — killing the family here would destroy it, and
-            // punish the customer for a race their own client caused. The loser is simply refused;
-            // its client retries and, inside the grace above, gets the winner's replacement handed
-            // to it.
-            return IdentityErrors.InvalidRefreshToken;
+            // punish the customer for a race their own client caused.
+            //
+            // Nor may the loser be refused with 401 (pre-launch item 240): every client reads a 401
+            // from this endpoint as the end of the session, and the app never presents again after
+            // one, so a loser whose answer the client was waiting for signed it out of a live family.
+            // It is told to try again (503). Every app build takes that as a network event and keeps
+            // the token it holds: the winner's replacement, if the winner's answer reached it, and
+            // otherwise the old token, which the reuse grace above redeems on its next rotation. The
+            // BFFs end the browser session on it exactly as they did on the 401, no worse off.
+            //
+            // Not a fresh pair through that grace path, here and now: when the client is listening to
+            // the WINNER, that would retire the replacement it was just handed, and its next rotation
+            // would be a replay. The same answer covers two in-grace retries that race (both reach
+            // here from RetryOrRevokeFamilyAsync).
+            //
+            // The refused rotation is forgotten, as after every caught conflict: this request saves
+            // nothing more, and nothing may later save it by accident.
+            unitOfWork.DiscardChanges();
+            return IdentityErrors.RefreshRaceLost;
         }
 
         return tokens.Value;

@@ -303,6 +303,8 @@ void main() {
       ('a 401', _Failure.unauthorized),
       ('a 500', _Failure.serverError),
       ('a dropped connection', _Failure.dropped),
+      // Item 240: the server's answer to the loser of a concurrent rotation. A network event, not a verdict.
+      ('a lost race (503 auth.refresh_conflict)', _Failure.raceLost),
     ]) {
       test('128-C: $label is presented once, never retried', () async {
         await signedIn();
@@ -311,8 +313,9 @@ void main() {
         expect(await session.refresh(), isFalse);
 
         expect(api.presented, ['refresh-1']);
-        // Only the 401 is a verdict.
+        // Only the 401 is a verdict. Every other answer leaves the token exactly where it was, to present again.
         expect(session.state.isSignedIn, failure != _Failure.unauthorized);
+        if (failure != _Failure.unauthorized) expect(await store.readRefreshToken(), 'refresh-1');
       }, timeout: const Timeout(Duration(seconds: 20)));
     }
 
@@ -428,7 +431,7 @@ class _SlowMeApi extends FakeApi {
   }
 }
 
-enum _Failure { unauthorized, serverError, dropped }
+enum _Failure { unauthorized, serverError, dropped, raceLost }
 
 /// One upload as the server received it.
 typedef _Upload = ({List<int> body, String? contentType, String? bearer});
@@ -542,6 +545,8 @@ class _StrictApi {
           return _answer(request, 401, {'code': 'auth.invalid_refresh_token'});
         case _Failure.serverError:
           return _answer(request, 500, {'title': 'Internal Server Error'});
+        case _Failure.raceLost:
+          return _answer(request, 503, {'code': 'auth.refresh_conflict', 'status': 503});
         case _Failure.dropped:
           final socket = await request.response.detachSocket(writeHeaders: false);
           socket.destroy();

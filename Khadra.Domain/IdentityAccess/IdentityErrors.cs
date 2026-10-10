@@ -94,6 +94,13 @@ public static class IdentityErrors
     public static readonly Error InvalidRefreshToken =
         Error.Unauthorized("auth.invalid_refresh_token", "The session is no longer valid. Sign in again.");
 
+    // Two rotations of one refresh token raced and this one lost: the other committed first, and the session is fine.
+    // Deliberately not a 401, which every client reads as a verdict on the session. Every app build takes a 503 as a
+    // network event and keeps the token it holds; the BFFs end the browser session on it as they did on the 401
+    // (pre-launch item 240).
+    public static readonly Error RefreshRaceLost =
+        Error.Unavailable("auth.refresh_conflict", "This session was refreshed by another request at the same moment. Try again.");
+
     public static readonly Error InvalidToken =
         Error.Validation("auth.invalid_token", "The link is invalid or has expired. Request a new one.");
 
