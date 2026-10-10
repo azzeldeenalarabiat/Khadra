@@ -1324,6 +1324,50 @@ public sealed class DisputeUseCaseTests
         Assert.Equal("Rania Haddad", admin.AssignedAdminName);
     }
 
+    /// <summary>
+    /// Pre-launch item 245: the booking inside the customer's copy of a dispute says the office recorded each handover,
+    /// never which of its people did, and the staff account id is nowhere in what the customer is sent. The office's and
+    /// the administrator's copies keep it.
+    /// </summary>
+    [Fact]
+    public async Task The_customer_copy_never_carries_the_staff_account_that_recorded_a_handover()
+    {
+        var context = new Context();
+        var (paid, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        var pickupStaff = Id.New();
+        var returnStaff = Id.New();
+        Assert.True(paid.RecordPickup(BookingParty.Dealer, pickupStaff, paid.Period.Start).IsSuccess);
+        Assert.True(paid.RecordReturn(BookingParty.Dealer, returnStaff, paid.Period.End).IsSuccess);
+        paid.ClearDomainEvents();
+        context.Clock.UtcNow = paid.Period.End.AddHours(1);
+        var booking = context.GivenBooking(paid);
+        var ticket = context.GivenTicket(DisputeTicket.Open(
+            booking.Id, CustomerId, BookingParty.Customer, "The car had a scratch I did not make.", TimeSpan.FromHours(48), context.Clock.UtcNow).Value);
+        context.Names.NamesAsync(Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, string> { [CustomerId.Value] = "Layla Odeh" });
+
+        var customer = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
+        var office = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None);
+        var admin = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
+
+        Assert.Equal(2, customer.Booking.Handovers.Count);
+        Assert.All(customer.Booking.Handovers, handover =>
+        {
+            Assert.Equal("Dealer", handover.RecordedBy);
+            Assert.Null(handover.RecordedByUserId);
+        });
+        var wire = JsonSerializer.Serialize(customer, Web);
+        Assert.DoesNotContain(pickupStaff.Value.ToString(), wire, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(returnStaff.Value.ToString(), wire, StringComparison.OrdinalIgnoreCase);
+
+        foreach (var internalCopy in new[] { office, admin })
+        {
+            Assert.Equal(
+                new Guid?[] { pickupStaff.Value, returnStaff.Value },
+                internalCopy.Booking.Handovers.Select(handover => handover.RecordedByUserId).ToArray());
+        }
+    }
+
     /// <summary>A closed ticket is still on the booking, so a decision page is never reachable only by its address (F44).</summary>
     [Fact]
     public async Task A_closed_dispute_stays_listed_on_the_booking_it_decided()

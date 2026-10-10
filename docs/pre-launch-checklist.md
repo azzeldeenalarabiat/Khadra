@@ -6395,8 +6395,25 @@ APK it refuses is never written to the release folder.
 
 ### 245. A customer is sent the internal account id of the office staff member who recorded a handover
 
-**Status:** open, approved for a fix after Wave 7's timed Staging checks (owner, 2026-10-10) · **Raised:** 2026-10-10
-(Wave 7 Staging verification, item 8)
+**Status:** fixed (2026-10-10, `fix/polish-wave7`, after the timed Staging checks); deploys with the next Staging
+API release · **Raised:** 2026-10-10 (Wave 7 Staging verification, item 8)
+
+**Fixed:** `BookingDto.ForCustomer()` now also returns every handover with `recordedByUserId` null, the way it already
+treated `history[].actorUserId`. `HandoverDto.RecordedByUserId` became `Guid?`. The office's copy (`ForDealer()`) and
+the administrator's (unshaped) are unchanged, and neither console reads the field: the dealer timeline uses
+`actorUserId` presence, the Activity screen names staff through its own reader, and the admin sees the handover
+staff through the HandoverVerified/HandoverUnverified audit entries. Every customer path goes through `ForCustomer()`:
+the booking detail, create, cancel/report, next, and every customer dispute copy.
+
+**Tests:** `CustomerBookingPrivacyTests` covers:
+- the customer, office and admin copies;
+- a sentinel that no staff id appears anywhere in the serialised customer copy;
+- the handler path for each party;
+- a SHAPE snapshot (an allow-list of the customer copy's 151 JSON paths), so a field added anywhere fails until it
+  is decided for the customer.
+
+`DisputeUseCaseTests` covers the dispute copy. Four of these failed with the fix removed. No raised minimum: no
+installed client reads the field (docs/contracts/README.md).
 
 A booking's handovers carry `recordedByUserId`, the user id of the office account that recorded the pickup or the
 return (`HandoverDto`, `Khadra.Application/Bookings/Dtos/BookingDtos.cs`, since `fe860b5` on 2026-09-03). The same

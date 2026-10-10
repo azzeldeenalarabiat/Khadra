@@ -191,6 +191,11 @@ public sealed record BookingDto(
     /// before an answer carries <c>plateNumber: null</c>. Once approved it stays. Installed apps read the null as an
     /// empty string and print an empty "Plate:" until 1.4.0 hides the row (owner, 2026-10-06, decision A3).
     /// </para>
+    /// <para>
+    /// Nor the account id of the office's staff member who recorded a handover (pre-launch item 245): the customer
+    /// sees that the office recorded it (<c>recordedBy</c>), never which of its people. No customer client reads the
+    /// field, so it travels as null rather than being removed.
+    /// </para>
     /// </remarks>
     public BookingDto ForCustomer() => this with
     {
@@ -200,6 +205,7 @@ public sealed record BookingDto(
         History = History
             .Select(change => change.ActorParty == BookingParty.Customer.Name ? change : change with { ActorUserId = null })
             .ToList(),
+        Handovers = Handovers.Select(handover => handover with { RecordedByUserId = null }).ToList(),
     };
 
     /// <summary>
@@ -513,7 +519,9 @@ public static class PenaltyStates
 public sealed record HandoverDto(
     string Type,
     string RecordedBy,
-    Guid RecordedByUserId,
+    // The staff account that recorded it: for the office's and the administrator's copies. Null on the customer's
+    // copy (BookingDto.ForCustomer, pre-launch item 245); never null on the others.
+    Guid? RecordedByUserId,
     int? OdometerKm,
     decimal? FuelLevel,
     string? Notes,
