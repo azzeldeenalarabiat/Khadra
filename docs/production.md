@@ -470,8 +470,15 @@ with Khadra's release key, and published as a GitHub release.
 
 ```bash
 cd Khadra.Mobile
-flutter build apk --release --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com
+flutter clean
+flutter build apk --release --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com \n  --dart-define=KHADRA_BUILD_COMMIT=$(git rev-parse HEAD)
 ```
+
+**Always from a clean build (`flutter clean` first), and always stamped.** On 2026-10-10 an APK labelled
+1.4.0+7 carried, in every ABI, the compiled Dart of an earlier build: Flutter compiled the right code and
+Gradle's native-library merge and strip steps reused their old outputs (pre-launch item 244). The version,
+the signer and the API address come from outside the Dart, so all three were right. `KHADRA_BUILD_COMMIT`
+puts the commit INSIDE it: Profile shows it at the foot of the screen, and the check below finds it.
 
 The command is unchanged since the app gained build flavors: `pubspec.yaml` names `production` the
 default flavor, so it builds the customer app — same package, same name, same key. What changed is
@@ -483,6 +490,10 @@ explicitly builds the identical APK. Before publishing it:
   APKs under one version.
 - `apksigner verify --print-certs` shows the release certificate above. An APK signed with
   anything else cannot install over the copies on phones.
+- `node tools/verify_apk_dart.js <apk> --commit $(git rev-parse HEAD)` passes in EVERY ABI: the
+  compiled Dart is this commit's. Add `--arb lib/l10n/app_en.arb --since <previous release's app_en.arb>`
+  (`git show <tag>:Khadra.Mobile/lib/l10n/app_en.arb`) for a second, independent check. Never hand over
+  or publish an APK this refuses; the version and the signature cannot see what it catches.
 
 ### The staging app ("Khadra TEST")
 
@@ -491,10 +502,12 @@ runs the SANDBOX payment provider). It is never published as `khadra.apk` and ne
 
 ```bash
 cd Khadra.Mobile
-flutter build apk --release --flavor staging
+flutter clean
+flutter build apk --release --flavor staging --dart-define=KHADRA_BUILD_COMMIT=$(git rev-parse HEAD)
 ```
 
-The APK is `build/app/outputs/flutter-apk/app-staging-release.apk`.
+The APK is `build/app/outputs/flutter-apk/app-staging-release.apk`. It goes through the same three checks
+as a release (`aapt`, `apksigner`, `tools/verify_apk_dart.js`) before it is handed to anybody.
 
 | | |
 |---|---|

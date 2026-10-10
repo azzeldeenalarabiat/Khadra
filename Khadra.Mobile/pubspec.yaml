@@ -14,7 +14,10 @@ publish_to: 'none'
 # shares, and waits for the handover window (Wave 7). The API holds every caller to those
 # rules and spares only a build that declares an older version, until the minimum reaches
 # 1.4.0 — published first, then raised (docs/contracts/README.md; pre-launch item 239).
-version: 1.4.0+7
+#
+# +8, not +7: the APK first built as 1.4.0+7 carried another build's compiled Dart and was
+# withdrawn (pre-launch item 244). Two different APKs never share a version.
+version: 1.4.0+8
 
 environment:
   sdk: ^3.12.2

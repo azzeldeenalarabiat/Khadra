@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/dtos.dart';
+import '../../core/config/build_stamp.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -192,6 +193,24 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
             ],
+
+            // Which build this is (pre-launch item 244): the version the platform reports and
+            // the commit stamped into the Dart itself, so a phone says what code it is running.
+            // For everyone, guests included: it is about the app, not the account.
+            if (buildStampLine(
+              installedVersion: ref.watch(installedAppVersionProvider),
+              commit: ref.watch(buildCommitProvider),
+            )
+                case final stamp?)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, 0),
+                child: Center(
+                  child: LatinRun(
+                    stamp,
+                    style: const TextStyle(fontSize: 12, color: KhadraColors.neutral500),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

@@ -6373,3 +6373,22 @@ so nobody reads it, and the app has no range variant. **Deliberately not worded 
 sentence is invented for a case no customer can reach, and the old one stays where it is until then. **To close, in
 the change that first makes a customer penalty a range:** the owner words it in both languages, as for item 208, and
 the app gains the same range variant.
+
+### 244. An APK can carry another build's compiled Dart, and nothing about it says so
+
+**Status:** guarded (2026-10-10, Fix & Polish Wave 7) · **Raised:** 2026-10-10 (Staging, second Android device)
+
+The Staging APK handed over as 1.4.0+7 (sha256 `f46de958…2282d9f`) carried, in all three ABIs, the compiled Dart of
+an 8 Oct build of `8efc254` (fix/polish-wave4, marker `w4-9-diag-3`). Flutter compiled Wave 7 correctly; Gradle's
+native-library merge and strip steps did not rerun after the first attempt was killed at a timeout, and the APK
+packaged their 8 Oct outputs. Its version, versionCode, signer and API address were all right, because none of them
+comes from the Dart snapshot, and those were the checks run. It surfaced as no consent prompt after a 1.3.0 upgrade,
+and as no `GET /auth/me` reaching Staging from any "1.4.0" build; every phone check run on it exercised the old code.
+
+**Guarded by:** a build stamp, `--dart-define=KHADRA_BUILD_COMMIT=$(git rev-parse HEAD)`, compiled into the Dart
+(`core/config/build_stamp.dart`) and shown at the foot of Profile; `tools/verify_apk_dart.js`, which finds that
+commit, and the strings changed since the previous release, in every ABI's `libapp.so`; and a build from a clean
+tree (`flutter clean`) every time (`docs/production.md`, section 11). The APK was withdrawn and the release rebuilt
+as 1.4.0+8. `consent_on_restore_wire_test` proves the consent read over the real client, which no test did before.
+**Not closed while:** the check is a step a person runs. **To close:** run it from the release script itself, so an
+APK it refuses is never written to the release folder.

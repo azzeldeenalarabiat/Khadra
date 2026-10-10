@@ -73,7 +73,8 @@ its final working tree:
 
 ### Wave 7 final regression on `fix/polish-wave7` (2026-10-10)
 
-Wave 7 starts at `59abeff`, the end of Wave 6. It is the customer-app release, 1.4.0+7, and carries:
+Wave 7 starts at `59abeff`, the end of Wave 6. It is the customer-app release, 1.4.0 (built as `+8`: the first APK,
+`+7`, carried another build's compiled Dart and was withdrawn, pre-launch item 244), and carries:
 - pre-launch items 95, 101, 103, 126, 127, 128, 151, 208, 225, 238 and 240;
 - the 1.4.0 app-change ledger (section 3);
 - the owner's 208 and F26 wording.

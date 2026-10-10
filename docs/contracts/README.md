@@ -117,7 +117,8 @@ closes in the release that raises `MobileApp:MinimumSupportedVersion` to 1.4.0 â
 
 ## 1.4.0: three rules, and the bridge that keeps older builds working until the minimum (Wave 7)
 
-App 1.4.0 (`1.4.0+7`) answers three rules the API now holds every caller to:
+App 1.4.0 (`1.4.0+8`; the APK first built as `+7` carried another build's Dart and was withdrawn, pre-launch
+item 244) answers three rules the API now holds every caller to:
 
 | Rule | Server | What a caller that is held to it gets |
 |---|---|---|
