@@ -6392,3 +6392,18 @@ tree (`flutter clean`) every time (`docs/production.md`, section 11). The APK wa
 as 1.4.0+8. `consent_on_restore_wire_test` proves the consent read over the real client, which no test did before.
 **Not closed while:** the check is a step a person runs. **To close:** run it from the release script itself, so an
 APK it refuses is never written to the release folder.
+
+### 245. A customer is sent the internal account id of the office staff member who recorded a handover
+
+**Status:** open, approved for a fix after Wave 7's timed Staging checks (owner, 2026-10-10) · **Raised:** 2026-10-10
+(Wave 7 Staging verification, item 8)
+
+A booking's handovers carry `recordedByUserId`, the user id of the office account that recorded the pickup or the
+return (`HandoverDto`, `Khadra.Application/Bookings/Dtos/BookingDtos.cs`, since `fe860b5` on 2026-09-03). The same
+DTO is used for every reader, so the customer receives it in their booking detail (`GET /bookings/{id}`) and inside
+their copy of a dispute (`GET /disputes/{id}`, `booking.handovers`). Seen on Staging on KH-A2HCYYVZ. It is an opaque
+id with no name or contact attached, but a customer has no use for an internal staff account id (owner, 2026-10-10).
+No customer client reads it: neither the app nor the website; only the console's model declares it. **To close:**
+withhold it from every customer-facing answer (the booking detail and the dispute copy) with regression tests, and
+prove the dealer and admin consoles still receive the staff identity they need. Nothing an installed app reads
+changes, so it needs no raised minimum.
