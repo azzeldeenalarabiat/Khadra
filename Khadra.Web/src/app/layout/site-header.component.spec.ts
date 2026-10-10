@@ -128,7 +128,11 @@ function rule(stylesheet: string, selector: string): string {
 
 describe('the header panels are held to the screen (F92)', () => {
   it.each(['.site-drawer', '.menu__panel'])('%s is capped under the header and scrolls itself', async (selector) => {
-    const css = (await nodeModule('node:fs')).readFileSync(`${projectRoot}/src/styles/_layout.scss`, 'utf8');
+    // As LF, whichever the checkout wrote: a Windows checkout with core.autocrlf=true writes CRLF, and the rules are
+    // found by their line breaks. The stylesheet's content is under test, not its line endings.
+    const css = (await nodeModule('node:fs'))
+      .readFileSync(`${projectRoot}/src/styles/_layout.scss`, 'utf8')
+      .replace(/\r\n/g, '\n');
     const body = rule(css, selector);
     expect(body).toContain('max-block-size: calc(100dvh - var(--header-h));');
     expect(body).toContain('overflow-y: auto;');

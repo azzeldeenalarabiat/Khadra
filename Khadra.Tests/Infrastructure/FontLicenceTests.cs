@@ -38,7 +38,7 @@ public sealed partial class FontLicenceTests
     public void Every_font_file_is_named_in_its_notice_with_its_own_hash_and_its_familys_licence_is_beside_it(string folder)
     {
         var directory = RepositoryRoot.File([.. folder.Split('/')]);
-        var notice = File.ReadAllText(Path.Combine(directory, "FONTS.md"));
+        var notice = ReadNotice(Path.Combine(directory, "FONTS.md"));
         var rows = NoticeRow().Matches(notice).ToDictionary(match => match.Groups["file"].Value, match => match.Groups["hash"].Value, StringComparer.Ordinal);
         var fonts = Directory.GetFiles(directory, "*.ttf").Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
 
@@ -62,7 +62,7 @@ public sealed partial class FontLicenceTests
     public void Every_font_files_own_metadata_says_what_its_notice_says_and_names_the_licence_bundled_beside_it(string folder)
     {
         var directory = RepositoryRoot.File([.. folder.Split('/')]);
-        var rows = NoticeRow().Matches(File.ReadAllText(Path.Combine(directory, "FONTS.md")));
+        var rows = NoticeRow().Matches(ReadNotice(Path.Combine(directory, "FONTS.md")));
 
         Assert.NotEmpty(rows);
         foreach (Match row in rows)
@@ -108,7 +108,7 @@ public sealed partial class FontLicenceTests
             .Where(name => name.StartsWith("Khadra.FinancialDocuments.Fonts.", StringComparison.Ordinal))
             .Select(name => name["Khadra.FinancialDocuments.Fonts.".Length..])
             .Order(StringComparer.Ordinal);
-        var named = NoticeRow().Matches(File.ReadAllText(Path.Combine(shipped, "FONTS.md"))).Select(match => match.Groups["file"].Value).Order(StringComparer.Ordinal);
+        var named = NoticeRow().Matches(ReadNotice(Path.Combine(shipped, "FONTS.md"))).Select(match => match.Groups["file"].Value).Order(StringComparer.Ordinal);
         Assert.Equal(named, embedded);
     }
 
@@ -135,6 +135,14 @@ public sealed partial class FontLicenceTests
 
         return names;
     }
+
+    /// <summary>A notice's text with its line endings as LF, whichever the checkout wrote.</summary>
+    /// <remarks>
+    /// The row pattern anchors on `$`, which in a multiline .NET regex stops before `\n` and not before `\r`. A Windows
+    /// checkout with `core.autocrlf=true` writes the notice in CRLF, every row then ended in `\r`, and the tests found no
+    /// rows at all. The notice's content is what is under test, never the line endings it was checked out with.
+    /// </remarks>
+    private static string ReadNotice(string path) => File.ReadAllText(path).ReplaceLineEndings("\n");
 
     [GeneratedRegex(
         @"^\| `(?<file>[^`]+\.ttf)` \| (?<name>[^|]+?) \| (?<version>[^|]+?) \| (?<copyright>[^|]+?) \| (?<licence>[^|]+?) \| `(?<hash>[0-9a-f]{64})` \|$",

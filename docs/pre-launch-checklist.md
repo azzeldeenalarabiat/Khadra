@@ -4092,7 +4092,7 @@ Polish Wave 7; reaches phones with app 1.4.0)
 timeout that may have reached the server. Not after a timeout spent connecting (`ApiFailure.neverConnected`): that
 request never reached the server. A 401, a 5xx, a 429 and a dropped connection are presented once, as before. One
 correction to the text below, from `RefreshTokensHandler`: an in-grace retry is handed a NEW pair, and the winner's
-replacement is retired, not given back. Item 240 records the one case the retry cannot save.
+replacement is retired, not given back. Item 240 closed the case where the retry raced the first attempt and lost: the loser is told to try again (503), never that the session is over.
 
 `SessionController.refresh` correctly treats a transport failure as "not a verdict" and returns
 false without ending the session. But the rotation may well have REACHED the server and had its
@@ -6300,19 +6300,46 @@ would reach asks what 1.3.0 cannot answer.
 
 ### 240. Two presentations of one refresh token that arrive together can end a live session
 
-**Status:** open · **Raised:** 2026-10-10 (Fable advisor's review of Fix & Polish Wave 7's session changes)
+**Status:** closed · **Raised:** 2026-10-10 (Fable advisor's review of Fix & Polish Wave 7's session changes) ·
+**Closed:** 2026-10-10 (Fix & Polish Wave 7, server only: every installed build has it once the API is deployed)
 
-`RefreshTokensHandler` turns the loser of a concurrent rotation of the same token into a 401
-(`ConcurrencyConflictException`, `auth.invalid_refresh_token`), and its own comment expects the client to retry and be
-handed the winner's replacement inside the grace. The app treats every 401 from the refresh endpoint as a verdict, and
-the two codes are the same, so it cannot tell. It is reachable whenever both presentations are inside the handler at
-once: a stalled database, or a cold host that queued two requests and then ran them together (Render does this after
-a 25-second receive timeout). Since Wave 7 the app presents at most twice, and only after a timeout (item 128). If
-the first attempt is still in the handler when the retry lands, the retry loses and the session ends with its family
-alive and an unused replacement. Before Wave 7 the same lost answer ended the session at the next rotation anyway.
-**To close, on the server (no contract change, no minimum):** in the conflict's catch, clear the change tracker,
-re-read the token and answer through `RetryOrRevokeFamilyAsync`. The winner has committed, so the grace path hands
-the loser the replacement as a 200. With a test in `SessionHandlerTests`.
+`RefreshTokensHandler` turned the loser of a concurrent rotation of the same token into a 401
+(`ConcurrencyConflictException`, `auth.invalid_refresh_token`), and its own comment expected the client to retry. The
+app treats every 401 from the refresh endpoint as a verdict and never presents again after one, and the BFFs sign
+out on it, so a loser whose answer the client was waiting for ended a live family. It is reachable whenever both
+presentations are inside the handler at once: a stalled database, or a cold host that queued two requests and then
+ran them together, which Render does after a 25-second receive timeout. The app's second presentation after a
+timeout (item 128) and app 1.3.0's cold-start race (item 95) are two such clients.
+
+**What shipped.** The loser is answered **503 `auth.refresh_conflict`** (`IdentityErrors.RefreshRaceLost`,
+`ErrorKind.Unavailable`). Nothing is revoked, the winner's replacement stands, and the refused rotation is discarded
+(`DiscardChanges`). The same answer covers two in-grace retries that race, because the conflict is caught where both
+issue. Every app build since 2026-09-08 (1.1.0 and later) takes a 5xx as a network event and keeps the token it
+holds: the winner's replacement if the winner's answer reached it, and otherwise the old token, which the reuse grace
+redeems on its next rotation. In practice that comes at once, from the interceptor's own 401 path. The BFFs end the
+browser session on the 503 exactly as they did on the 401, so they are no worse off. A 401 from the endpoint still
+means what it meant. No contract change an installed build would misread, so no minimum.
+
+**Rejected: handing the loser a fresh pair through the reuse grace** (the first suggestion). The server cannot tell
+which of the two answers the client will consume. The grace path retires the winner's unused replacement, so when the
+client is listening to the WINNER — app 1.4.0's retry winning while the abandoned first attempt loses, or 1.3.0's
+restore and interceptor both consuming their answers — it would retire the very token the client was just handed.
+Its next rotation, a quarter of an hour later and outside the grace, would be a replay that revokes the family: a
+silent, delayed sign-out, worse than the immediate one.
+
+**Residual, the same bound as any lost response:** a client that was listening to the loser and does not present
+again within `RefreshReuseGrace` (60 s) is a replay when it does. Widening the grace is a security dial, not a fix.
+
+**Proved by:**
+- `RefreshTokensHandlerTests`: the direct path and the in-grace path, each answered `auth.refresh_conflict` with
+  the family untouched. A guard checks that the loser issues and retires nothing.
+- `RefreshRaceTests`: the real endpoint answers 503 with the code. Both of these failed on the old code.
+- `session_robustness_test` (128-C): the app keeps its session and its token on that 503.
+- `PostgresRefreshRaceTests`: two rotations of one row commit once and conflict once on `xmin`. It is opt-in
+  under `KHADRA_TEST_POSTGRES`, NOT run on the machine that wrote it; run it in the Staging preflight.
+
+**Operations:** these 503s appear in the API's access log and on any error-rate view. They are rare and expected,
+not an outage.
 
 ### 241. A garbled answer to the cold-start rotation signs the customer out
 
@@ -6336,10 +6363,13 @@ correction on the website, from the `Date` of its own same-origin BFF answers.
 
 ### 243. The website's range wording for a cancellation penalty still promises nothing is charged
 
-**Status:** open, unreachable today · **Raised:** 2026-10-10 (Fix & Polish Wave 7, while replacing item 208's wording)
+**Status:** deferred by the owner (2026-10-10) until penalty ranges are a real customer-visible feature · **Raised:**
+2026-10-10 (Fix & Polish Wave 7, while replacing item 208's wording)
 
 `cancel.penaltyRange` — shown on the website's cancel sheet only when the penalty is a range — still reads
 "Cancelling now assesses between {min} and {max} against you. Nothing is charged unless a dispute is opened and
 settled.", the promise item 208 removed. A customer's cancellation penalty is the whole deposit today, never a range,
-so nobody reads it, and the app has no range variant. **To close, before any customer penalty can be a range:** the
-owner words it in both languages, as for item 208.
+so nobody reads it, and the app has no range variant. **Deliberately not worded now (owner, 2026-10-10):** no
+sentence is invented for a case no customer can reach, and the old one stays where it is until then. **To close, in
+the change that first makes a customer penalty a range:** the owner words it in both languages, as for item 208, and
+the app gains the same range variant.

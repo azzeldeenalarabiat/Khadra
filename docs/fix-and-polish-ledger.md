@@ -73,17 +73,30 @@ its final working tree:
 
 ### Wave 7 final regression on `fix/polish-wave7` (2026-10-10)
 
-Wave 7 starts at `59abeff`, the end of Wave 6. It is the customer-app release, 1.4.0+7, and carries pre-launch items 95,
-101, 103, 126, 127, 128, 151, 208, 225 and 238, the 1.4.0 app-change ledger (section 3) and the owner's 208 and F26
-wording. It was measured on a Windows worktree, `core.autocrlf=true`, with the working files in CRLF, and every failure
-listed below comes from that alone:
+Wave 7 starts at `59abeff`, the end of Wave 6. It is the customer-app release, 1.4.0+7, and carries:
+- pre-launch items 95, 101, 103, 126, 127, 128, 151, 208, 225, 238 and 240;
+- the 1.4.0 app-change ledger (section 3);
+- the owner's 208 and F26 wording.
+
+It was measured on a Windows worktree with `core.autocrlf=true`, its working files in CRLF, with no file converted
+first:
 
 | Suite | Result |
 |---|---|
-| Backend: `dotnet test Khadra.slnx`, run alone, WITHOUT `KHADRA_TEST_POSTGRES` | 3,118 passed, 65 skipped (the opt-in PostgreSQL proofs), 5 failed: `FontLicenceTests`, whose notice regex does not match a CRLF `FONTS.md`. All 6 pass with the two notices in LF; neither the notices nor the test changed since `59abeff` |
-| Website: `ng test` · production build | 59 files, 384 tests: 382 passed, 2 failed (`site-header.component.spec.ts`, F92, which looks for `\n.site-drawer {\n` in a CRLF `_layout.scss`; 6 of 6 pass with it in LF; unchanged since Wave 6) · production build clean |
-| App: `flutter analyze` · `flutter test` · `flutter build web --release` | no issues · 888 passed · built. No Android release APK: signing waits on item 134 |
+| Backend: `dotnet test Khadra.slnx`, run alone, without `KHADRA_TEST_POSTGRES` | 3,126 passed, 0 failed, 66 skipped. The skips are the opt-in PostgreSQL proofs, the new `PostgresRefreshRaceTests` included |
+| Website: `ng test` · production build | 59 files, 384 passed, 0 failed · clean. One earlier full run timed out a single test at 5 s under memory pressure; it passed alone and in the full rerun |
+| App: `flutter analyze` · `flutter test` · `flutter build web --release` | no issues · 889 passed · built. No Android release APK: signing waits on the owner's key backup (item 134) |
 | Console | not run: no file under `Khadra.Dashboard/` changed |
+
+**CRLF failures, resolved.** Two suites failed only because this checkout writes CRLF:
+- `FontLicenceTests`: the notice regex anchors on `$`, which stops before `\n` and not before `\r`.
+- `site-header.component.spec.ts`: it looks for `\n.site-drawer {\n`.
+
+A `.gitattributes` was evaluated and not taken. Every text file in the index is already LF, so it would have
+produced no normalization diff. But an attribute applies only when git next writes a file. A file left unchanged by a
+checkout keeps its CRLF working copy, so this checkout and every existing one would have kept failing until re-checked
+out by hand. Each test now reads its file with the line endings as LF instead (`ReadNotice`; `.replace(/\r\n/g,
+'\n')`). Nothing is skipped or loosened, and both pass on CRLF and on LF.
 
 ## 2. Contract ledger — what the API serves or accepts
 
@@ -155,6 +168,7 @@ Waves 1 to 6 (decision D6). Wave 7 raises it to 1.4.0; the phone used for its ch
 | 7 | Consent: `LegalConsentGate` judges a request that declares an app version of 1.4.0 or later, and an app registration from 1.4.0 must carry `acceptedLegalVersions` (items 224, 238). Any declared version used to be exempt | behavioural, bridged | none for 1.3.0 and older: a request declaring a version below 1.4.0 is still spared both (a temporary bridge, item 239) |
 | 7 | A customer's copy of a decided dispute: `retainedByPlatform` and `transferredToDealer` null to a declared 1.4.0 or later, the website and every undeclared caller; `dealerCharge` and `waivesEverything` null to every customer (item 151) | value (null), bridged | none for 1.3.0 and older: still sent the two shares they render; no build renders the other two |
 | 7 | `POST /bookings/{id}/handover-code` refuses a pickup code before `pickupAvailableFrom` and a return code before `returnAvailableFrom`: 409 `booking.pickup_too_early` / `booking.return_too_early` with `availableFrom` (item 225) | behavioural, bridged | none for 1.3.0 and older: still issued a code at any time |
+| 7 | `POST /api/v1/auth/refresh` answers the loser of two simultaneous rotations of one token 503 `auth.refresh_conflict` where it answered 401 `auth.invalid_refresh_token`; nothing is revoked and the winner's replacement stands (item 240) | behavioural | better for every build from 1.1.0: a 5xx is a network event to each, which keeps its token, where the 401 signed it out. The BFFs sign out on it as they did on the 401 |
 | 7 | The tracked `MobileApp:MinimumSupportedVersion` is 1.4.0 (it was 1.1.0) | minimum | wherever the tracked setting is in force, 1.3.0 and older get 426 and the update screen. Publish 1.4.0 first; Staging keeps its own 1.2.0 until the phone check (owner, 2026-10-09) |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
@@ -190,4 +204,4 @@ notes:
   stand-in can reach it.
 
 Beyond the table: the owner's 208 and F26 wording (2026-10-09), and the session's pre-launch items 95, 126, 127 and
-128, with the advisor's further findings on them.
+128, with the advisor's further findings on them, including item 240 on the server.
