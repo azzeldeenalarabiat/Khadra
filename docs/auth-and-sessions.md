@@ -111,6 +111,11 @@ marker, one meaning. Covered by `test/session_store_test.dart`.
 1. `GET /bff/antiforgery` → antiforgery cookie + `XSRF-TOKEN` cookie; Angular sends the value in `X-XSRF-TOKEN` on every mutation.
 2. `POST /bff/login {email, password}` → BFF calls the API, stores tokens in an encrypted Redis ticket, sets the session cookie (Secure, HttpOnly, SameSite=Lax, 8h absolute, 30 min idle).
 3. Proxied `/api/**` requests: YARP strips browser `Cookie`/`Authorization`/XSRF headers, attaches the server-held bearer token, refreshing it single-flight one minute before expiry.
+   - The token is got in the proxy pipeline (`BffProxyAccessToken`), before forwarding, never in YARP's request transform, where an exception becomes a bodiless 502.
+   - **Only the API's own 401 or 403 from the refresh endpoint ends the session** (its ProblemDetails with a code; pre-launch item 246, 2026-10-10). The browser is then answered 401 `bff.session_expired`. Anything else keeps the session and its stored refresh token: a 429, a 5xx, the 503 `auth.refresh_conflict` of a refresh race, a timeout, a dropped connection, a success whose body is not the token pair, or a 401/403 page from an edge in front of the API.
+   - The browser is then answered 503 `bff.session_refresh_unavailable`, with the API's `Retry-After` where it gave one. The failed attempt is not remembered by the single flight, so the next request refreshes again.
+   - The website and the console send a person to sign-in only on a 401, so a 503 reaches the screen as an ordinary retryable error.
+   - The customer app has kept the same rule since 1.1.0.
 4. `POST /bff/logout` revokes the API family and deletes the ticket. `GET /bff/user` returns the session user.
 5. Anonymous API routes proxied without a session: register, verify-email, resend-verification, forgot-password, reset-password.
 

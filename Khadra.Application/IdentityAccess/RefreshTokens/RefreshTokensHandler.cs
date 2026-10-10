@@ -164,7 +164,7 @@ public sealed class RefreshTokensHandler(
             // It is told to try again (503). Every app build takes that as a network event and keeps
             // the token it holds: the winner's replacement, if the winner's answer reached it, and
             // otherwise the old token, which the reuse grace above redeems on its next rotation. The
-            // BFFs end the browser session on it exactly as they did on the 401, no worse off.
+            // BFFs keep the browser session and tell it to retry (503; pre-launch item 246).
             //
             // Not a fresh pair through that grace path, here and now: when the client is listening to
             // the WINNER, that would retire the replacement it was just handed, and its next rotation

@@ -57,8 +57,23 @@ internal sealed partial class AuthApiClient(
 
         if (response.IsSuccessStatusCode)
         {
-            var tokens = await response.Content.ReadFromJsonAsync<ApiAuthTokens>(cancellationToken);
-            return new AuthApiResult(tokens, response.StatusCode, null);
+            ApiAuthTokens? tokens = null;
+            try
+            {
+                tokens = await response.Content.ReadFromJsonAsync<ApiAuthTokens>(cancellationToken);
+            }
+            catch (Exception error) when (error is JsonException or NotSupportedException)
+            {
+                // Not the token pair: a proxy's page, an empty or truncated body. NotSupportedException is what
+                // ReadFromJsonAsync throws for a body that is not JSON at all (text/html, no content type).
+            }
+
+            // A success that carried no tokens is a broken hop, not an answer: reported as a bad gateway so no caller
+            // mistakes it for a refusal (pre-launch item 246). JSON without the two tokens is not the pair either: it
+            // deserialises into one whose tokens are null, which would otherwise be installed as the session's.
+            return tokens is null || string.IsNullOrEmpty(tokens.AccessToken) || string.IsNullOrEmpty(tokens.RefreshToken)
+                ? new AuthApiResult(null, HttpStatusCode.BadGateway, null)
+                : new AuthApiResult(tokens, response.StatusCode, null);
         }
 
         ApiProblem? problem = null;
@@ -66,9 +81,10 @@ internal sealed partial class AuthApiClient(
         {
             problem = await response.Content.ReadFromJsonAsync<ApiProblem>(cancellationToken);
         }
-        catch (JsonException)
+        catch (Exception error) when (error is JsonException or NotSupportedException)
         {
-            // Non-JSON error body (e.g. a proxy page); fall through with a generic problem.
+            // Not the API's ProblemDetails (a proxy page, a plain-text 429 from the edge): no problem, and callers
+            // treat its absence as "not the API's own verdict".
         }
 
         return new AuthApiResult(null, response.StatusCode, problem, RetryAfterOf(response));
@@ -132,11 +148,14 @@ internal sealed record AuthApiResult(
     /// Relays the API's Retry-After onto the BFF's own answer, in whole seconds and never below one,
     /// the form the API itself sends.
     /// </summary>
-    public void CopyRetryAfterTo(HttpResponse response)
+    public void CopyRetryAfterTo(HttpResponse response) => WriteRetryAfter(response, RetryAfter);
+
+    /// <summary>Writes <paramref name="wait"/> as a Retry-After in whole seconds, never below one; nothing when null.</summary>
+    internal static void WriteRetryAfter(HttpResponse response, TimeSpan? wait)
     {
-        if (RetryAfter is not { } wait)
+        if (wait is not { } value)
             return;
-        var seconds = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds));
+        var seconds = Math.Max(1, (int)Math.Ceiling(value.TotalSeconds));
         response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 }

@@ -216,7 +216,7 @@ builder.Services.AddReverseProxy()
         if (isFrontendRoute && !isAnonymousRoute)
             throw new InvalidOperationException("A route to the renderer must be Anonymous: pages are public, and the session never leaves this BFF.");
 
-        transformBuilder.AddRequestTransform(async transform =>
+        transformBuilder.AddRequestTransform(transform =>
         {
             // The browser never chooses the API identity, and is never the customer app: its credentials and the app's
             // version header go (Wave 4, W4-8), on every route, anonymous ones included, before the early return below.
@@ -244,11 +244,12 @@ builder.Services.AddReverseProxy()
             }
 
             if (isAnonymousRoute)
-                return;
+                return ValueTask.CompletedTask;
 
-            var tokens = transform.HttpContext.RequestServices.GetRequiredService<BffAccessTokenService>();
-            var accessToken = await tokens.GetAccessTokenAsync(transform.HttpContext, transform.HttpContext.RequestAborted);
-            transform.ProxyRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            // Got in the proxy pipeline (BffProxyAccessToken.AcquireAsync), never here: an exception thrown in a
+            // transform is turned by YARP into a bodiless 502 that the exception handler never sees (item 246).
+            BffProxyAccessToken.AttachTo(transform.HttpContext, transform.ProxyRequest);
+            return ValueTask.CompletedTask;
         });
 
         // The API says 401 on a proxied call when the bearer token it was given is no longer good:
@@ -650,6 +651,10 @@ app.MapReverseProxy(proxyPipeline =>
 
         await next();
     });
+
+    // The session's API token, refreshed here if due, before forwarding starts: a refusal reaches the exception
+    // handler as 401 and a passing failure as 503 to retry (pre-launch item 246). The transform only attaches it.
+    proxyPipeline.Use(BffProxyAccessToken.AcquireAsync);
 }).RequireAuthorization();
 
 // Static: serves the built Angular dashboard from wwwroot in production; in development ng serve

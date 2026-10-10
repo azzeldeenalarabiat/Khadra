@@ -6316,8 +6316,9 @@ timeout (item 128) and app 1.3.0's cold-start race (item 95) are two such client
 (`DiscardChanges`). The same answer covers two in-grace retries that race, because the conflict is caught where both
 issue. Every app build since 2026-09-08 (1.1.0 and later) takes a 5xx as a network event and keeps the token it
 holds: the winner's replacement if the winner's answer reached it, and otherwise the old token, which the reuse grace
-redeems on its next rotation. In practice that comes at once, from the interceptor's own 401 path. The BFFs end the
-browser session on the 503 exactly as they did on the 401, so they are no worse off. A 401 from the endpoint still
+redeems on its next rotation. In practice that comes at once, from the interceptor's own 401 path. The BFFs ended the
+browser session on the 503 exactly as they did on the 401 (no worse off); since item 246 they keep it and answer the
+browser 503 to retry. A 401 from the endpoint still
 means what it meant. No contract change an installed build would misread, so no minimum.
 
 **Rejected: handing the loser a fresh pair through the reuse grace** (the first suggestion). The server cannot tell
@@ -6427,8 +6428,47 @@ changes, so it needs no raised minimum.
 
 ### 246. The BFFs sign a person out when a token refresh fails for any reason, not only when it is refused
 
-**Status:** open, a reliability fix approved by the owner after Wave 7's timed Staging checks (2026-10-10) ·
-**Raised:** 2026-10-10 (Wave 7 Staging verification, item 10)
+**Status:** fixed (2026-10-10, `fix/polish-wave7`, after the timed Staging checks); deploys with the next Staging BFF
+releases (`khadra-bff-staging`, `khadra-customer-staging`) · **Raised:** 2026-10-10 (Wave 7 Staging verification,
+item 10)
+
+**Fixed** (after the Fable advisor's review, "sound with changes", all applied):
+- `BffAccessTokenService` now tells a refresh outcome three ways:
+  - new tokens;
+  - a **refusal**, which signs the cookie out as before. That means a 401 or 403 **that is the API's own answer**,
+    its ProblemDetails with a code. A 401/403 page from an edge in front of the API is not one: the refresh is
+    server to server through the same edge as everyone's, and a firewall's 403 read as a refusal would sign every
+    session out.
+  - **unavailable**: anything else, any exception from the call, or a 2xx that is not the token pair. The cookie and
+    its stored refresh token are kept.
+- `AuthApiClient` no longer throws on a body that is not JSON (`NotSupportedException` on `text/html`, `text/plain`
+  or no content type), on a success or an error. A 2xx without both tokens is reported as a 502.
+- **The token is now got in the proxy pipeline** (`BffProxyAccessToken.AcquireAsync`), no longer in YARP's request
+  transform, which only attaches it. YARP 2.3 turns any exception thrown in a request transform into a bodiless 502
+  that the exception handler never sees.
+  - So until this fix a REFUSED refresh also reached the browser as 502, not 401, since the bootstrap; the website
+    and the console reached sign-in only on the following call.
+  - Now a refusal is 401 `bff.session_expired`, and a passing failure is 503 `bff.session_refresh_unavailable` with
+    the API's `Retry-After`. It is logged as a warning naming the status, the API's code and any exception type.
+- The single flight drops an unavailable or faulted attempt (only that entry), so the next request asks the API
+  again. Requests already waiting on that attempt share its answer.
+- The website and the console redirect to sign-in only on a 401 (`api.interceptor.ts`,
+  `session-expired.interceptor.ts`), so they need no change: a 503 reaches the screen as a retryable error.
+- Docs: `auth-and-sessions.md`; the item 240 notes here, in the ledger and in `RefreshTokensHandler`.
+
+**Tests:** `BffSessionRefreshTests`, 21 cases beside the 4 login tests.
+- The API's 401/403 ends the session.
+- Each of these keeps it, with the refresh token unchanged: a 429 as JSON and as plain text, 500, an HTML 502, 503
+  `auth.refresh_conflict`, 504 with no body, an edge's HTML 403, and a 401 with no body.
+- A 2xx that is not the pair (HTML, JSON without tokens, empty), a dropped connection and a timeout all keep it.
+- The wait and the code travel.
+- After a failure the next request asks again and succeeds.
+- Two requests waiting on one failed attempt make one API call, and the next request makes a second.
+- Through the real YARP forwarder on a test server: 503 with `Retry-After` for a passing failure, 401 for a refusal
+  (nothing forwarded in either case), and the refreshed token as the forwarded bearer.
+
+With the old status rule put back, seven tests failed. With the token got in the transform again, the browser received
+502 for both a passing failure and a refusal.
 
 When the access token is near expiry, a BFF refreshes it server-side (`Khadra.Bff/Security/BffAccessTokenService.cs`).
 `RefreshCoreAsync` returns `AuthApiClient.RefreshAsync(...).Tokens`, which is null for EVERY unsuccessful answer, and a
