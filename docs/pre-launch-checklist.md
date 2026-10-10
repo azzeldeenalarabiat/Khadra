@@ -6407,3 +6407,34 @@ No customer client reads it: neither the app nor the website; only the console's
 withhold it from every customer-facing answer (the booking detail and the dispute copy) with regression tests, and
 prove the dealer and admin consoles still receive the staff identity they need. Nothing an installed app reads
 changes, so it needs no raised minimum.
+
+### 246. The BFFs sign a person out when a token refresh fails for any reason, not only when it is refused
+
+**Status:** open, a reliability fix approved by the owner after Wave 7's timed Staging checks (2026-10-10) ·
+**Raised:** 2026-10-10 (Wave 7 Staging verification, item 10)
+
+When the access token is near expiry, a BFF refreshes it server-side (`Khadra.Bff/Security/BffAccessTokenService.cs`).
+`RefreshCoreAsync` returns `AuthApiClient.RefreshAsync(...).Tokens`, which is null for EVERY unsuccessful answer, and a
+null signs the cookie out (`SignOutAsync`, "The session refresh was rejected"). So the session ends on a 429, a 5xx, the
+Wave 7 `503 auth.refresh_conflict` (item 240), or a timeout, exactly as on a definite refusal. Unchanged since the
+bootstrap (`a1a5fba`, split into two deployments in `4897c63`); it affects the customer website and the staff console
+alike. The customer app has the right rule: only a 401 or 403 from the refresh endpoint ends its session.
+
+Seen live on Staging on 2026-10-10:
+- 17:28:32: the customer BFF woke from sleep.
+- 17:28:38: it refreshed a signed-in website session; the call reached the API while that was still asleep, and
+  Render answered **429**.
+- The BFF ended the session. The customer next found the site on its sign-in page with `reason=ended`.
+
+On Production, with no sleeping services, the same happens on a 5xx during a deploy, a timeout, the API's own rate
+limit, or a refresh race.
+
+**Expected behaviour (owner, 2026-10-10):** end the session only on a definitive authentication failure, a 401 or
+403 from the refresh endpoint. Temporary failures (429, 5xx, 503 `auth.refresh_conflict`, a timeout or a dropped
+connection) keep the session and its stored refresh token.
+
+**To close:**
+- The request that needed the token gets a retryable answer: 503 with `Retry-After` where the API gave one.
+- The single-flight result for that refresh token is not cached as a failure, so the next request can retry.
+- Tests cover each status (401/403 end it; 429, 500, 503 and a timeout keep it, and a later refresh succeeds).
+- Check that the website and the console show "try again" rather than the sign-in page for a 503 from the BFF.
